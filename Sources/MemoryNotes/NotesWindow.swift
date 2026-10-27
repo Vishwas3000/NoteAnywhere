@@ -62,11 +62,14 @@ private struct NotesBrowser: View {
         } detail: {
             if let id = selection, let note = model.notes.first(where: { $0.id == id }) {
                 VStack(alignment: .leading, spacing: 8) {
-                    if note.kind == .url {
-                        TextField("Site or page, e.g. github.com or github.com/vercel/next.js", text: targetBinding(id))
-                            .textFieldStyle(.roundedBorder)
-                    } else {
-                        Text("\(note.label) — \(note.target)").foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        NoteIcon(note: note, size: 24)
+                        if note.kind == .url {
+                            TextField("Site or page, e.g. github.com or github.com/vercel/next.js", text: targetBinding(id))
+                                .textFieldStyle(.roundedBorder)
+                        } else {
+                            Text("\(note.label) — \(note.target)").foregroundStyle(.secondary)
+                        }
                     }
                     TextEditor(text: model.binding(id, \.text)).font(.body)
                     HStack {
@@ -85,9 +88,12 @@ private struct NotesBrowser: View {
     }
 
     private func row(_ note: Note, title: String) -> some View {
-        VStack(alignment: .leading) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(note.text.split(separator: "\n").first.map(String.init) ?? "Empty note").lineLimit(1)
+        HStack(spacing: 8) {
+            NoteIcon(note: note, size: 20)
+            VStack(alignment: .leading) {
+                Text(title).font(.caption).foregroundStyle(.secondary)
+                Text(note.text.split(separator: "\n").first.map(String.init) ?? "Empty note").lineLimit(1)
+            }
         }
         .tag(note.id)
     }

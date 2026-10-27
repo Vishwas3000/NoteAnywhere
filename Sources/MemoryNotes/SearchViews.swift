@@ -21,7 +21,8 @@ struct SearchResultsView: View {
                             expanded = expanded == hit.note.id ? nil : hit.note.id
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(hit.note.source).font(.caption).foregroundStyle(.secondary)
+                                Label { Text(hit.note.source) } icon: { NoteIcon(note: hit.note, size: 14) }
+                                    .font(.caption).foregroundStyle(.secondary)
                                 Text(hit.note.text.isEmpty ? "Empty note" : hit.note.text).lineLimit(2)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)

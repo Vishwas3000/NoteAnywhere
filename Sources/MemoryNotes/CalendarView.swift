@@ -81,7 +81,10 @@ struct CalendarView: View {
                     .foregroundStyle(today ? Color.white : .primary)
                     .padding(.horizontal, 5)
                     .background(today ? Color.accentColor : .clear, in: Capsule())
-                ForEach(items.prefix(3)) { Text(firstLine($0.note)).font(.caption2).lineLimit(1) }
+                ForEach(items.prefix(3)) { s in
+                    Label { Text(firstLine(s.note)) } icon: { NoteIcon(note: s.note, size: 11) }
+                        .font(.caption2).lineLimit(1)
+                }
                 if items.count > 3 {
                     Text("+\(items.count - 3) more").font(.caption2).foregroundStyle(.secondary)
                 }
@@ -125,7 +128,8 @@ struct CalendarView: View {
 
     private func card(_ s: Snapshot) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(sourceName(s.note)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            Label { Text(sourceName(s.note)) } icon: { NoteIcon(note: s.note, size: 12) }
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             Text(firstLine(s.note)).font(.callout).lineLimit(2)
         }
         .padding(6)
@@ -144,6 +148,7 @@ struct CalendarView: View {
                     HStack {
                         Text(Date(timeIntervalSince1970: s.note.updatedAt / 1000).formatted(date: .omitted, time: .shortened))
                             .monospacedDigit()
+                        NoteIcon(note: s.note, size: 14)
                         Text(sourceName(s.note)).foregroundStyle(.secondary)
                     }
                     .font(.caption)
