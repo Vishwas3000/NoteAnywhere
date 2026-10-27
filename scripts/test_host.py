@@ -33,7 +33,7 @@ assert not call({"op": "nope"})["ok"]
 
 # Every save also writes that day's snapshot for the calendar; delete removes the history.
 import datetime
-day = datetime.datetime.fromtimestamp(2 / 1000).strftime("%Y-%m-%d")
+day = datetime.date.today().isoformat()  # the host stamps updatedAt with "now"
 assert os.path.exists(os.path.join(env["MEMORYNOTES_DIR"], "history", page, day + ".json"))
 
 assert call({"op": "delete", "id": page})["ok"]
