@@ -18,6 +18,7 @@
 | D14 | Search UX: ⌥⇧Space popup, hybrid scoring, host embeds only the query | Claude | Proposed |
 | D15 | Calendar layout details (subagent) | Claude (subagent) | Proposed |
 | D16 | Browser search UX details (subagent) | Claude (subagent) | Proposed |
+| D17 | Browser overlay runs in an isolated extension frame | User | Decided |
 
 ## D1 — Native SwiftUI app via SwiftPM (2026-10-27)
 - **Why:** native floating panels (`NSPanel`, non-activating, over full-screen apps) and frontmost-app tracking
@@ -116,3 +117,14 @@ Made by the subagent that wrote the extension:
 - Search box sits in the panel body (hidden when collapsed). Website results open the site in a new tab;
   app results expand inline. Keystrokes inside the overlay don't reach the page's shortcuts.
 - **Status:** Proposed.
+
+## D17 — Browser overlay in an isolated extension frame (2026-10-28)
+- **Why:** the user's typing went into the site's own text box on several sites. The overlay now lives in
+  `overlay.html` inside an extension iframe, so page scripts never see its keystrokes or styles; `content.js` only
+  places the frame and tracks the URL. Page context reaches the frame via extension messaging, which the page can't forge.
+- **Measured** (Chromium + Playwright, scratch test): a page that redirects every keystroke to its own box no longer
+  gets the overlay's typing (pass 5/5). A page that re-focuses its box on *every* blur still steals focus (fail);
+  a page-side fix isn't possible because the page can't see the pointer enter the frame. Accepted as a known limit.
+- **Also:** delete needs a second click (confirm() is blocked in cross-origin frames).
+- **Rejected:** a key/focus guard script in the page (weaker, and the phase-2 editor needs the frame anyway).
+- **Status:** Decided (user).

@@ -20,6 +20,7 @@ enum NativeHost {
     }
 
     static func run() -> Never {
+        signal(SIGPIPE, SIG_IGN)  // a closed tab mid-reply should fail the write, not kill the process
         let stdin = FileHandle.standardInput
         while true {
             let header = stdin.readData(ofLength: 4)
@@ -29,7 +30,8 @@ enum NativeHost {
             // shortcut: Chrome caps host replies at 1 MB; fine for text notes on one page, paginate if that's ever hit.
             let body = (try? JSONEncoder().encode(reply)) ?? Data(#"{"ok":false,"error":"encode failed"}"#.utf8)
             var size = UInt32(body.count).littleEndian
-            FileHandle.standardOutput.write(Data(bytes: &size, count: 4) + body)
+            // The throwing write: the old write(_:) raises an Objective-C exception (a crash report) if Chrome hung up.
+            do { try FileHandle.standardOutput.write(contentsOf: Data(bytes: &size, count: 4) + body) } catch { exit(0) }
         }
     }
 

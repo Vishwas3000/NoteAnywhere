@@ -7,7 +7,7 @@ Each phase lands as its own commit(s). Decisions behind it are in [DECISIONS.md]
 | 0 | Mac app, per-app overlay, Chrome/Brave extension, Native Messaging bridge | Done |
 | 1a | Calendar: daily snapshots; Month / Week / Day views; filter by app/site | Done |
 | 1b | Semantic search (all-MiniLM-L6-v2 + keyword): main window, ⌥⇧Space popup, Mac overlay, browser overlay | Done |
-| 2 | Shared TipTap editor (Markdown) in the Mac app (WebView) and the browser overlay: formatting, checklists, tables, links between notes | Planned |
+| 2 | Shared TipTap editor (Markdown) in the Mac app (WebView) and the browser overlay: full Markdown (headings, bold/italic/strike, code, quotes, lists, task lists, tables, links, images, rules), links between notes, and an Info panel listing every formatting shortcut | Planned |
 | 3 | Organize: folders, pinned notes, #tags | Planned |
 | 4 | Media: images & files, Notion-style web link previews, sketches, audio + on-device transcript, scan from iPhone | Planned |
 | 5 | Quick Note hotkey, export (Markdown/PDF) & share sheet | Planned |

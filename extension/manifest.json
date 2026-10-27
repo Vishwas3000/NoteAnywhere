@@ -32,5 +32,15 @@
         "default": "Alt+Shift+N"
       }
     }
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "overlay.html"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
 }
