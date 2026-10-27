@@ -1,0 +1,98 @@
+import SwiftUI
+import WebKit
+
+/// The shared Markdown editor (built from editor/, the same one the browser overlay uses) inside a WKWebView.
+/// Falls back to a plain TextEditor if the editor files aren't in the app bundle.
+struct NoteEditor: View {
+    let noteID: String
+    var toolbar = true
+    @ObservedObject private var model = NotesModel.shared
+
+    static let editorDir = Bundle.main.resourceURL?.appendingPathComponent("editor")
+
+    var body: some View {
+        if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
+            EditorWebView(dir: dir, markdown: model.binding(noteID, \.text), toolbar: toolbar)
+                .id(noteID)  // a fresh editor per note keeps undo history per note
+        } else {
+            TextEditor(text: model.binding(noteID, \.text)).font(.body)
+        }
+    }
+}
+
+private struct EditorWebView: NSViewRepresentable {
+    let dir: URL
+    @Binding var markdown: String
+    let toolbar: Bool
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.userContentController.add(context.coordinator, name: "mn")
+        let web = WKWebView(frame: .zero, configuration: config)
+        web.setValue(false, forKey: "drawsBackground")  // transparent, so the panel/window material shows through
+        web.navigationDelegate = context.coordinator
+        web.loadFileURL(dir.appendingPathComponent("editor.html"), allowingReadAccessTo: dir)
+        context.coordinator.web = web
+        return web
+    }
+
+    func updateNSView(_ web: WKWebView, context: Context) {
+        context.coordinator.parent = self
+        context.coordinator.push(markdown)  // e.g. the same note was edited in the browser
+    }
+
+    static func dismantleNSView(_ web: WKWebView, coordinator: Coordinator) {
+        web.configuration.userContentController.removeScriptMessageHandler(forName: "mn")
+    }
+
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+        var parent: EditorWebView
+        weak var web: WKWebView?
+        private var ready = false
+        private var shown: String?  // the Markdown the editor currently holds
+
+        init(_ parent: EditorWebView) { self.parent = parent }
+
+        private func call(_ function: String, _ args: Any...) {
+            guard let json = try? JSONSerialization.data(withJSONObject: args, options: .fragmentsAllowed),
+                  let list = String(data: json, encoding: .utf8) else { return }
+            web?.evaluateJavaScript("MNHost.\(function)(...\(list))")
+        }
+
+        func push(_ markdown: String) {
+            guard ready, markdown != shown else { return }
+            shown = markdown
+            call("set", markdown)
+        }
+
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+            switch type {
+            case "ready":
+                ready = true
+                shown = parent.markdown
+                call("load", parent.markdown, parent.toolbar)
+            case "change":
+                guard let markdown = body["markdown"] as? String else { return }
+                shown = markdown
+                parent.markdown = markdown
+            case "openNote":
+                if let id = body["id"] as? String { NotesModel.shared.openRequest = id }
+            default:
+                break
+            }
+        }
+
+        // Links open in the default browser, never inside the editor.
+        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            if action.navigationType == .linkActivated, let url = action.request.url {
+                NSWorkspace.shared.open(url)
+                return decisionHandler(.cancel)
+            }
+            decisionHandler(.allow)
+        }
+    }
+}

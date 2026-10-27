@@ -1,8 +1,9 @@
+import AppKit
 import SwiftUI
 
 /// What was edited when: month / week / day views over the daily snapshots.
 struct CalendarView: View {
-    enum Mode: String, CaseIterable { case month = "Month", week = "Week", day = "Day" }
+    enum Mode: String, CaseIterable { case day = "Day", week = "Week", month = "Month" }
 
     @ObservedObject private var model = NotesModel.shared
     @State private var mode = Mode.month
@@ -21,29 +22,45 @@ struct CalendarView: View {
 
     var body: some View {
         let days = Dictionary(grouping: model.snapshots.filter { filter.isEmpty || sourceKey($0.note) == filter }, by: \.day)
-        VStack(spacing: 0) {
-            HStack {
-                Picker("View", selection: $mode) {
-                    ForEach(Mode.allCases, id: \.self) { Text($0.rawValue) }
-                }
-                .pickerStyle(.segmented).labelsHidden().fixedSize()
-                Button { step(-1) } label: { Image(systemName: "chevron.left") }.accessibilityLabel("Previous")
-                Button("Today") { date = Date() }
-                Button { step(1) } label: { Image(systemName: "chevron.right") }.accessibilityLabel("Next")
-                Text(title).font(.title3.bold()).lineLimit(1)
-                Spacer()
-                Picker("Show", selection: $filter) {
-                    Text("All notes").tag("")
-                    ForEach(sources, id: \.key) { Text($0.title).tag($0.key) }
-                }
-                .fixedSize()
-            }
-            .padding()
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title).font(.largeTitle.bold()).lineLimit(1).padding([.horizontal, .top]).padding(.bottom, 8)
             Divider()
             switch mode {
             case .month: month(days)
             case .week: week(days)
             case .day: day(days)
+            }
+        }
+        .toolbar {
+            // ⌘-arrows rather than bare arrows, so text fields keep their arrow keys.
+            ToolbarItemGroup(placement: .navigation) {
+                Button { step(-1) } label: { Label("Previous", systemImage: "chevron.left") }
+                    .help("Previous \(mode.rawValue.lowercased()) (⌘←)")
+                    .keyboardShortcut(.leftArrow, modifiers: .command)
+                Button("Today") { date = Date() }
+                    .help("Go to today (⌘T)")
+                    .keyboardShortcut("t", modifiers: .command)
+                Button { step(1) } label: { Label("Next", systemImage: "chevron.right") }
+                    .help("Next \(mode.rawValue.lowercased()) (⌘→)")
+                    .keyboardShortcut(.rightArrow, modifiers: .command)
+            }
+            ToolbarItemGroup {
+                Picker("View", selection: $mode) {
+                    ForEach(Mode.allCases, id: \.self) { Text($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+                .help("Day, week or month")
+                Picker(selection: $filter) {
+                    Label("All Notes", systemImage: "tray.full").tag("")
+                    Divider()
+                    ForEach(sources, id: \.key) { source in
+                        Label { Text(source.title) } icon: { menuIcon(source.note) }.tag(source.key)
+                    }
+                } label: {
+                    Label("Show", systemImage: "line.3.horizontal.decrease.circle")
+                }
+                .pickerStyle(.menu)
+                .help("Show notes from one app or site")
             }
         }
     }
@@ -141,7 +158,8 @@ struct CalendarView: View {
     private func day(_ days: [String: [Snapshot]]) -> some View {
         let items = days[key(date)] ?? []
         if items.isEmpty {
-            Text("Nothing edited on this day").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+            ContentUnavailableView("Nothing Edited", systemImage: "calendar",
+                                   description: Text("Notes you edit on this day appear here."))
         } else {
             List(items) { s in
                 VStack(alignment: .leading, spacing: 4) {
@@ -174,13 +192,22 @@ struct CalendarView: View {
     }
 
     /// One filter entry per app/site that has history; the newest label wins.
-    private var sources: [(key: String, title: String)] {
+    private var sources: [(key: String, title: String, note: Note)] {
         var seen = Set<String>()
-        return model.snapshots.reversed().compactMap { s -> (key: String, title: String)? in
+        return model.snapshots.reversed().compactMap { s -> (key: String, title: String, note: Note)? in
             guard seen.insert(sourceKey(s.note)).inserted else { return nil }
-            return (sourceKey(s.note), (s.note.kind == .app ? "App · " : "Site · ") + sourceName(s.note))
+            return (sourceKey(s.note), (s.note.kind == .app ? "App · " : "Site · ") + sourceName(s.note), s.note)
         }
         .sorted { $0.title < $1.title }
+    }
+
+    /// Menus draw only plain images, so the app/site icon goes in as a small NSImage rather than a NoteIcon view.
+    private func menuIcon(_ note: Note) -> Image {
+        guard let icon = IconStore.shared.icon(for: note)?.copy() as? NSImage else {
+            return Image(systemName: note.kind == .app ? "app.dashed" : "globe")
+        }
+        icon.size = NSSize(width: 14, height: 14)
+        return Image(nsImage: icon)
     }
 
     private func step(_ n: Int) {

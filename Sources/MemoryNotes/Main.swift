@@ -27,8 +27,50 @@ struct MemoryNotesApp: App {
         Window("MemoryNotes", id: "notes") {
             NotesWindow()
         }
+        .defaultSize(width: 960, height: 640)
+        .commands { NotesCommands() }
+
+        Window("Keyboard Shortcuts", id: "shortcuts") {
+            ShortcutsView()
+        }
+        .defaultSize(width: 480, height: 560)
+
         MenuBarExtra("MemoryNotes", systemImage: "note.text") {
             MenuContent(overlay: delegate.overlay)
+        }
+    }
+}
+
+private struct NotesCommands: Commands {
+    @FocusedValue(\.windowActions) private var actions
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button("New Website Note") { actions?.newWebsiteNote() }
+                .keyboardShortcut("n")
+                .disabled(actions == nil)
+        }
+        CommandGroup(after: .textEditing) {
+            Button("Find Notes") { actions?.findNotes() }
+                .keyboardShortcut("f")
+                .disabled(actions == nil)
+        }
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            // Always asks for confirmation, since ⌘⌫ is also "delete to line start" while typing.
+            Button("Delete Note…") { actions?.deleteSelected?() }
+                .keyboardShortcut(.delete)
+                .disabled(actions?.deleteSelected == nil)
+        }
+        CommandGroup(before: .toolbar) {
+            Button("Notes") { actions?.show(.notes) }.keyboardShortcut("1")
+            Button("Calendar") { actions?.show(.calendar) }.keyboardShortcut("2")
+            Divider()
+        }
+        CommandGroup(replacing: .help) {
+            Button("Keyboard Shortcuts") { openWindow(id: "shortcuts") }
+                .keyboardShortcut("/", modifiers: [.command, .shift])
         }
     }
 }
@@ -39,9 +81,14 @@ private struct MenuContent: View {
 
     var body: some View {
         Button("Show/Hide Overlay") { overlay.toggle() }
-        Button("Search Notes  ⌥⇧Space") { SearchPopup.shared.toggle() }
+        Button("Search Notes") { SearchPopup.shared.toggle() }
+            .keyboardShortcut(.space, modifiers: [.option, .shift])  // shows the glyphs; the Carbon hotkey does the work
         Button("Open Notes") {
             openWindow(id: "notes")
+            NSApp.activate()
+        }
+        Button("Keyboard Shortcuts") {
+            openWindow(id: "shortcuts")
             NSApp.activate()
         }
         Divider()

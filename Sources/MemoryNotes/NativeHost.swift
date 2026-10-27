@@ -53,7 +53,7 @@ enum NativeHost {
             switch req.op {
             case "list":
                 let url = req.url ?? ""
-                return Reply(notes: NoteStore.loadAll().filter { $0.matches(url: url) })
+                return Reply(notes: NoteStore.notes(under: url))
             case "save":
                 // The browser may only write website notes, never app notes.
                 guard var note = req.note, note.kind == .url, !note.target.isEmpty else {

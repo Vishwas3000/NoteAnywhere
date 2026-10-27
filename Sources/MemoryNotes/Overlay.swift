@@ -15,8 +15,9 @@ final class OverlayController {
         // Non-activating: typing in the panel doesn't steal "frontmost" from the app the notes are about.
         let panel = OverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 340),
-            styleMask: [.titled, .closable, .resizable, .utilityWindow, .nonactivatingPanel],
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered, defer: false)
+        panel.makeFloating()
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false  // MemoryNotes is almost never the active app
@@ -48,15 +49,46 @@ final class OverlayController {
     }
 }
 
+extension NSPanel {
+    /// Borderless-looking panel: glass/material content shows through, only the close button stays (where present).
+    func makeFloating() {
+        titlebarAppearsTransparent = true
+        titleVisibility = .hidden
+        isMovableByWindowBackground = true
+        backgroundColor = .clear
+        isOpaque = false
+        for button in [NSWindow.ButtonType.miniaturizeButton, .zoomButton] { standardWindowButton(button)?.isHidden = true }
+    }
+}
+
+extension View {
+    /// Liquid Glass on macOS 26, a material before that.
+    @ViewBuilder
+    func floatingBackground() -> some View {
+        if #available(macOS 26, *) {
+            glassEffect(.regular, in: .rect(cornerRadius: 16))
+        } else {
+            background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        }
+    }
+}
+
 struct OverlayView: View {
     @ObservedObject private var model = NotesModel.shared
     @State private var query = ""
+    @State private var pendingDelete: Note?
 
     var body: some View {
         if let app = model.frontApp, let id = app.bundleIdentifier {
             let name = app.localizedName ?? id
             VStack(alignment: .leading, spacing: 8) {
-                TextField("Search all notes…", text: $query)
+                HStack(spacing: 6) {
+                    if let icon = app.icon { Image(nsImage: icon).resizable().frame(width: 18, height: 18) }
+                    Text(name).font(.headline).lineLimit(1)
+                    Spacer()
+                }
+                .padding(.leading, 20)  // clear of the close button in the transparent title bar
+                TextField("Search all notes", text: $query, prompt: Text("\(Image(systemName: "magnifyingglass")) Search all notes"))
                     .textFieldStyle(.roundedBorder)
                     .onExitCommand { query = "" }
                 if !query.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -66,27 +98,43 @@ struct OverlayView: View {
                         VStack(spacing: 8) {
                             ForEach(model.notes(forApp: id)) { note in
                                 HStack(alignment: .top, spacing: 4) {
-                                    TextEditor(text: model.binding(note.id, \.text))
-                                        .font(.body)
-                                        .frame(height: 90)
-                                        .scrollContentBackground(.hidden)
+                                    NoteEditor(noteID: note.id, toolbar: false)
+                                        .frame(height: 110)
                                         .padding(4)
                                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                                    Button { model.delete(note.id) } label: { Image(systemName: "trash") }
+                                        .accessibilityLabel("Note for \(name)")
+                                    Button {
+                                        if note.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                            model.delete(note.id)
+                                        } else {
+                                            pendingDelete = note
+                                        }
+                                    } label: { Image(systemName: "trash") }
                                         .buttonStyle(.borderless)
                                         .help("Delete note")
+                                        .accessibilityLabel("Delete note")
                                 }
                             }
                         }
                     }
-                    Button("+ Note for \(name)") { model.add(kind: .app, target: id, label: name) }
+                    Button { model.add(kind: .app, target: id, label: name) } label: {
+                        Label("New Note for \(name)", systemImage: "plus")
+                    }
                 }
             }
             .padding(10)
             // The hosting view sizes the panel to this; without it the ScrollView collapses to zero height.
-            .frame(minWidth: 240, idealWidth: 300, minHeight: 160, idealHeight: 320)
+            .frame(minWidth: 240, idealWidth: 300, minHeight: 160, idealHeight: 320, alignment: .top)
+            .floatingBackground()
+            .confirmationDialog("Delete this note?", isPresented: Binding(
+                get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
+            ), presenting: pendingDelete) { note in
+                Button("Delete", role: .destructive) { model.delete(note.id) }
+            } message: { _ in
+                Text("This can't be undone.")
+            }
         } else {
-            Text("Switch to an app to see its notes.").padding()
+            Text("Switch to an app to see its notes.").padding().floatingBackground()
         }
     }
 }

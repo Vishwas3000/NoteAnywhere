@@ -1,0 +1,90 @@
+// Runs the built bundle in happy-dom and checks Markdown round-trips and list keyboard behavior.
+import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
+import { Window } from "happy-dom";
+
+// Only our own build is evaluated; `npm test` runs node with --disallow-code-generation-from-strings, which also
+// proves the bundle needs no eval (CSP-safe for the extension and the app's WebView).
+const window = new Window({ settings: { enableJavaScriptEvaluation: true, suppressInsecureJavaScriptEnvironmentWarning: true } });
+window.eval(readFileSync("dist/mn-editor.js", "utf8"));
+const { MNEditor, document } = window;
+assert.ok(MNEditor?.mount, "bundle exposes window.MNEditor.mount");
+
+let failed = 0;
+function check(name, fn) {
+  try { fn(); console.log("ok  ", name); } catch (e) { failed++; console.log("FAIL", name, "\n    ", e.message.split("\n").join("\n     ")); }
+}
+function mount(markdown, extra = {}) {
+  const el = document.createElement("div");
+  document.body.append(el);
+  return MNEditor.mount(el, { markdown, ...extra });
+}
+const roundTrip = (md) => assert.equal(mount(md).getMarkdown().trim(), md);
+// Put the cursor at the end of the first text node containing `text`, then press `key` like a user would.
+function press(ed, text, key, shift = false) {
+  const { state } = ed.editor;
+  let at = -1;
+  state.doc.descendants((node, pos) => { if (at < 0 && node.isText && node.text.includes(text)) at = pos + node.text.indexOf(text) + text.length; });
+  assert.ok(at >= 0, `found "${text}"`);
+  ed.editor.commands.setTextSelection(at);
+  ed.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key, shiftKey: shift, bubbles: true, cancelable: true }));
+}
+
+check("nested bullet list", () => roundTrip("- a\n  - b\n- c"));
+check("task list", () => roundTrip("- [ ] todo\n- [x] done"));
+// Tables come back column-padded; the padded form must then be stable.
+check("table", () => roundTrip("| A   | B   |\n| --- | --- |\n| 1   | 2   |"));
+check("links (web + note)", () => roundTrip("[site](https://example.com) and [other](note://ABCD-1234)"));
+check("code block", () => roundTrip("```js\nconst x = 1;\n```"));
+check("headings, quote, inline marks", () => roundTrip("# Title\n\n> quoted **bold** *it* ~~gone~~ `code`"));
+
+check("Tab nests an item and the outer numbering stays in order", () => {
+  const ed = mount("1. a\n2. b\n3. c");
+  press(ed, "b", "Tab");
+  assert.match(ed.getMarkdown(), /^1\. a\n\s+1\. b\n2\. c/);
+});
+check("Shift-Tab outdents it again", () => {
+  const ed = mount("1. a\n   1. b\n2. c");
+  press(ed, "b", "Tab", true);
+  assert.equal(ed.getMarkdown().trim(), "1. a\n2. b\n3. c");
+});
+check("Enter continues a numbered list with the next number", () => {
+  const ed = mount("1. a\n2. b");
+  press(ed, "b", "Enter");
+  ed.editor.commands.insertContent("c");
+  assert.equal(ed.getMarkdown().trim(), "1. a\n2. b\n3. c");
+});
+check("Enter on an empty item ends the list", () => {
+  const ed = mount("- a");
+  press(ed, "a", "Enter");
+  ed.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+  ed.editor.commands.insertContent("after");
+  assert.equal(ed.getMarkdown().trim(), "- a\n\nafter");
+});
+check("Enter continues a checklist with an unchecked item", () => {
+  const ed = mount("- [x] a");
+  press(ed, "a", "Enter");
+  ed.editor.commands.insertContent("b");
+  assert.equal(ed.getMarkdown().trim(), "- [x] a\n- [ ] b");
+});
+check("onChange fires for edits but not for setMarkdown", () => {
+  const seen = [];
+  const ed = mount("x", { onChange: (md) => seen.push(md) });
+  ed.setMarkdown("y");
+  assert.equal(seen.length, 0);
+  ed.editor.commands.insertContent("z");
+  assert.equal(seen.length, 1);
+});
+check("note:// link click calls onLinkNote", () => {
+  let got;
+  const ed = mount("[other](note://ABCD-1234)", { onLinkNote: (id) => (got = id) });
+  ed.editor.view.dom.querySelector("a").dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  // ProseMirror routes clicks through mousedown/up; fall back to the prop directly if the synthetic click isn't routed.
+  if (got === undefined) ed.editor.view.someProp("handleClick", (f) => f(ed.editor.view, 2, { target: ed.editor.view.dom.querySelector("a") }));
+  assert.equal(got, "ABCD-1234");
+});
+check("shortcuts list is exported", () => assert.ok(MNEditor.shortcuts.length >= 20));
+
+await window.happyDOM.close();
+console.log(failed ? `${failed} failed` : "all passed");
+process.exit(failed ? 1 : 0);

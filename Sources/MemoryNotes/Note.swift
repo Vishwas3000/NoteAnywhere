@@ -1,20 +1,17 @@
 import Foundation
+import SQLite3
+import notify
 
 struct Note: Codable, Identifiable, Hashable {
     enum Kind: String, Codable { case app, url }
 
     var id = UUID().uuidString
     var kind: Kind
-    var target: String  // bundle id for apps, "host/path" prefix for websites
+    var target: String  // bundle id for apps, "host/path" for websites
     var label: String
     var text = ""
     var createdAt = Date().timeIntervalSince1970 * 1000
     var updatedAt = Date().timeIntervalSince1970 * 1000
-
-    /// `url` is "host/path" without "www.". "github.com" matches the whole site, not "github.company.com".
-    func matches(url: String) -> Bool {
-        kind == .url && (url == target || url.hasPrefix(target.hasSuffix("/") ? target : target + "/"))
-    }
 }
 
 /// A note as it was at the end of one local day (its last save that day).
@@ -24,22 +21,112 @@ struct Snapshot: Identifiable, Hashable {
     var id: String { note.id + "/" + day }
 }
 
-/// One JSON file per note, so the app and the browser host can write concurrently without clobbering each other.
-/// Every save also overwrites that day's snapshot in history/<id>/<day>.json, which the calendar reads.
+/// One SQLite database shared by the app and the short-lived browser host process (WAL lets both write).
+/// Deletes are soft (deleted_at) so a future sync can propagate them; every read skips deleted notes.
 enum NoteStore {
     struct BadID: Error {}
+    struct SQLError: Error, CustomStringConvertible { let description: String }
+
+    /// Posted (Darwin notify, crosses processes) after every committed note change.
+    static let changed = "com.memorynotes.changed"
+    static let embeddingModel = "sentence-transformers/all-MiniLM-L6-v2"
 
     static let root: URL = {
         let root = ProcessInfo.processInfo.environment["MEMORYNOTES_DIR"].map { URL(fileURLWithPath: $0) }
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("MemoryNotes")
-        for sub in ["notes", "history"] {
-            try? FileManager.default.createDirectory(at: root.appendingPathComponent(sub), withIntermediateDirectories: true)
-        }
+        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         return root
     }()
-    static let dir = root.appendingPathComponent("notes")
-    static let historyDir = root.appendingPathComponent("history")
+
+    // MARK: Notes
+
+    static func loadAll() -> [Note] {
+        (try? query("""
+            SELECT id, kind, target, title, body_md, created_at, updated_at FROM notes
+            WHERE deleted_at IS NULL ORDER BY created_at
+            """, [], note)) ?? []
+    }
+
+    /// Website notes for a page and every page under it, never its parents.
+    /// "github.com/" shows the whole site; "github.com/vercel" shows github.com/vercel/next.js but not github.com.
+    static func notes(under url: String) -> [Note] {
+        var page = url
+        while page.hasSuffix("/") { page.removeLast() }
+        // "0" sorts right after "/", so [page/, page0) is exactly the targets under this page, on the (kind, target) index.
+        return (try? query("""
+            SELECT id, kind, target, title, body_md, created_at, updated_at FROM notes
+            WHERE deleted_at IS NULL AND kind = 'url' AND (target = ?1 OR (target >= ?2 AND target < ?3))
+            ORDER BY created_at
+            """, [page, page + "/", page + "0"], note)) ?? []
+    }
+
+    static func loadHistory() -> [Snapshot] {
+        (try? query("""
+            SELECT n.id, n.kind, n.target, n.title, s.body_md, n.created_at, s.updated_at, s.day
+            FROM snapshots s JOIN notes n ON n.id = s.note_id
+            WHERE n.deleted_at IS NULL ORDER BY s.updated_at
+            """, []) { Snapshot(day: text($0, 7), note: note($0)) }) ?? []
+    }
+
+    /// Upserts the note and that day's snapshot together. Saving a deleted note, or one whose kind differs
+    /// (e.g. the browser reusing an app note's id), changes nothing.
+    static func save(_ note: Note) throws {
+        try validate(note.id)
+        try transaction {
+            try run("""
+                INSERT INTO notes (id, kind, target, title, body_md, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (id) DO UPDATE SET target = excluded.target, title = excluded.title,
+                    body_md = excluded.body_md, updated_at = excluded.updated_at
+                WHERE notes.deleted_at IS NULL AND notes.kind = excluded.kind
+                """, [note.id, note.kind.rawValue, note.target, note.label, note.text, note.createdAt, note.updatedAt])
+            guard sqlite3_changes(try db()) > 0 else { return }
+            try run("""
+                INSERT INTO snapshots (note_id, day, body_md, updated_at) VALUES (?, ?, ?, ?)
+                ON CONFLICT (note_id, day) DO UPDATE SET body_md = excluded.body_md, updated_at = excluded.updated_at
+                """, [note.id, day(note.updatedAt), note.text, note.updatedAt])
+        }
+        notify_post(changed)
+    }
+
+    static func delete(_ id: String) throws {
+        try validate(id)
+        let now = Date().timeIntervalSince1970 * 1000
+        try transaction { try run("UPDATE notes SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL", [now, now, id]) }
+        notify_post(changed)
+    }
+
+    // MARK: Embeddings and icons (derived caches: no change notification)
+
+    static func vectors() -> [String: (updatedAt: Double, vector: [Float])] {
+        let rows = (try? query("""
+            SELECT e.note_id, e.updated_at, e.vector FROM embeddings e JOIN notes n ON n.id = e.note_id
+            WHERE n.deleted_at IS NULL AND e.model = ?
+            """, [embeddingModel]) { row in
+            (text(row, 0), sqlite3_column_double(row, 1), floats(blob(row, 2)))
+        }) ?? []
+        return Dictionary(rows.map { ($0.0, (updatedAt: $0.1, vector: $0.2)) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    static func saveVector(_ id: String, updatedAt: Double, vector: [Float]) throws {
+        let data = vector.withUnsafeBufferPointer { Data(buffer: $0) }  // Float32, little-endian on every Mac
+        try transaction {
+            try run("""
+                INSERT INTO embeddings (note_id, model, updated_at, vector) VALUES (?, ?, ?, ?)
+                ON CONFLICT (note_id) DO UPDATE SET model = excluded.model, updated_at = excluded.updated_at, vector = excluded.vector
+                """, [id, embeddingModel, updatedAt, data])
+        }
+    }
+
+    static func icon(_ key: String) -> Data? {
+        (try? query("SELECT png FROM icons WHERE key = ?", [key]) { blob($0, 0) })?.first
+    }
+
+    static func saveIcon(_ key: String, png: Data) {
+        try? transaction {
+            try run("INSERT OR REPLACE INTO icons (key, png, fetched_at) VALUES (?, ?, ?)", [key, png, Date().timeIntervalSince1970 * 1000])
+        }
+    }
 
     static func day(_ ms: Double) -> String {
         let f = DateFormatter()
@@ -48,44 +135,191 @@ enum NoteStore {
         return f.string(from: Date(timeIntervalSince1970: ms / 1000))
     }
 
-    static func loadAll() -> [Note] {
-        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
-        return files.filter { $0.pathExtension == "json" }
-            .compactMap { try? JSONDecoder().decode(Note.self, from: Data(contentsOf: $0)) }
-            .sorted { $0.createdAt < $1.createdAt }
-    }
-
-    static func save(_ note: Note) throws {
-        let data = try JSONEncoder().encode(note)
-        try data.write(to: file(note.id), options: .atomic)
-        let history = historyDir.appendingPathComponent(note.id)
-        try FileManager.default.createDirectory(at: history, withIntermediateDirectories: true)
-        try data.write(to: history.appendingPathComponent(day(note.updatedAt) + ".json"), options: .atomic)
-    }
-
-    /// Deleting a note also drops its history: deleted means gone from the calendar too.
-    static func delete(_ id: String) throws {
-        try? FileManager.default.removeItem(at: file(id))
-        try? FileManager.default.removeItem(at: historyDir.appendingPathComponent(id))
-    }
-
-    static func loadHistory() -> [Snapshot] {
-        let fm = FileManager.default
-        let notes = (try? fm.contentsOfDirectory(at: historyDir, includingPropertiesForKeys: nil)) ?? []
-        return notes.flatMap { folder in
-            ((try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [])
-                .filter { $0.pathExtension == "json" }
-                .compactMap { url in
-                    (try? JSONDecoder().decode(Note.self, from: Data(contentsOf: url)))
-                        .map { Snapshot(day: url.deletingPathExtension().lastPathComponent, note: $0) }
-                }
-        }
-        .sorted { $0.note.updatedAt < $1.note.updatedAt }
-    }
-
-    // ids come from the browser too; only allow UUID characters so an id can't escape the folder.
-    private static func file(_ id: String) throws -> URL {
+    // ids come from the browser too; only allow UUID characters.
+    private static func validate(_ id: String) throws {
         guard !id.isEmpty, id.allSatisfy({ $0.isHexDigit || $0 == "-" }) else { throw BadID() }
-        return dir.appendingPathComponent(id + ".json")
+    }
+
+    // MARK: SQLite
+
+    private static let lock = NSRecursiveLock()  // one connection shared by the main thread and the search actor
+    private static let connection: Result<OpaquePointer, Error> = Result { try open() }
+    private static func db() throws -> OpaquePointer { try connection.get() }
+
+    private static func open() throws -> OpaquePointer {
+        var handle: OpaquePointer?
+        let path = root.appendingPathComponent("memorynotes.sqlite").path
+        guard sqlite3_open_v2(path, &handle, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK,
+              let handle else { throw SQLError(description: "can't open \(path)") }
+        sqlite3_busy_timeout(handle, 5000)  // the app and the browser host may write at the same moment
+        for pragma in ["PRAGMA journal_mode = WAL", "PRAGMA foreign_keys = ON"] {
+            sqlite3_exec(handle, pragma, nil, nil, nil)
+        }
+        try migrate(handle)
+        return handle
+    }
+
+    private static let schemaV1 = """
+        CREATE TABLE folders (id TEXT PRIMARY KEY, name TEXT NOT NULL, parent_id TEXT REFERENCES folders (id) ON DELETE CASCADE);
+        CREATE TABLE notes (
+            id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('app', 'url')), target TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '', body_md TEXT NOT NULL DEFAULT '',
+            folder_id TEXT REFERENCES folders (id) ON DELETE SET NULL, pinned INTEGER NOT NULL DEFAULT 0,
+            created_at REAL NOT NULL, updated_at REAL NOT NULL, deleted_at REAL);
+        CREATE INDEX notes_kind_target ON notes (kind, target);
+        CREATE TABLE snapshots (note_id TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE, day TEXT NOT NULL,
+            body_md TEXT NOT NULL, updated_at REAL NOT NULL, PRIMARY KEY (note_id, day));
+        CREATE TABLE embeddings (note_id TEXT PRIMARY KEY REFERENCES notes (id) ON DELETE CASCADE, model TEXT NOT NULL,
+            updated_at REAL NOT NULL, vector BLOB NOT NULL);
+        CREATE TABLE tags (note_id TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE, tag TEXT NOT NULL, PRIMARY KEY (note_id, tag));
+        CREATE TABLE links (from_note TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,
+            to_note TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE, PRIMARY KEY (from_note, to_note));
+        CREATE TABLE attachments (id TEXT PRIMARY KEY, note_id TEXT NOT NULL REFERENCES notes (id) ON DELETE CASCADE,
+            kind TEXT NOT NULL, path TEXT NOT NULL, meta_json TEXT);
+        CREATE TABLE icons (key TEXT PRIMARY KEY, png BLOB NOT NULL, fetched_at REAL NOT NULL);
+        """
+
+    /// Schema version lives in PRAGMA user_version. BEGIN IMMEDIATE + re-check, since the app and host may start together.
+    private static func migrate(_ handle: OpaquePointer) throws {
+        var imported = false
+        try exec(handle, "BEGIN IMMEDIATE")
+        do {
+            if try userVersion(handle) < 1 {
+                try exec(handle, schemaV1)
+                imported = try importJSON(handle)
+                try exec(handle, "PRAGMA user_version = 1")
+            }
+            try exec(handle, "COMMIT")
+        } catch {
+            try? exec(handle, "ROLLBACK")
+            throw error
+        }
+        if imported {
+            // Keep the old files (renamed) rather than deleting the user's data.
+            for name in ["notes", "history", "embeddings.json"] {
+                let old = root.appendingPathComponent(name)
+                try? FileManager.default.moveItem(at: old, to: old.appendingPathExtension("imported"))
+            }
+        }
+    }
+
+    /// One-time import of the pre-SQLite layout: notes/<id>.json, history/<id>/<day>.json, embeddings.json.
+    private static func importJSON(_ handle: OpaquePointer) throws -> Bool {
+        let fm = FileManager.default
+        let notesDir = root.appendingPathComponent("notes")
+        let files = (try? fm.contentsOfDirectory(at: notesDir, includingPropertiesForKeys: nil)) ?? []
+        let notes = files.filter { $0.pathExtension == "json" }
+            .compactMap { try? JSONDecoder().decode(Note.self, from: Data(contentsOf: $0)) }
+            .filter { (try? validate($0.id)) != nil }
+        guard !notes.isEmpty else { return false }
+        for n in notes {
+            try run(handle, "INSERT OR IGNORE INTO notes (id, kind, target, title, body_md, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    [n.id, n.kind.rawValue, n.target, n.label, n.text, n.createdAt, n.updatedAt])
+            let history = root.appendingPathComponent("history").appendingPathComponent(n.id)
+            for file in (try? fm.contentsOfDirectory(at: history, includingPropertiesForKeys: nil)) ?? [] where file.pathExtension == "json" {
+                guard let s = try? JSONDecoder().decode(Note.self, from: Data(contentsOf: file)) else { continue }
+                try run(handle, "INSERT OR IGNORE INTO snapshots (note_id, day, body_md, updated_at) VALUES (?, ?, ?, ?)",
+                        [n.id, file.deletingPathExtension().lastPathComponent, s.text, s.updatedAt])
+            }
+        }
+        struct OldVector: Decodable { let updatedAt: Double; let vector: [Float] }
+        let ids = Set(notes.map(\.id))
+        if let data = try? Data(contentsOf: root.appendingPathComponent("embeddings.json")),
+           let old = try? JSONDecoder().decode([String: OldVector].self, from: data) {
+            for (id, v) in old where ids.contains(id) {
+                try run(handle, "INSERT OR IGNORE INTO embeddings (note_id, model, updated_at, vector) VALUES (?, ?, ?, ?)",
+                        [id, embeddingModel, v.updatedAt, v.vector.withUnsafeBufferPointer { Data(buffer: $0) }])
+            }
+        }
+        return true
+    }
+
+    private static func userVersion(_ handle: OpaquePointer) throws -> Int {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(handle, "PRAGMA user_version", -1, &stmt, nil) == SQLITE_OK else { throw error(handle) }
+        defer { sqlite3_finalize(stmt) }
+        return sqlite3_step(stmt) == SQLITE_ROW ? Int(sqlite3_column_int(stmt, 0)) : 0
+    }
+
+    private static func transaction(_ body: () throws -> Void) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        let handle = try db()
+        try exec(handle, "BEGIN IMMEDIATE")
+        do {
+            try body()
+            try exec(handle, "COMMIT")
+        } catch {
+            try? exec(handle, "ROLLBACK")
+            throw error
+        }
+    }
+
+    private static func exec(_ handle: OpaquePointer, _ sql: String) throws {
+        guard sqlite3_exec(handle, sql, nil, nil, nil) == SQLITE_OK else { throw error(handle) }
+    }
+
+    private static func run(_ sql: String, _ args: [Any]) throws { try run(try db(), sql, args) }
+
+    private static func run(_ handle: OpaquePointer, _ sql: String, _ args: [Any]) throws {
+        let stmt = try prepare(handle, sql, args)
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_DONE else { throw error(handle) }
+    }
+
+    private static func query<T>(_ sql: String, _ args: [Any], _ row: (OpaquePointer) -> T) throws -> [T] {
+        lock.lock()
+        defer { lock.unlock() }
+        let handle = try db()
+        let stmt = try prepare(handle, sql, args)
+        defer { sqlite3_finalize(stmt) }
+        var rows: [T] = []
+        while true {
+            switch sqlite3_step(stmt) {
+            case SQLITE_ROW: rows.append(row(stmt))
+            case SQLITE_DONE: return rows
+            default: throw error(handle)
+            }
+        }
+    }
+
+    private static func prepare(_ handle: OpaquePointer, _ sql: String, _ args: [Any]) throws -> OpaquePointer {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(handle, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else { throw error(handle) }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)  // SQLite copies the value
+        for (i, arg) in args.enumerated() {
+            let index = Int32(i + 1)
+            switch arg {
+            case let s as String: sqlite3_bind_text(stmt, index, s, -1, transient)
+            case let d as Double: sqlite3_bind_double(stmt, index, d)
+            case let data as Data: _ = data.withUnsafeBytes { sqlite3_bind_blob(stmt, index, $0.baseAddress, Int32($0.count), transient) }
+            default: sqlite3_finalize(stmt); throw SQLError(description: "unsupported bind \(type(of: arg))")
+            }
+        }
+        return stmt
+    }
+
+    private static func error(_ handle: OpaquePointer) -> SQLError {
+        SQLError(description: String(cString: sqlite3_errmsg(handle)))
+    }
+
+    private static func note(_ row: OpaquePointer) -> Note {
+        Note(id: text(row, 0), kind: Note.Kind(rawValue: text(row, 1)) ?? .url, target: text(row, 2), label: text(row, 3),
+             text: text(row, 4), createdAt: sqlite3_column_double(row, 5), updatedAt: sqlite3_column_double(row, 6))
+    }
+
+    private static func text(_ row: OpaquePointer, _ column: Int32) -> String {
+        sqlite3_column_text(row, column).map { String(cString: $0) } ?? ""
+    }
+
+    private static func blob(_ row: OpaquePointer, _ column: Int32) -> Data {
+        guard let bytes = sqlite3_column_blob(row, column) else { return Data() }
+        return Data(bytes: bytes, count: Int(sqlite3_column_bytes(row, column)))
+    }
+
+    private static func floats(_ data: Data) -> [Float] {
+        var out = [Float](repeating: 0, count: data.count / MemoryLayout<Float>.size)
+        _ = out.withUnsafeMutableBytes { data.copyBytes(to: $0) }  // copy: blob bytes needn't be Float-aligned
+        return out
     }
 }

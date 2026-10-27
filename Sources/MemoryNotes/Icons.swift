@@ -3,13 +3,12 @@ import LinkPresentation
 import SwiftUI
 
 /// App icons come from the system. Website icons are fetched once from the site itself (no third-party favicon
-/// service, so nobody else learns which sites you keep notes on) and cached in icons/<host>.png.
+/// service, so nobody else learns which sites you keep notes on) and cached as PNG in the icons table.
 @MainActor
 final class IconStore: ObservableObject {
     static let shared = IconStore()
     @Published private var icons: [String: NSImage] = [:]
     private var requested: Set<String> = []
-    private let dir = NoteStore.root.appendingPathComponent("icons")
 
     func icon(for note: Note) -> NSImage? {
         let key = note.kind == .app ? note.target : String(note.target.prefix { $0 != "/" })
@@ -26,18 +25,16 @@ final class IconStore: ObservableObject {
             icons[key] = NSWorkspace.shared.icon(forFile: url.path)
             return
         }
-        // The host becomes a file name, so keep it to host characters.
+        // The host goes into an https URL, so keep it to host characters.
         guard !key.isEmpty, key.allSatisfy({ $0.isLetter || $0.isNumber || ".-:".contains($0) }) else { return }
-        let file = dir.appendingPathComponent(key + ".png")
-        if let image = NSImage(contentsOf: file) {
+        if let png = NoteStore.icon(key), let image = NSImage(data: png) {
             icons[key] = image
             return
         }
         guard let image = await Self.fetch(host: key) else { return }  // not cached: retried next launch
         icons[key] = image
         if let tiff = image.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
-            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            try? png.write(to: file, options: .atomic)
+            NoteStore.saveIcon(key, png: png)
         }
     }
 

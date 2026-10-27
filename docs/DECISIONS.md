@@ -3,10 +3,10 @@
 | ID | Decision | Who | Status |
 |----|----------|-----|--------|
 | D1 | Native SwiftUI app, built with SwiftPM + a bundling script | Claude | Proposed |
-| D2 | Store notes locally as one JSON file per note; cloud later | User | Decided |
+| D2 | Store notes locally as one JSON file per note; cloud later | User | Superseded by D18 |
 | D3 | Browser ↔ app bridge via Chrome Native Messaging, same binary as host | Claude | Proposed |
 | D4 | Overlay opens automatically when the app/tab has notes | User | Decided |
-| D5 | Website notes match a URL prefix; user picks "this site" or "this page" | User | Decided |
+| D5 | Website notes match a URL prefix; user picks "this site" or "this page" | User | Superseded by D19 |
 | D6 | Support Chrome and Brave | User | Decided |
 | D7 | Extension UX details (see entry) | Claude (subagent) | Proposed |
 | D8 | Keep the extension for website notes vs. reading the tab URL via AppleScript | User | Pending |
@@ -19,6 +19,11 @@
 | D15 | Calendar layout details (subagent) | Claude (subagent) | Proposed |
 | D16 | Browser search UX details (subagent) | Claude (subagent) | Proposed |
 | D17 | Browser overlay runs in an isolated extension frame | User | Decided |
+| D18 | One SQLite database (WAL) replaces the JSON files | User | Decided |
+| D19 | A page shows its own notes plus notes of pages under it, not its parents | User | Decided |
+| D20 | One "+ New note" button, always for the current page | User | Decided |
+| D21 | Shared editor: TipTap 3.32 IIFE bundle, Markdown storage | Claude (subagent) | Proposed |
+| D22 | UI review (ui-review-tahoe skill) fixes applied | User asked; Claude | Proposed |
 
 ## D1 — Native SwiftUI app via SwiftPM (2026-10-27)
 - **Why:** native floating panels (`NSPanel`, non-activating, over full-screen apps) and frontmost-app tracking
@@ -128,3 +133,38 @@ Made by the subagent that wrote the extension:
 - **Also:** delete needs a second click (confirm() is blocked in cross-origin frames).
 - **Rejected:** a key/focus guard script in the page (weaker, and the phase-2 editor needs the frame anyway).
 - **Status:** Decided (user).
+
+## D18 — SQLite storage (2026-10-28)
+- **Why:** user asked for a better-designed database and picked SQLite. One file `memorynotes.sqlite`, WAL + busy_timeout
+  so the app and the short-lived browser host can both write. Tables: notes (soft delete via deleted_at, for future sync),
+  snapshots, embeddings (Float32 BLOB), icons, plus empty folders/tags/links/attachments for phases 3–4.
+- Old JSON files are imported once and renamed `*.imported` (never deleted). Changes are announced across processes with
+  `notify_post("com.memorynotes.changed")`. A save never revives a deleted note, and the browser can't take over an app note's id.
+- **Rejected:** keep JSON files + an index (every later feature would bolt on its own file).
+- **Status:** Decided (user); details by the subagent are Proposed.
+
+## D19 — Parent pages see child notes (2026-10-28)
+- **Why:** user: "parent should be able to see its child". `list(url)` returns notes whose target equals the page or
+  sits under it (indexed range query `[p/, p0)`), and no longer notes from parent pages. Supersedes D5.
+- **Status:** Decided (user chose "only this page and below").
+
+## D20 — Single "+ New note" button (2026-10-28)
+- **Why:** user: remove "This site"/"This page"; new notes always target the current page. Child-page notes in the
+  overlay show a "↳ /path" link that opens that page.
+- **Status:** Decided (user).
+
+## D21 — Shared editor build (2026-10-28, subagent)
+- TipTap 3.32.0 (pinned) built by Vite into one classic script + CSS (505 kB / 158 kB gzip), loaded by `<script src>`
+  in both the extension frame and the app's WKWebView. Markdown via @tiptap/markdown. `note://<id>` links call back to
+  the host. Built files are committed because the extension loads straight from the repo. 14 round-trip/list tests in happy-dom.
+- Lists: Enter continues and renumbers, Enter on an empty item exits, Tab/⇧Tab indent (user request).
+- **Rejected:** ES modules (module loading setup in two hosts); a custom link mark.
+- **Status:** Proposed.
+
+## D22 — UI review fixes (2026-10-28)
+- Review by an agent following the vendored `ui-review-tahoe` skill; all 12 findings applied: root NavigationSplitView with
+  a Notes/Calendar segmented picker, `.searchable` sidebar, ⌘N/⌘F/⌘1/⌘2/⌘⌫ commands, context menus, ContentUnavailableView
+  empty states, glass/material floating panels, keyboard navigation in the search popup, confirmation before deleting,
+  VoiceOver labels, calendar controls in the toolbar (⌘←/⌘T/⌘→), Help ▸ Keyboard Shortcuts window (user request).
+- ⌘⌫ always confirms, because it also means "delete to line start" while typing.
+- **Status:** Proposed.

@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="mn-editor.css">
+<style>
+  html, body { margin: 0; background: transparent; }
+  body { padding: 0 2px; }
+</style>
+</head>
+<body>
+<div id="editor"></div>
+<script src="mn-editor.js"></script>
+<script>
+  // Bridge for EditorView.swift. Every edit goes straight to Swift, which saves it, so switching notes loses nothing.
+  let editor;
+  const post = (msg) => webkit.messageHandlers.mn.postMessage(msg);
+  window.MNHost = {
+    load(markdown, toolbar) {
+      editor?.destroy();
+      editor = MNEditor.mount(document.getElementById("editor"), {
+        markdown, toolbar, placeholder: "Write a note…",
+        onChange: (md) => post({ type: "change", markdown: md }),
+        onLinkNote: (id) => post({ type: "openNote", id }),
+      });
+    },
+    set(markdown) { if (editor && editor.getMarkdown() !== markdown) editor.setMarkdown(markdown); },
+    focus() { editor?.focus(); },
+  };
+  post({ type: "ready" });
+</script>
+</body>
+</html>

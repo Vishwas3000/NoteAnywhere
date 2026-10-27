@@ -2,28 +2,20 @@ import Embeddings
 import Foundation
 
 /// Hybrid search: MiniLM similarity plus a boost for notes containing the query's words.
-/// The app keeps vectors cached in embeddings.json; the browser host reads that cache so it only embeds the query.
+/// The app keeps vectors in the embeddings table; the browser host only reads them, so it embeds just the query.
 actor SearchIndex {
     struct Hit: Codable, Hashable {
         let note: Note
         let score: Double
     }
 
-    private struct Entry: Codable {
-        let updatedAt: Double
-        let vector: [Float]
-    }
-
     static let shared = SearchIndex()
-    private static let modelID = "sentence-transformers/all-MiniLM-L6-v2"
+    private static let modelID = NoteStore.embeddingModel
     private static let modelsDir = NoteStore.root.appendingPathComponent("models")
-    // shortcut: one JSON file of all vectors (~3 MB per 1000 notes); move to SQLite if it grows past a few MB.
-    private static let cacheURL = NoteStore.root.appendingPathComponent("embeddings.json")
 
     private var bundle: Bert.ModelBundle?
     private var loading: Task<Bert.ModelBundle?, Never>?
-    private var cache: [String: Entry] = (try? JSONDecoder().decode(
-        [String: Entry].self, from: Data(contentsOf: SearchIndex.cacheURL))) ?? [:]
+    private var cache = NoteStore.vectors()
 
     /// Loads the model, downloading it once (~90 MB) on first use. Returns nil offline before the first download.
     private func model() async -> Bert.ModelBundle? {
@@ -61,21 +53,12 @@ actor SearchIndex {
         "\(note.label) \(note.target)\n\(note.text)"
     }
 
-    /// Embeds new or changed notes and forgets deleted ones. Called by the app; the host never writes the cache.
+    /// Embeds new or changed notes. Called by the app; the host never writes vectors.
     func update(_ notes: [Note]) async {
-        var changed = false
-        let ids = Set(notes.map(\.id))
-        for id in cache.keys where !ids.contains(id) {
-            cache[id] = nil
-            changed = true
-        }
         for note in notes where cache[note.id]?.updatedAt != note.updatedAt {
             guard let vector = await embed(Self.document(note)) else { break }
-            cache[note.id] = Entry(updatedAt: note.updatedAt, vector: vector)
-            changed = true
-        }
-        if changed, let data = try? JSONEncoder().encode(cache) {
-            try? data.write(to: Self.cacheURL, options: .atomic)
+            cache[note.id] = (updatedAt: note.updatedAt, vector: vector)
+            try? NoteStore.saveVector(note.id, updatedAt: note.updatedAt, vector: vector)
         }
     }
 

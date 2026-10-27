@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>MemoryNotes</title>
+<link rel="stylesheet" href="editor/mn-editor.css">
 <!-- No color-scheme meta on purpose: a mismatch with the host page would paint the frame opaque. -->
 <style>
   html, body { margin: 0; background: transparent; }
@@ -23,9 +24,18 @@
   .list { overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 10px; }
   .meta { display: flex; align-items: center; gap: 6px; color: var(--mute); font-size: 11px; margin-bottom: 3px; }
   .meta span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  textarea { box-sizing: border-box; width: 100%; min-height: 64px; resize: vertical; font: inherit; color: var(--fg);
-    background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
-  textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .panel .mn-editor { --mn-fg: var(--fg); --mn-muted: var(--mute); --mn-line: var(--line); --mn-accent: var(--accent); }
+  .note-editor { background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px;
+    max-height: 40vh; overflow-y: auto; }
+  .note-editor:focus-within { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .meta a { color: inherit; text-decoration: none; }
+  .meta a:hover, .meta a:focus-visible { color: var(--accent); text-decoration: underline; }
+  header .format[aria-pressed="true"], header .help-toggle[aria-expanded="true"] { border-color: var(--line); }
+  .help { overflow-y: auto; padding: 4px 10px 10px; font-size: 12px; }
+  .help h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--mute); margin: 10px 0 4px; }
+  .help div { display: flex; gap: 8px; padding: 2px 0; }
+  .help kbd { flex: 0 0 46%; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg); }
+  .help span { color: var(--mute); }
   .empty, .error { padding: 8px 10px; color: var(--mute); }
   .error { color: #d14; }
   footer { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }
@@ -44,6 +54,8 @@
   <div class="panel" role="complementary" aria-label="MemoryNotes">
     <header>
       <strong>Notes<span class="count"></span></strong>
+      <button class="format" aria-label="Show formatting toolbar" aria-pressed="false" title="Formatting">Aa</button>
+      <button class="help-toggle" aria-label="Keyboard shortcuts" aria-expanded="false" title="Shortcuts">?</button>
       <button class="collapse" aria-label="Collapse">−</button>
       <button class="close" aria-label="Close">×</button>
     </header>
@@ -51,15 +63,16 @@
       <input class="search" type="search" placeholder="Search all notes…" aria-label="Search all notes">
       <div class="error" role="alert" hidden></div>
       <div class="list notes"></div>
+      <div class="help" hidden></div>
       <div class="list results" hidden></div>
       <div class="empty">No notes here yet.</div>
       <div class="empty no-results" hidden>No matching notes</div>
       <footer>
-        <button class="add-site">+ This site</button>
-        <button class="add-page">+ This page</button>
+        <button class="add">+ New note</button>
       </footer>
     </div>
   </div>
+  <script src="editor/mn-editor.js"></script>
   <script src="overlay.js"></script>
 </body>
 </html>

@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import notify
 import SwiftUI
 
 /// Shared state for the main window and the overlay: all notes, plus which app is in front.
@@ -9,28 +10,17 @@ final class NotesModel: ObservableObject {
     @Published private(set) var notes = NoteStore.loadAll()
     /// One entry per note per day it was edited; feeds the calendar.
     @Published private(set) var snapshots = NoteStore.loadHistory()
+    /// A note to select in the main window, e.g. after clicking a link to it inside another note.
+    @Published var openRequest: String?
     /// The last frontmost app that isn't MemoryNotes itself.
     @Published private(set) var frontApp: NSRunningApplication?
 
-    private var watcher: DispatchSourceFileSystemObject?
+    private var notifyToken: Int32 = 0
     private var indexing: AnyCancellable?
 
     private init() {
-        // Notes made before the calendar existed get a snapshot on their last-edited day.
-        for note in notes where !FileManager.default.fileExists(atPath: NoteStore.historyDir.appendingPathComponent(note.id).path) {
-            try? NoteStore.save(note)
-        }
-        snapshots = NoteStore.loadHistory()
-
-        // Atomic writes rename into the folder, so a directory watch sees every save/delete from the browser host.
-        let fd = open(NoteStore.dir.path, O_EVTONLY)
-        if fd >= 0 {
-            let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
-            source.setEventHandler { [weak self] in self?.reload() }
-            source.setCancelHandler { close(fd) }
-            source.resume()
-            watcher = source
-        }
+        // Every committed write (here or in the browser host process) posts this Darwin notification.
+        notify_register_dispatch(NoteStore.changed, &notifyToken, .main) { [weak self] _ in self?.reload() }
 
         // Re-embed changed notes once typing pauses; the first run downloads the model if needed.
         indexing = $notes.debounce(for: .seconds(2), scheduler: RunLoop.main).sink { notes in

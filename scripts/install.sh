@@ -10,6 +10,11 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 cp .build/release/MemoryNotes "$APP/Contents/MacOS/"
 cp Info.plist "$APP/Contents/"
+
+# The shared editor (also used by the browser extension) is built from editor/ and loaded by the app's web views.
+(cd editor && npm ci --no-audit --no-fund --silent && npm run build --silent)
+mkdir -p "$APP/Contents/Resources/editor"
+cp editor/dist/* app/editor.html "$APP/Contents/Resources/editor/"
 codesign --force --sign - "$APP"
 
 # The manifest "key" pins the unpacked extension's id; Chrome's id is the first 32 hex of sha256(key) mapped 0-f -> a-p.

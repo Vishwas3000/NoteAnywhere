@@ -1,0 +1,142 @@
+[
+  {
+    "group": "Text",
+    "keys": "⌘B",
+    "action": "Bold"
+  },
+  {
+    "group": "Text",
+    "keys": "⌘I",
+    "action": "Italic"
+  },
+  {
+    "group": "Text",
+    "keys": "⌘U",
+    "action": "Underline"
+  },
+  {
+    "group": "Text",
+    "keys": "⌘⇧X",
+    "action": "Strikethrough"
+  },
+  {
+    "group": "Text",
+    "keys": "⌘E",
+    "action": "Inline code"
+  },
+  {
+    "group": "Text",
+    "keys": "⌘K",
+    "action": "Add or edit link"
+  },
+  {
+    "group": "Text",
+    "keys": "⌘Z / ⌘⇧Z",
+    "action": "Undo / redo"
+  },
+  {
+    "group": "Blocks",
+    "keys": "⌘⌥1 / 2 / 3",
+    "action": "Heading 1 / 2 / 3"
+  },
+  {
+    "group": "Blocks",
+    "keys": "⌘⌥0",
+    "action": "Normal text"
+  },
+  {
+    "group": "Blocks",
+    "keys": "⌘⇧B",
+    "action": "Quote"
+  },
+  {
+    "group": "Blocks",
+    "keys": "⌘⌥C",
+    "action": "Code block"
+  },
+  {
+    "group": "Blocks",
+    "keys": "⇧Enter",
+    "action": "Line break inside a block"
+  },
+  {
+    "group": "Lists",
+    "keys": "⌘⇧8",
+    "action": "Bullet list"
+  },
+  {
+    "group": "Lists",
+    "keys": "⌘⇧7",
+    "action": "Numbered list"
+  },
+  {
+    "group": "Lists",
+    "keys": "⌘⇧9",
+    "action": "Checklist"
+  },
+  {
+    "group": "Lists",
+    "keys": "Enter",
+    "action": "Next item (numbers continue)"
+  },
+  {
+    "group": "Lists",
+    "keys": "Enter on an empty item",
+    "action": "End the list"
+  },
+  {
+    "group": "Lists",
+    "keys": "Tab / ⇧Tab",
+    "action": "Indent / outdent item"
+  },
+  {
+    "group": "Markdown",
+    "keys": "# ␣ … ### ␣",
+    "action": "Heading 1–3"
+  },
+  {
+    "group": "Markdown",
+    "keys": "- ␣ or * ␣",
+    "action": "Bullet list"
+  },
+  {
+    "group": "Markdown",
+    "keys": "1. ␣",
+    "action": "Numbered list"
+  },
+  {
+    "group": "Markdown",
+    "keys": "[] ␣ or [x] ␣",
+    "action": "Checklist item"
+  },
+  {
+    "group": "Markdown",
+    "keys": "> ␣",
+    "action": "Quote"
+  },
+  {
+    "group": "Markdown",
+    "keys": "``` ␣",
+    "action": "Code block"
+  },
+  {
+    "group": "Markdown",
+    "keys": "---",
+    "action": "Divider line"
+  },
+  {
+    "group": "Markdown",
+    "keys": "**bold** *italic* ~~strike~~ `code`",
+    "action": "Inline formatting"
+  },
+  {
+    "group": "Markdown",
+    "keys": "![alt](url)",
+    "action": "Image"
+  },
+  {
+    "group": "Markdown",
+    "keys": "[text](note://id)",
+    "action": "Link to another note"
+  }
+]

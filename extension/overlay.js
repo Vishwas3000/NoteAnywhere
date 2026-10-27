@@ -6,10 +6,11 @@ const MISSING = "Mac app not installed — run scripts/install.sh";
 let tabId, page = {};
 let notes = [], visible = false, dismissed = false, collapsed = false, forced = false, error = "";
 let query = "", results = [], searchSeq = 0, searchTimer;
+let editors = [], toolbarOn = false;
 
 const $ = (s) => document.querySelector(s);
 const [panel, count, body, list, empty, errBox] = [".panel", ".count", ".body", ".notes", ".empty", ".error"].map($);
-const [searchBox, resultList, noResults, footer] = [".search", ".results", ".no-results", "footer"].map($);
+const [searchBox, resultList, noResults, footer, help] = [".search", ".results", ".no-results", "footer", ".help"].map($);
 
 function send(msg) {
   return new Promise((resolve) => {
@@ -23,7 +24,7 @@ function send(msg) {
 // Tell content.js whether to show the frame and how tall the panel wants to be.
 function report() {
   if (tabId === undefined) return; // not wired up yet; the first load reports
-  const shown = query ? resultList : list;
+  const shown = query ? resultList : help.hidden ? list : help;
   const height = panel.offsetHeight - shown.clientHeight + shown.scrollHeight + 16;
   chrome.tabs.sendMessage(tabId, { type: "mn:frame", visible, height }, { frameId: 0 }).catch(() => {});
 }
@@ -43,9 +44,37 @@ searchBox.onkeydown = (e) => {
 
 $(".collapse").onclick = () => { collapsed = !collapsed; render(); };
 $(".close").onclick = () => { visible = false; dismissed = true; render(); };
-$(".add-site").onclick = () => add(page.host, page.host);
-$(".add-page").onclick = () => add(page.page, page.title || page.page);
+$(".add").onclick = () => add();
+$(".format").onclick = () => {
+  toolbarOn = !toolbarOn;
+  $(".format").setAttribute("aria-pressed", String(toolbarOn));
+  for (const ed of editors) ed.setToolbar(toolbarOn);
+};
+$(".help-toggle").onclick = () => {
+  help.hidden = !help.hidden;
+  $(".help-toggle").setAttribute("aria-expanded", String(!help.hidden));
+  render();
+};
 
+// The shortcut list comes from the editor bundle, so it can't drift from what the editor does.
+let lastGroup;
+for (const { group, keys, action } of MNEditor.shortcuts) {
+  if (group !== lastGroup) {
+    const h = document.createElement("h3");
+    h.textContent = lastGroup = group;
+    help.append(h);
+  }
+  const row = document.createElement("div");
+  const k = document.createElement("kbd");
+  k.textContent = keys;
+  const a = document.createElement("span");
+  a.textContent = action;
+  row.append(k, a);
+  help.append(row);
+}
+
+// State only. The note editors are rebuilt by renderNotes(), and only when the note set changes,
+// so typing, searching or collapsing never resets the cursor.
 function render() {
   count.textContent = ` ${notes.length}`;
   body.hidden = collapsed;
@@ -54,14 +83,20 @@ function render() {
   errBox.textContent = error;
   errBox.hidden = !error;
   const searching = query !== "";
-  list.hidden = searching;
-  footer.hidden = searching;
-  empty.hidden = searching || notes.length > 0;
+  list.hidden = searching || !help.hidden;
+  footer.hidden = searching || !help.hidden;
+  empty.hidden = searching || !help.hidden || notes.length > 0;
   resultList.hidden = !searching;
   noResults.hidden = !searching || results.length > 0;
   if (searching) resultList.replaceChildren(...results.map(resultRow));
-  else list.replaceChildren(...notes.map(noteRow));
   report();
+}
+
+function renderNotes() {
+  for (const ed of editors) ed.destroy();
+  editors = [];
+  list.replaceChildren(...notes.map(noteRow));
+  render();
 }
 
 async function search() {
@@ -92,16 +127,28 @@ function resultRow(note) {
   return row;
 }
 
+// Notes for this page have no location label; notes for pages under it link there ("↳ /vercel/next.js").
+function whereLabel(note) {
+  if (note.target === page.page) return null;
+  const a = document.createElement("a");
+  a.href = `https://${note.target}`;
+  a.target = "_blank";
+  a.rel = "noopener";
+  a.textContent = note.target.startsWith(page.page + "/") ? `↳ ${note.target.slice(page.page.length)}` : note.target;
+  a.title = note.label || note.target;
+  return a;
+}
+
 function noteRow(note) {
   const row = document.createElement("div");
   const meta = document.createElement("div");
   meta.className = "meta";
-  const label = document.createElement("span");
-  label.textContent = (note.target.includes("/") ? "Page · " : "Site · ") + note.target;
-  label.title = note.label || note.target;
+  const where = document.createElement("span");
+  const link = whereLabel(note);
+  if (link) where.append(link);
   const del = document.createElement("button");
   del.textContent = "Delete";
-  del.setAttribute("aria-label", `Delete note for ${note.target}`);
+  del.setAttribute("aria-label", `Delete note${link ? ` for ${note.target}` : ""}`);
   // confirm() is blocked in cross-origin frames, so a note with text needs a second click.
   let armed;
   del.onclick = () => {
@@ -109,19 +156,23 @@ function noteRow(note) {
     del.textContent = "Really delete?";
     armed = setTimeout(() => { armed = undefined; del.textContent = "Delete"; }, 3000);
   };
-  meta.append(label, del);
+  meta.append(where, del);
 
-  const ta = document.createElement("textarea");
-  ta.value = note.text;
-  ta.setAttribute("aria-label", `Note for ${note.target}`);
+  const box = document.createElement("div");
+  box.className = "note-editor";
   let timer;
-  ta.oninput = () => {
-    note.text = ta.value;
-    note.updatedAt = Date.now();
-    clearTimeout(timer);
-    timer = setTimeout(() => save(note), 400);
-  };
-  row.append(meta, ta);
+  editors.push(MNEditor.mount(box, {
+    markdown: note.text,
+    placeholder: "Write a note…",
+    toolbar: toolbarOn,
+    onChange: (md) => {
+      note.text = md;
+      note.updatedAt = Date.now();
+      clearTimeout(timer);
+      timer = setTimeout(() => save(note), 400);
+    },
+  }));
+  row.append(meta, box);
   return row;
 }
 
@@ -132,36 +183,38 @@ async function save(note) {
   errBox.hidden = !error;
 }
 
-async function add(target, label) {
+async function add() {
   const now = Date.now();
-  const note = { id: crypto.randomUUID(), kind: "url", target, label, text: "", createdAt: now, updatedAt: now };
+  const note = { id: crypto.randomUUID(), kind: "url", target: page.page, label: page.title || page.page, text: "", createdAt: now, updatedAt: now };
   const r = await send({ op: "save", note });
   if (!r.ok) { error = r.error; return render(); }
   error = "";
   notes.push(r.note);
   collapsed = false;
-  render();
-  list.lastElementChild?.querySelector("textarea").focus();
+  renderNotes();
+  editors.at(-1)?.focus();
 }
 
 async function remove(note) {
   const r = await send({ op: "delete", id: note.id });
   if (!r.ok) { error = r.error; return render(); }
   notes = notes.filter((n) => n !== note);
-  render();
+  renderNotes();
 }
 
 // nav: a new page, so auto-show/hide afresh. Otherwise a refresh: never clobber an in-progress edit.
 async function load(nav) {
-  if (!nav && document.activeElement?.tagName === "TEXTAREA") return;
+  if (!nav && editors.some((ed) => ed.isFocused())) return;
   const r = await send({ op: "list", url: page.url });
   error = r.ok ? "" : r.error;
+  const before = JSON.stringify(notes);
   if (r.ok) notes = r.notes;
   else if (nav) notes = [];
   // forced: opened by toggle on this page, so a slower first load mustn't hide it again.
   if (nav) { dismissed = false; visible = forced || notes.length > 0; }
   else if (notes.length && !dismissed) visible = true;
-  render();
+  // Rebuilding unchanged editors would drop the cursor (and focus) the user just placed.
+  JSON.stringify(notes) === before ? render() : renderNotes();
 }
 
 chrome.runtime.onMessage.addListener((msg, sender) => {
