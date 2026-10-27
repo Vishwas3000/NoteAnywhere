@@ -24,6 +24,7 @@
 | D20 | One "+ New note" button, always for the current page | User | Decided |
 | D21 | Shared editor: TipTap 3.32 IIFE bundle, Markdown storage | Claude (subagent) | Proposed |
 | D22 | UI review (ui-review-tahoe skill) fixes applied | User asked; Claude | Proposed |
+| D23 | App notes track the window: channel/DM, project/file, … from the front window title (Accessibility) | User | Decided |
 
 ## D1 — Native SwiftUI app via SwiftPM (2026-10-27)
 - **Why:** native floating panels (`NSPanel`, non-activating, over full-screen apps) and frontmost-app tracking
@@ -168,3 +169,16 @@ Made by the subagent that wrote the extension:
   VoiceOver labels, calendar controls in the toolbar (⌘←/⌘T/⌘→), Help ▸ Keyboard Shortcuts window (user request).
 - ⌘⌫ always confirms, because it also means "delete to line start" while typing.
 - **Status:** Proposed.
+
+## D23 — Notes per window context, for every app (2026-10-28)
+- **Why:** user wants Slack notes tied to the channel/DM they were written in, for every app. The front window title
+  is read through the Accessibility API (notified on window/title change, no polling) and cleaned into a broad→narrow
+  path: "Alex Rivera (DM) - Acme - 8 new items - Slack" → Slack › Acme › Alex Rivera (DM). App notes target
+  "bundle.id/Acme/Alex Rivera (DM)"; same parent-sees-children rule as web pages (D19).
+- Cleaning drops the app's own name, unread counts ("8 new items", "(3)"), unsaved dots; "/" inside names is escaped.
+  Website notes show "host › cleaned page title" the same way (Slack web → app.slack.com › Acme › DM).
+- **Limits:** desktop titles give names, not IDs, so renaming a channel starts a new context and we can't deep-link
+  into the exact channel. Without the permission, notes stay app-level. The ad-hoc signed dev build changes signature
+  on every install, so macOS may ask to re-allow Accessibility after updates (fix later: a stable signing identity).
+- **Rejected:** Screen Recording permission (scarier prompt, needs polling); Slack-only or hand-tuned per-app parsers (user chose every app).
+- **Status:** Decided (user). Parser covered by `swift test` (Slack, VS Code, Xcode, browsers, counts, "/").

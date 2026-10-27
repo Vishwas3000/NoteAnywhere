@@ -87,7 +87,7 @@ struct SearchResultsView: View {
 
 extension Note {
     /// "App · Xcode" / "Site · github.com"
-    var source: String { kind == .app ? "App · \(label)" : "Site · \(target)" }
+    var source: String { kind == .app ? "App · \(place)" : "Site · \(place)" }
 }
 
 /// Spotlight-style search panel toggled by a global hotkey (⌥⇧Space).

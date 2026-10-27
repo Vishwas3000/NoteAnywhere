@@ -223,7 +223,7 @@ struct CalendarView: View {
     private func weekStart(_ d: Date) -> Date { cal.dateInterval(of: .weekOfYear, for: d)!.start }
     private func key(_ d: Date) -> String { Self.dayKey.string(from: d) }
     private func sourceKey(_ n: Note) -> String { n.kind.rawValue + ":" + n.target }
-    private func sourceName(_ n: Note) -> String { n.kind == .app ? n.label : n.target }
+    private func sourceName(_ n: Note) -> String { n.place }
     private func firstLine(_ n: Note) -> String {
         n.text.split(separator: "\n").first.map(String.init) ?? (n.kind == .app ? n.label : n.target)
     }

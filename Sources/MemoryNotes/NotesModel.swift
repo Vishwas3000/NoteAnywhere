@@ -14,6 +14,11 @@ final class NotesModel: ObservableObject {
     @Published var openRequest: String?
     /// The last frontmost app that isn't MemoryNotes itself.
     @Published private(set) var frontApp: NSRunningApplication?
+    /// Where in that app you are, as an app-note target: "bundle.id/Workspace/Channel" (just "bundle.id" without
+    /// the Accessibility permission or a useful window title).
+    @Published private(set) var frontContext: String?
+
+    private let titles = WindowTitleWatcher()
 
     private var notifyToken: Int32 = 0
     private var indexing: AnyCancellable?
@@ -27,14 +32,25 @@ final class NotesModel: ObservableObject {
             Task { await SearchIndex.shared.update(notes) }
         }
 
-        frontApp = Self.otherApp(NSWorkspace.shared.frontmostApplication)
+        titles.onChange = { [weak self] title in
+            guard let self, let app = self.frontApp, let id = app.bundleIdentifier else { return }
+            let context = WindowContext.target(bundleID: id, appName: app.localizedName ?? id, title: title)
+            if context != self.frontContext { self.frontContext = context }
+        }
+        WindowTitleWatcher.requestPermission()
+        setFront(Self.otherApp(NSWorkspace.shared.frontmostApplication))
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
         ) { [weak self] note in
             if let app = Self.otherApp(note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication) {
-                self?.frontApp = app
+                self?.setFront(app)
             }
         }
+    }
+
+    private func setFront(_ app: NSRunningApplication?) {
+        frontApp = app
+        titles.watch(app)  // reports the window title right away, which sets frontContext
     }
 
     private static func otherApp(_ app: NSRunningApplication?) -> NSRunningApplication? {
@@ -52,8 +68,9 @@ final class NotesModel: ObservableObject {
         await SearchIndex.shared.search(query, in: notes)
     }
 
-    func notes(forApp bundleID: String) -> [Note] {
-        notes.filter { $0.kind == .app && $0.target == bundleID }
+    /// App notes for a context and everything under it (same rule as web pages: parents see children).
+    func notes(inContext context: String) -> [Note] {
+        notes.filter { $0.kind == .app && ($0.target == context || $0.target.hasPrefix(context + "/")) }
     }
 
     @discardableResult

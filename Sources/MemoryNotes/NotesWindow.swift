@@ -86,10 +86,10 @@ struct NotesWindow: View {
                 let apps = model.notes.filter { $0.kind == .app }
                 let sites = model.notes.filter { $0.kind == .url }
                 if !apps.isEmpty {
-                    Section("Apps") { ForEach(apps) { row($0, title: $0.label) } }
+                    Section("Apps") { ForEach(apps) { row($0, title: $0.place) } }
                 }
                 if !sites.isEmpty {
-                    Section("Websites") { ForEach(sites) { row($0, title: $0.target.isEmpty ? "New website note" : $0.target) } }
+                    Section("Websites") { ForEach(sites) { row($0, title: $0.target.isEmpty ? "New website note" : $0.place) } }
                 }
             }
         }
@@ -160,8 +160,8 @@ struct NotesWindow: View {
                             .focused($targetFocused)
                     } else {
                         VStack(alignment: .leading) {
-                            Text(note.label).font(.headline)
-                            Text(note.target).font(.caption).foregroundStyle(.secondary)
+                            Text(note.place).font(.headline)
+                            Text(note.target.prefix { $0 != "/" }).font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }

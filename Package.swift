@@ -7,6 +7,7 @@ let package = Package(
     dependencies: [.package(url: "https://github.com/jkrukowski/swift-embeddings", from: "0.1.1")],
     targets: [
         .executableTarget(name: "MemoryNotes", dependencies: [.product(name: "Embeddings", package: "swift-embeddings")]),
+        .testTarget(name: "MemoryNotesTests", dependencies: ["MemoryNotes"]),
     ],
     swiftLanguageModes: [.v5]
 )

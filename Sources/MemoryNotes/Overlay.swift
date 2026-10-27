@@ -31,16 +31,16 @@ final class OverlayController {
     }()
 
     func start() {
-        subscription = model.$frontApp.sink { [weak self] app in self?.frontAppChanged(app) }
+        subscription = model.$frontContext.removeDuplicates().sink { [weak self] context in self?.contextChanged(context) }
     }
 
     func toggle() {
         panel.isVisible ? panel.orderOut(nil) : show(model.frontApp)
     }
 
-    private func frontAppChanged(_ app: NSRunningApplication?) {
-        guard let id = app?.bundleIdentifier, !model.notes(forApp: id).isEmpty else { return panel.orderOut(nil) }
-        show(app)
+    private func contextChanged(_ context: String?) {
+        guard let context, !model.notes(inContext: context).isEmpty else { return panel.orderOut(nil) }
+        show(model.frontApp)
     }
 
     private func show(_ app: NSRunningApplication?) {
@@ -79,12 +79,18 @@ struct OverlayView: View {
     @State private var pendingDelete: Note?
 
     var body: some View {
-        if let app = model.frontApp, let id = app.bundleIdentifier {
+        if let app = model.frontApp, let id = app.bundleIdentifier, let context = model.frontContext {
             let name = app.localizedName ?? id
+            let place = context.split(separator: "/").dropFirst().joined(separator: " › ")
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     if let icon = app.icon { Image(nsImage: icon).resizable().frame(width: 18, height: 18) }
-                    Text(name).font(.headline).lineLimit(1)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(name).font(.headline).lineLimit(1)
+                        if !place.isEmpty {
+                            Text(place).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        }
+                    }
                     Spacer()
                 }
                 .padding(.leading, 20)  // clear of the close button in the transparent title bar
@@ -96,13 +102,13 @@ struct OverlayView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 8) {
-                            ForEach(model.notes(forApp: id)) { note in
+                            ForEach(model.notes(inContext: context)) { note in
                                 HStack(alignment: .top, spacing: 4) {
                                     NoteEditor(noteID: note.id, toolbar: false)
                                         .frame(height: 110)
                                         .padding(4)
                                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                                        .accessibilityLabel("Note for \(name)")
+                                        .accessibilityLabel("Note for \(note.place)")
                                     Button {
                                         if note.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                             model.delete(note.id)
@@ -117,8 +123,8 @@ struct OverlayView: View {
                             }
                         }
                     }
-                    Button { model.add(kind: .app, target: id, label: name) } label: {
-                        Label("New Note for \(name)", systemImage: "plus")
+                    Button { model.add(kind: .app, target: context, label: name) } label: {
+                        Label("New Note for \(place.isEmpty ? name : place)", systemImage: "plus")
                     }
                 }
             }

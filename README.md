@@ -40,5 +40,5 @@ Decisions and their reasons are in [docs/DECISIONS.md](docs/DECISIONS.md); the p
 ## Test
 
 ```sh
-swift build -c release && python3 scripts/test_host.py
+swift test && swift build -c release && python3 scripts/test_host.py && (cd editor && npm test)
 ```

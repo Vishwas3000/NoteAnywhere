@@ -11,7 +11,7 @@ final class IconStore: ObservableObject {
     private var requested: Set<String> = []
 
     func icon(for note: Note) -> NSImage? {
-        let key = note.kind == .app ? note.target : String(note.target.prefix { $0 != "/" })
+        let key = String(note.target.prefix { $0 != "/" })  // bundle id for apps, host for sites
         if let icon = icons[key] { return icon }
         if requested.insert(key).inserted {
             Task { await load(note.kind, key) }  // async so the view body never publishes changes
