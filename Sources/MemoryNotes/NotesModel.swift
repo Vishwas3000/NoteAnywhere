@@ -6,6 +6,8 @@ final class NotesModel: ObservableObject {
     static let shared = NotesModel()
 
     @Published private(set) var notes = NoteStore.loadAll()
+    /// One entry per note per day it was edited; feeds the calendar.
+    @Published private(set) var snapshots = NoteStore.loadHistory()
     /// The last frontmost app that isn't MemoryNotes itself.
     @Published private(set) var frontApp: NSRunningApplication?
 
@@ -39,6 +41,8 @@ final class NotesModel: ObservableObject {
     func reload() {
         let fresh = NoteStore.loadAll()
         if fresh != notes { notes = fresh }
+        let history = NoteStore.loadHistory()
+        if history != snapshots { snapshots = history }
     }
 
     func notes(forApp bundleID: String) -> [Note] {
@@ -55,6 +59,7 @@ final class NotesModel: ObservableObject {
 
     func delete(_ id: String) {
         notes.removeAll { $0.id == id }
+        snapshots.removeAll { $0.note.id == id }
         do { try NoteStore.delete(id) } catch { NSLog("MemoryNotes: delete failed: \(error)") }
     }
 

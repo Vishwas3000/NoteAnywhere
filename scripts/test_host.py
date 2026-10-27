@@ -31,6 +31,12 @@ assert not call({"op": "save", "note": note("../../evil", "x.com")})["ok"], "pat
 assert not call({"op": "save", "note": {**note(site, "x.com"), "kind": "app"}})["ok"], "browser can't write app notes"
 assert not call({"op": "nope"})["ok"]
 
+# Every save also writes that day's snapshot for the calendar; delete removes the history.
+import datetime
+day = datetime.datetime.fromtimestamp(2 / 1000).strftime("%Y-%m-%d")
+assert os.path.exists(os.path.join(env["MEMORYNOTES_DIR"], "history", page, day + ".json"))
+
 assert call({"op": "delete", "id": page})["ok"]
+assert not os.path.exists(os.path.join(env["MEMORYNOTES_DIR"], "history", page))
 assert ids("github.com/vercel/next.js") == [site]
 print("host ok")

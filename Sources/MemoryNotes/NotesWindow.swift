@@ -3,6 +3,16 @@ import SwiftUI
 
 /// Every note in one place: app notes and website notes (including ones written in the browser).
 struct NotesWindow: View {
+    var body: some View {
+        TabView {
+            NotesBrowser().tabItem { Label("Notes", systemImage: "note.text") }
+            CalendarView().tabItem { Label("Calendar", systemImage: "calendar") }
+        }
+        .frame(minWidth: 720, minHeight: 460)
+    }
+}
+
+private struct NotesBrowser: View {
     @ObservedObject private var model = NotesModel.shared
     @State private var selection: String?
 
@@ -52,7 +62,6 @@ struct NotesWindow: View {
                 Text("Select or create a note").foregroundStyle(.secondary)
             }
         }
-        .frame(minWidth: 640, minHeight: 400)
     }
 
     private func row(_ note: Note, title: String) -> some View {

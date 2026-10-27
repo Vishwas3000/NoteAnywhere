@@ -35,7 +35,7 @@ MemoryNotes.app (watches the folder) ◀─────────────�
 ```
 
 Chrome starts the same app binary as a short-lived host process, so the extension works even when the app is closed.
-Decisions and their reasons are in [docs/DECISIONS.md](docs/DECISIONS.md).
+Decisions and their reasons are in [docs/DECISIONS.md](docs/DECISIONS.md); the plan is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Test
 

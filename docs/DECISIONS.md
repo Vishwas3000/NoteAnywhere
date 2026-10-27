@@ -10,6 +10,11 @@
 | D6 | Support Chrome and Brave | User | Decided |
 | D7 | Extension UX details (see entry) | Claude (subagent) | Proposed |
 | D8 | Keep the extension for website notes vs. reading the tab URL via AppleScript | User | Pending |
+| D9 | Calendar keeps one snapshot per note per edited day | User | Decided |
+| D10 | Semantic search with all-MiniLM-L6-v2 (+ keyword), not Apple's built-in embeddings | User + measured | Decided |
+| D11 | One shared TipTap web editor for the Mac app and browser overlay; notes stored as Markdown | User | Decided |
+| D12 | Apple Notes feature set: scope and phases in ROADMAP.md | User | Decided |
+| D13 | Sync backend for iPhone: decide later; keep storage sync-ready | User | Pending |
 
 ## D1 — Native SwiftUI app via SwiftPM (2026-10-27)
 - **Why:** native floating panels (`NSPanel`, non-activating, over full-screen apps) and frontmost-app tracking
@@ -59,3 +64,33 @@ Made by the subagent that wrote the extension:
   native panel. Pros: no extension. Cons: macOS Automation permission prompt, ~1s polling, panel floats over the
   window rather than inside the page.
 - **Current:** extension (built). **Status:** Pending the user's call.
+
+## D9 — Daily snapshots for the calendar (2026-10-27)
+- **Why:** user chose "days edited + snapshot". Every save overwrites `history/<id>/<yyyy-MM-dd>.json`, so each
+  day keeps that note's last version. Deleting a note deletes its history too (Claude's call: deleted means gone).
+- **Rejected:** dates only (can't show what a note said that day); created/updated only (≤2 days per note).
+- **Status:** Decided (user); delete-removes-history is Proposed.
+
+## D10 — MiniLM embeddings for search (2026-10-27)
+- **Measured** on 8 sample notes × 7 paraphrased queries (top-1 hit): Apple `NLEmbedding.sentenceEmbedding` 2/7,
+  Apple `NLContextualEmbedding` mean-pooled 2/7, all-MiniLM-L6-v2 6/7, bge-small-en-v1.5 6/7, multilingual-e5-small 6/7.
+- **Decision:** all-MiniLM-L6-v2 (23M params, ~90 MB one-time download), plus keyword matching so exact words
+  (and non-English text) still hit. Run in Swift via the `swift-embeddings` package (MLTensor, macOS 15+).
+- **Rejected:** Apple built-in (too weak); e5-small (5× bigger, only needed for non-English meaning search); Ollama (must run separately).
+- **Status:** Decided (user picked MiniLM after the numbers). Dependency awaiting the user's approval.
+
+## D11 — Shared web editor, Markdown storage (2026-10-27)
+- **Why:** tables, checklists, link cards, sketches and audio need a real rich-text editor; building it once
+  (TipTap) and running it in both the Mac app's WebView and the browser overlay keeps them identical.
+  Markdown keeps notes readable, searchable, exportable and syncable.
+- **Rejected:** native AppKit editor (much more custom text-system work, and the browser would need a second editor).
+- **Status:** Decided (user).
+
+## D12 — Apple Notes features in scope (2026-10-27)
+- **Chosen by the user:** folders, pins, #tags; formatting, checklists, tables, links between notes; images & files,
+  sketches, audio + transcript, scan from iPhone, Notion-style web link previews; export & share, Quick Note hotkey,
+  iPhone app + sync. **Not chosen:** Recently Deleted, locked notes.
+- **Status:** Decided (user). Order is in ROADMAP.md (Claude's proposal).
+
+## D13 — Sync backend (2026-10-27)
+- **Status:** Pending. User: decide later. Options on the table: CloudKit (needs Apple Developer account), Supabase.
