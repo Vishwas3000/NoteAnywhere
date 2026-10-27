@@ -4,7 +4,7 @@ if (window.top === window) (() => {
   const currentUrl = () => host() + location.pathname;
   const pageTarget = () => (location.pathname === "/" ? host() : host() + location.pathname.replace(/\/$/, ""));
 
-  let notes = [], visible = false, dismissed = false, collapsed = false, error = "";
+  let notes = [], visible = false, dismissed = false, collapsed = false, forced = false, error = "";
 
   async function send(msg) {
     try {
@@ -143,7 +143,8 @@ if (window.top === window) (() => {
     error = r.ok ? "" : errorText(r);
     if (r.ok) notes = r.notes;
     else if (nav) notes = [];
-    if (nav) { dismissed = false; visible = notes.length > 0; }
+    // forced: opened by toggle on this page, so a slower first load mustn't hide it again.
+    if (nav) { dismissed = false; visible = forced || notes.length > 0; }
     else if (notes.length && !dismissed) visible = true;
     render();
   }
@@ -151,6 +152,7 @@ if (window.top === window) (() => {
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type !== "toggle") return;
     visible = !visible;
+    forced = visible;
     dismissed = !visible;
     render();
   });
@@ -160,7 +162,7 @@ if (window.top === window) (() => {
   // shortcut: polling for SPA navigation, upgrade to the Navigation API if CPU matters.
   let lastUrl = currentUrl();
   setInterval(() => {
-    if (currentUrl() !== lastUrl) { lastUrl = currentUrl(); load(true); }
+    if (currentUrl() !== lastUrl) { lastUrl = currentUrl(); forced = false; load(true); }
   }, 1000);
 
   document.documentElement.append(el);

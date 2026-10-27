@@ -5,7 +5,9 @@
   "description": "Overlay your MemoryNotes on the sites and pages they belong to.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnnvgS9BucYZWOBwt4Qu7diY7ptClJ7H5IqWvLU15v2bK9Y3uul0fcwpX09N7dNjCqbBqgAILPYOU7LAOk00zhK9fawVsrafGWf06Q6dbQVQ/lwPOMFAiYoXsqNjDZ1rije9syJTSxCI1WQdajrv5YACfF4jWt3Au0e7CqA3N+z2ZITylrtkzJMPiKewY1bewcK8PBG9Kf1ZbqOh5YambdXBfjMD3wP401wXi8UAwQDEOSxV+FNHWXmgVf0FtXbfP/mqWvEoE4bwR1I5DeC511SI5Q83a5w54oluE7pz9aAMKwC0yacCkDWaJqsXSH5XkUWHC+LhpL1w9bui6WbGhJQIDAQAB",
   "permissions": [
-    "nativeMessaging"
+    "nativeMessaging",
+    "activeTab",
+    "scripting"
   ],
   "background": {
     "service_worker": "background.js"

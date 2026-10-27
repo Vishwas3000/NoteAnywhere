@@ -13,6 +13,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return true; // keep sendResponse alive for the async reply
 });
 
-chrome.action.onClicked.addListener((tab) => {
-  chrome.tabs.sendMessage(tab.id, { type: "toggle" }).catch(() => {}); // e.g. chrome:// pages have no content script
+chrome.action.onClicked.addListener(async (tab) => {
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: "toggle" });
+  } catch {
+    // Tabs opened before install have no content script yet; activeTab lets us inject it now.
+    // chrome:// and Web Store pages refuse injection, nothing to do there.
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] }).catch(() => {});
+    await chrome.tabs.sendMessage(tab.id, { type: "toggle" }).catch(() => {});
+  }
 });
