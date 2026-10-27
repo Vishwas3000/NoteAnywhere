@@ -50,29 +50,37 @@ final class OverlayController {
 
 struct OverlayView: View {
     @ObservedObject private var model = NotesModel.shared
+    @State private var query = ""
 
     var body: some View {
         if let app = model.frontApp, let id = app.bundleIdentifier {
             let name = app.localizedName ?? id
             VStack(alignment: .leading, spacing: 8) {
-                ScrollView {
-                    VStack(spacing: 8) {
-                        ForEach(model.notes(forApp: id)) { note in
-                            HStack(alignment: .top, spacing: 4) {
-                                TextEditor(text: model.binding(note.id, \.text))
-                                    .font(.body)
-                                    .frame(height: 90)
-                                    .scrollContentBackground(.hidden)
-                                    .padding(4)
-                                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                                Button { model.delete(note.id) } label: { Image(systemName: "trash") }
-                                    .buttonStyle(.borderless)
-                                    .help("Delete note")
+                TextField("Search all notes…", text: $query)
+                    .textFieldStyle(.roundedBorder)
+                    .onExitCommand { query = "" }
+                if !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                    SearchResultsView(query: query)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            ForEach(model.notes(forApp: id)) { note in
+                                HStack(alignment: .top, spacing: 4) {
+                                    TextEditor(text: model.binding(note.id, \.text))
+                                        .font(.body)
+                                        .frame(height: 90)
+                                        .scrollContentBackground(.hidden)
+                                        .padding(4)
+                                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                                    Button { model.delete(note.id) } label: { Image(systemName: "trash") }
+                                        .buttonStyle(.borderless)
+                                        .help("Delete note")
+                                }
                             }
                         }
                     }
+                    Button("+ Note for \(name)") { model.add(kind: .app, target: id, label: name) }
                 }
-                Button("+ Note for \(name)") { model.add(kind: .app, target: id, label: name) }
             }
             .padding(10)
             // The hosting view sizes the panel to this; without it the ScrollView collapses to zero height.

@@ -5,6 +5,7 @@ if (window.top === window) (() => {
   const pageTarget = () => (location.pathname === "/" ? host() : host() + location.pathname.replace(/\/$/, ""));
 
   let notes = [], visible = false, dismissed = false, collapsed = false, forced = false, error = "";
+  let query = "", results = [], searchSeq = 0, searchTimer;
 
   async function send(msg) {
     try {
@@ -44,6 +45,13 @@ if (window.top === window) (() => {
       .error { color: #d14; }
       footer { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }
       footer button { flex: 1; border-color: var(--line); }
+      .search { box-sizing: border-box; width: calc(100% - 20px); margin: 8px 10px 0; font: inherit; color: var(--fg);
+        background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
+      .search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+      .results button { display: block; width: 100%; text-align: left; border-color: var(--line); padding: 6px 8px; }
+      .results .meta { margin-bottom: 2px; }
+      .snippet { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
+      .snippet.full { display: block; -webkit-line-clamp: unset; user-select: text; }
       [hidden] { display: none !important; }
     </style>
     <div class="panel" role="complementary" aria-label="MemoryNotes">
@@ -53,9 +61,12 @@ if (window.top === window) (() => {
         <button class="close" aria-label="Close">×</button>
       </header>
       <div class="body">
+        <input class="search" type="search" placeholder="Search all notes…" aria-label="Search all notes">
         <div class="error" role="alert" hidden></div>
         <div class="list"></div>
+        <div class="list results" hidden></div>
         <div class="empty">No notes here yet.</div>
+        <div class="empty no-results" hidden>No matching notes</div>
         <footer>
           <button class="add-site">+ This site</button>
           <button class="add-page">+ This page</button>
@@ -64,6 +75,22 @@ if (window.top === window) (() => {
     </div>`;
   const $ = (s) => root.querySelector(s);
   const [count, body, list, empty, errBox] = [".count", ".body", ".list", ".empty", ".error"].map($);
+  const [searchBox, resultList, noResults, footer] = [".search", ".results", ".no-results", "footer"].map($);
+
+  // Keep typing in the overlay from triggering the page's own keyboard shortcuts (GitHub, YouTube, …).
+  for (const type of ["keydown", "keyup", "keypress"]) root.addEventListener(type, (e) => e.stopPropagation());
+
+  searchBox.oninput = () => {
+    clearTimeout(searchTimer);
+    query = searchBox.value.trim();
+    if (!query) { searchSeq++; results = []; return render(); }
+    searchTimer = setTimeout(search, 300);
+  };
+  searchBox.onkeydown = (e) => {
+    if (e.key !== "Escape") return;
+    searchBox.value = "";
+    searchBox.oninput();
+  };
 
   $(".collapse").onclick = () => { collapsed = !collapsed; render(); };
   $(".close").onclick = () => { visible = false; dismissed = true; render(); };
@@ -78,8 +105,42 @@ if (window.top === window) (() => {
     $(".collapse").setAttribute("aria-label", collapsed ? "Expand" : "Collapse");
     errBox.textContent = error;
     errBox.hidden = !error;
-    empty.hidden = notes.length > 0;
-    list.replaceChildren(...notes.map(noteRow));
+    const searching = query !== "";
+    list.hidden = searching;
+    footer.hidden = searching;
+    empty.hidden = searching || notes.length > 0;
+    resultList.hidden = !searching;
+    noResults.hidden = !searching || results.length > 0;
+    if (searching) resultList.replaceChildren(...results.map(resultRow));
+    else list.replaceChildren(...notes.map(noteRow));
+  }
+
+  async function search() {
+    const seq = ++searchSeq;
+    const r = await send({ op: "search", query });
+    if (seq !== searchSeq) return; // a newer query (or a cleared box) superseded this one
+    error = r.ok ? "" : errorText(r);
+    results = r.ok ? r.results.map((x) => x.note) : [];
+    render();
+  }
+
+  function resultRow(note) {
+    const row = document.createElement("button");
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = note.kind === "app" ? `App · ${note.label || note.target}` : `Site · ${note.target}`;
+    const snippet = document.createElement("div");
+    snippet.className = "snippet";
+    snippet.textContent = note.text || "Empty note";
+    row.append(meta, snippet);
+    if (note.kind === "app") {
+      row.setAttribute("aria-expanded", "false");
+      row.onclick = () => row.setAttribute("aria-expanded", String(snippet.classList.toggle("full")));
+    } else {
+      row.setAttribute("aria-label", `Open ${note.target}: ${note.text.split("\n")[0]}`);
+      row.onclick = () => window.open(`https://${note.target}`, "_blank", "noopener");
+    }
+    return row;
   }
 
   function noteRow(note) {

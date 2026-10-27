@@ -15,16 +15,36 @@ struct NotesWindow: View {
 private struct NotesBrowser: View {
     @ObservedObject private var model = NotesModel.shared
     @State private var selection: String?
+    @State private var query = ""
+    @State private var hits: [SearchIndex.Hit] = []
 
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
-                Section("Apps") {
-                    ForEach(model.notes.filter { $0.kind == .app }) { row($0, title: $0.label) }
+                if !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Section("Results") {
+                        ForEach(hits, id: \.note.id) { row($0.note, title: $0.note.source) }
+                    }
+                } else {
+                    Section("Apps") {
+                        ForEach(model.notes.filter { $0.kind == .app }) { row($0, title: $0.label) }
+                    }
+                    Section("Websites") {
+                        ForEach(model.notes.filter { $0.kind == .url }) { row($0, title: $0.target) }
+                    }
                 }
-                Section("Websites") {
-                    ForEach(model.notes.filter { $0.kind == .url }) { row($0, title: $0.target) }
-                }
+            }
+            // .searchable doesn't attach inside a TabView, so the field lives at the top of the sidebar.
+            .safeAreaInset(edge: .top) {
+                TextField("Search by meaning or keyword", text: $query)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+            }
+            .task(id: query) {
+                try? await Task.sleep(for: .milliseconds(250))  // debounce typing
+                guard !Task.isCancelled else { return }
+                hits = await model.search(query)
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 260)
             .toolbar {

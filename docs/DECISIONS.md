@@ -15,6 +15,9 @@
 | D11 | One shared TipTap web editor for the Mac app and browser overlay; notes stored as Markdown | User | Decided |
 | D12 | Apple Notes feature set: scope and phases in ROADMAP.md | User | Decided |
 | D13 | Sync backend for iPhone: decide later; keep storage sync-ready | User | Pending |
+| D14 | Search UX: ⌥⇧Space popup, hybrid scoring, host embeds only the query | Claude | Proposed |
+| D15 | Calendar layout details (subagent) | Claude (subagent) | Proposed |
+| D16 | Browser search UX details (subagent) | Claude (subagent) | Proposed |
 
 ## D1 — Native SwiftUI app via SwiftPM (2026-10-27)
 - **Why:** native floating panels (`NSPanel`, non-activating, over full-screen apps) and frontmost-app tracking
@@ -77,7 +80,7 @@ Made by the subagent that wrote the extension:
 - **Decision:** all-MiniLM-L6-v2 (23M params, ~90 MB one-time download), plus keyword matching so exact words
   (and non-English text) still hit. Run in Swift via the `swift-embeddings` package (MLTensor, macOS 15+).
 - **Rejected:** Apple built-in (too weak); e5-small (5× bigger, only needed for non-English meaning search); Ollama (must run separately).
-- **Status:** Decided (user picked MiniLM after the numbers). Dependency awaiting the user's approval.
+- **Status:** Decided (user picked MiniLM after the numbers). Dependency approved by the user 2026-10-28.
 
 ## D11 — Shared web editor, Markdown storage (2026-10-27)
 - **Why:** tables, checklists, link cards, sketches and audio need a real rich-text editor; building it once
@@ -94,3 +97,22 @@ Made by the subagent that wrote the extension:
 
 ## D13 — Sync backend (2026-10-27)
 - **Status:** Pending. User: decide later. Options on the table: CloudKit (needs Apple Developer account), Supabase.
+
+## D14 — Search UX and scoring (2026-10-28)
+- Global hotkey **⌥⇧Space** (Carbon, no Accessibility permission). Rejected ⌥⇧N: it's the browser overlay's shortcut.
+- Score = cosine similarity + 0.5 × (share of query words found). Results need cosine > 0.25 or a keyword hit.
+  Measured through the host: 6/7 top-1 on the benchmark set, ~0.4 s per browser search (the host loads the model per call).
+- The app keeps `embeddings.json` up to date (2 s after typing stops); the browser host only reads it and embeds the query.
+- Results expand into an editor in place (popup and overlay) instead of opening the main window.
+- **Status:** Proposed.
+
+## D15 — Calendar layout details (2026-10-28, subagent)
+- Month grid always 6 rows, cells stretch; cells show first 3 edits that day (earliest first) + "+N more".
+- Cells show the note's first line (falls back to app/site name); clicking a day opens the Day view.
+- Filter keyed by "kind:target", named by the latest label (page titles change, the key doesn't).
+- **Status:** Proposed.
+
+## D16 — Browser search UX details (2026-10-28, subagent)
+- Search box sits in the panel body (hidden when collapsed). Website results open the site in a new tab;
+  app results expand inline. Keystrokes inside the overlay don't reach the page's shortcuts.
+- **Status:** Proposed.

@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// Shared state for the main window and the overlay: all notes, plus which app is in front.
@@ -12,8 +13,15 @@ final class NotesModel: ObservableObject {
     @Published private(set) var frontApp: NSRunningApplication?
 
     private var watcher: DispatchSourceFileSystemObject?
+    private var indexing: AnyCancellable?
 
     private init() {
+        // Notes made before the calendar existed get a snapshot on their last-edited day.
+        for note in notes where !FileManager.default.fileExists(atPath: NoteStore.historyDir.appendingPathComponent(note.id).path) {
+            try? NoteStore.save(note)
+        }
+        snapshots = NoteStore.loadHistory()
+
         // Atomic writes rename into the folder, so a directory watch sees every save/delete from the browser host.
         let fd = open(NoteStore.dir.path, O_EVTONLY)
         if fd >= 0 {
@@ -22,6 +30,11 @@ final class NotesModel: ObservableObject {
             source.setCancelHandler { close(fd) }
             source.resume()
             watcher = source
+        }
+
+        // Re-embed changed notes once typing pauses; the first run downloads the model if needed.
+        indexing = $notes.debounce(for: .seconds(2), scheduler: RunLoop.main).sink { notes in
+            Task { await SearchIndex.shared.update(notes) }
         }
 
         frontApp = Self.otherApp(NSWorkspace.shared.frontmostApplication)
@@ -43,6 +56,10 @@ final class NotesModel: ObservableObject {
         if fresh != notes { notes = fresh }
         let history = NoteStore.loadHistory()
         if history != snapshots { snapshots = history }
+    }
+
+    func search(_ query: String) async -> [SearchIndex.Hit] {
+        await SearchIndex.shared.search(query, in: notes)
     }
 
     func notes(forApp bundleID: String) -> [Note] {

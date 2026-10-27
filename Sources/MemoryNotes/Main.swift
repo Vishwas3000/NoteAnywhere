@@ -14,7 +14,10 @@ enum Main {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let overlay = OverlayController()
-    func applicationDidFinishLaunching(_ notification: Notification) { overlay.start() }
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        overlay.start()
+        SearchPopup.shared.start()
+    }
 }
 
 struct MemoryNotesApp: App {
@@ -36,6 +39,7 @@ private struct MenuContent: View {
 
     var body: some View {
         Button("Show/Hide Overlay") { overlay.toggle() }
+        Button("Search Notes  ⌥⇧Space") { SearchPopup.shared.toggle() }
         Button("Open Notes") {
             openWindow(id: "notes")
             NSApp.activate()

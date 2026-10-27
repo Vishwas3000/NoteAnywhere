@@ -8,12 +8,14 @@ enum NativeHost {
         var url: String?
         var note: Note?
         var id: String?
+        var query: String?
     }
 
     struct Reply: Encodable {
         var ok = true
         var notes: [Note]?
         var note: Note?
+        var results: [SearchIndex.Hit]?
         var error: String?
     }
 
@@ -31,6 +33,18 @@ enum NativeHost {
         }
     }
 
+    /// The host loop is synchronous; run one async call to completion.
+    private static func blocking<T>(_ work: @escaping () async -> T) -> T {
+        var result: T?
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            result = await work()
+            done.signal()
+        }
+        done.wait()
+        return result!
+    }
+
     static func handle(_ data: Data) -> Reply {
         do {
             let req = try JSONDecoder().decode(Request.self, from: data)
@@ -46,6 +60,9 @@ enum NativeHost {
                 note.updatedAt = max(note.updatedAt, Date().timeIntervalSince1970 * 1000)
                 try NoteStore.save(note)
                 return Reply(note: note)
+            case "search":
+                let query = req.query ?? ""
+                return Reply(results: blocking { await SearchIndex.shared.search(query, in: NoteStore.loadAll()) })
             case "delete":
                 try NoteStore.delete(req.id ?? "")
                 return Reply()
