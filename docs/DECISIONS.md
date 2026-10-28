@@ -195,3 +195,11 @@ Made by the subagent that wrote the extension:
   window geometry) and over a fixed position.
 - Overlay keeps its offset from the top-right corner when it moves screens, clamped to fit; ⌥⇧Space popup centers there.
 - **Status:** Decided (user). Geometry covered by `swift test`.
+
+## D26 — Sign with a real certificate so Accessibility sticks (2026-10-28)
+- **Why:** user saw the Accessibility prompt again and again although it was allowed. Ad-hoc signing makes the
+  designated requirement a cdhash, which changes on every build, so macOS treated each install as a new app.
+- `install.sh` signs with the first valid Apple Development certificate (override: `MEMORYNOTES_SIGN_ID`), so the
+  requirement is identifier + certificate and survives rebuilds. Falls back to ad-hoc, with a warning, when there is none.
+- **Rejected:** a self-signed certificate (extra keychain setup; a valid Apple Development identity already exists).
+- **Status:** Decided (Claude, fixing a reported bug). One last grant was needed after switching.
