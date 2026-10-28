@@ -524,8 +524,8 @@ What kept it from becoming a pile of plausible code:
   else works without it.
 - **SPA navigation is polled** once a second in the content script, and native host replies are capped at 1 MB by
   Chrome, which text notes on one page won't reach.
-- **Not shipped yet:** the iPhone app (with Share and Safari extensions), iCloud sync, and an Apple Notes–style
-  right-click menu with pinning, folders and locked notes. They're in progress.
+- **Not shipped yet:** the iPhone app (with Share and Safari extensions), locked notes (password-encrypted, Touch
+  ID) and iCloud sync. The first two are in progress.
 
 ## Try it
 

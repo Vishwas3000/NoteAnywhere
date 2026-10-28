@@ -118,9 +118,10 @@ Mac app, which runs the model. macOS Writing Tools work in the editor as well.
 A notes app you use every day collects features. I tried to borrow habits people already have instead of inventing
 new ones.
 
-From Apple Notes: the look. A sidebar grouped into Today, Yesterday and Previous 7 Days, a yellow accent, round
-checkboxes. ⌘N makes a plain note that isn't tied to anything, and you can attach a website to it later, or take it
-away.
+From Apple Notes: the look and the organizing. A sidebar grouped into Today, Yesterday and Previous 7 Days, a
+yellow accent, round checkboxes, folders and pinned notes. Right-click a note to open it in its own window, duplicate
+it, share it, move it to a folder or give it a color label, the way Chrome colors tab groups. ⌘N makes a plain note
+that isn't tied to anything, and you can attach a website to it later, or take it away.
 
 From Obsidian: #tags, nested like `#area/topic`, and a knowledge graph. Each note is a dot joined to its app or site,
 its tags, the notes it links to, and notes with a similar meaning. That last kind of link comes from the search model,
@@ -167,8 +168,8 @@ together, that file is the most honest record of it.
 ## What's next
 
 An iPhone app is in progress, with a Share extension and a Safari extension, so you can save a note from anywhere on
-the phone. So is an Apple Notes–style right-click menu: pin, lock with Touch ID, folders, duplicate, share and color
-labels. iCloud sync is planned, for people who'd rather not use a separate service.
+the phone. So are locked notes: password-encrypted, opened with Touch ID. iCloud sync is planned, for people who'd
+rather not use a separate service.
 
 ## Try it
 

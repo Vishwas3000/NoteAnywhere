@@ -43,8 +43,11 @@ by default.
 - **A real Markdown editor**, shared by the app and the extension: headings, lists that continue, checklists,
   tables, code, quotes and links between notes. A Notion-style ⋮⋮ handle drags any block or list item between
   blocks, and ⌘⇧↑/↓ moves the current one.
-- **Apple Notes–style design**: a sidebar grouped by Today, Yesterday, Previous 7 Days and so on, and a menu-bar icon.
-- **Optional sync** through Supabase, signing in with a link sent to your email.
+- **Organized like Apple Notes.** Right-click a note to open it in its own window, pin it, duplicate it, share it,
+  move it to a folder, give it a color label (like Chrome's tab groups) or delete it. The sidebar has Folders, a
+  Pinned section and notes grouped by Today, Yesterday, Previous 7 Days and so on; the window shows how many notes
+  there are. A menu-bar icon is always there.
+- **Optional sync** through Supabase, signing in with a link sent to your email. Folders, pins and colors sync too.
 - **Light on your Mac**: about 0% CPU when idle and 37–65 MB of memory (measured).
 
 ## Install
@@ -175,9 +178,7 @@ permissions and sync.
 ## Coming soon
 
 - **An iPhone app**, with a Share extension and a Safari extension (in progress).
-- **An Apple Notes–style right-click menu** (in progress): Open in New Window, Pin, Lock (password-encrypted, unlock
-  with Touch ID), New, Duplicate, Share, Move to Folder, color labels like Chrome's tab groups, Delete.
-- **Folders and pinned notes**, synced (in progress).
+- **Locked notes** (in progress): password-encrypted, unlocked with Touch ID, from the right-click menu.
 - **iCloud sync** (planned).
 
 See [docs/ROADMAP.md](docs/ROADMAP.md).

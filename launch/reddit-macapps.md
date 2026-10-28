@@ -34,7 +34,8 @@ where you wrote it, and shows it again when you're back there.
   Mac app. A page also sees its sub-pages' notes.
 - **Find things by meaning.** ⌥⇧Space searches all notes from anywhere, with an on-device model (MiniLM) plus exact
   words.
-- **The rest of a notes app:** an Apple Notes–style window, a Markdown editor, #tags, a calendar with dated tasks
+- **The rest of a notes app:** an Apple Notes–style window with folders, pins and a right-click menu, a Markdown
+  editor, #tags, a calendar with dated tasks
   (type `@` for a date menu), an Obsidian-style graph, and Apple Intelligence actions (fix grammar, shorten, turn
   into a checklist) on macOS 26.
 

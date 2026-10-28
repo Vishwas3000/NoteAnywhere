@@ -47,7 +47,7 @@ It runs all-MiniLM-L6-v2 on your Mac plus exact-word matching. In a small test, 
 
 ---
 
-**5/7** [240]
+**5/7** [263]
 
 It's a full notes app, too:
 
@@ -55,7 +55,7 @@ It's a full notes app, too:
 #tags and an Obsidian-style graph
 type @ for a date menu; tasks land on the calendar
 Notion-style drag handles
-an Apple Notes–style window
+an Apple Notes–style window with folders and pins
 
 *Media: graph (S-6) or calendar (S-5)*
 

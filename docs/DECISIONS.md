@@ -298,3 +298,18 @@ Made by the subagent that wrote the extension:
 - `install.sh` remembers its signing certificate in an untracked `.signing-identity`, since with several valid
   certificates keychain order could change it and reset the Accessibility permission.
 - **Status:** Decided (user); release engineering and launch copy in progress.
+
+## D38 — Launch copy and privacy policy (2026-10-28, subagent)
+- **Why:** D36 needs posts, a store listing and a privacy policy. Written in `launch/` and `PRIVACY.md`, from the code
+  on `main`, not from memory: anything not merged (locked notes, iPhone app, iCloud) is listed as coming soon.
+- Claims are limited to what was measured: idle CPU ~0%, 37–65 MB, MiniLM ~87 MB, the 8-note × 7-query search test.
+  Posts use demo names only (Acme, Sam, weather-app); screenshots come from a separate macOS Demo account, because
+  the browser host always opens the default database, so `MEMORYNOTES_DIR` alone would leak real notes.
+- PRIVACY.md says plainly that deleted notes stay in the database as tombstones (soft delete, for sync) and that
+  sync isn't end-to-end encrypted. The Web Store disclosure declares web history and website content (page address
+  and title) even though they only reach the app on the same Mac.
+- Order: long posts (dev.to, Medium) first so later posts can link them, then Show HN, r/macapps, one subreddit a day,
+  Product Hunt last. AI-assisted build disclosed in the dev-facing posts; optional line in r/macapps.
+- **Rejected:** one-day blast across every site (no time to answer or fix); a contact email baked in (left as
+  `{{CONTACT_EMAIL}}` for the user to choose).
+- **Status:** Proposed. Nothing is posted; the user posts.

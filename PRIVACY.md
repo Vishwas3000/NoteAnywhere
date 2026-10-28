@@ -13,7 +13,9 @@ you turn it on. There are no analytics, no ads, no tracking and no account unles
 **On your Mac.** Everything NoteAnywhere keeps is in one SQLite database at
 `~/Library/Application Support/MemoryNotes/memorynotes.sqlite` (the folder still uses the app's former name). It holds:
 
-- your notes (Markdown text), with the app, chat or web page each one belongs to and when it was created and edited;
+- your notes (Markdown text), with the app, chat or web page each one belongs to, when it was created and edited,
+  and its folder, pin and color label;
+- your folders' names;
 - one snapshot per note for each day you edited it, which the calendar shows;
 - search vectors computed from your notes (see "On-device search");
 - icons of the websites you have notes for.
@@ -90,8 +92,9 @@ NoteAnywhere developer:
 
 - your email address and account id (managed by Supabase Auth, which also keeps sign-in records such as times and
   IP addresses, and sends the sign-in emails);
-- each note's text, the app, chat or page it belongs to, that place's name (such as a page title), its timestamps and
-  whether it was deleted;
+- each note's text, the app, chat or page it belongs to, that place's name (such as a page title), its timestamps,
+  whether it was deleted, and its folder, pin and color label;
+- your folders' names;
 - the daily snapshots the calendar uses.
 
 Search vectors and website icons are not synced. Data travels over HTTPS. Database rules ensure each account can only

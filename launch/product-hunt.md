@@ -45,7 +45,8 @@ Around that is a full notes app:
 - ⌥⇧Space to search everything by meaning, with a model that runs on your Mac
 - ✨ Apple Intelligence actions: fix grammar, make shorter, turn into a checklist (macOS 26)
 - #tags, a knowledge graph, and a calendar where `@fri` puts a task on Friday
-- a Markdown editor with Notion-style drag handles, in an Apple Notes–style window
+- a Markdown editor with Notion-style drag handles, in an Apple Notes–style window with folders, pins and color
+  labels
 
 It's local-first: your notes are in a SQLite database on your Mac, the AI runs on-device, and sync is off unless you
 turn it on. No account needed, no analytics.

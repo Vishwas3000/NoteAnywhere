@@ -8,7 +8,7 @@ comment: LinkedIn shows the first lines above the fold, so the point comes first
 I just open-sourced NoteAnywhere, a notes app for macOS where notes stay with the place they're about.
 
 Write a note in a Slack channel, a VS Code project, a WhatsApp chat or on a web page. The next time you're back
-there, the note is waiting in a small floating panel. No folders to remember, no searching for "that thing I wrote
+there, the note is waiting in a small floating panel. No digging through folders, no searching for "that thing I wrote
 about this client".
 
 It knows where you are by reading the front window's title (with your permission, never message contents), and a

@@ -70,7 +70,8 @@ check them in the uploader).
 | S-1 | Slack on the Sam DM with the floating panel open on the right, showing the note with its checklist and a date chip. | README hero `{{HERO_SCREENSHOT_URL}}`, PH-1 | Notes come back when you return to the DM. |
 | S-2 | Chrome on github.com/ueberdosis/tiptap with the panel: the page's note plus the `↳ /issues` note. | Medium `{{BROWSER_PANEL_URL}}`, X 3/7, PH-2, CWS-1 | Notes on any web page, and its sub-pages. |
 | S-3 | The ⌥⇧Space popup over VS Code with results and the key-hint footer. | PH-3 | Search everything from anywhere. |
-| S-4 | Main window, Notes tab: sidebar with Today / Previous 7 Days and the Tags list with counts; the Sam note open with its source chip, checklist, #tag and date chip. | PH-4 | A full Markdown notes app. |
+| S-4 | Main window, Notes tab: sidebar with Folders (create "Work" and "Personal"), a Pinned note, Today / Previous 7 Days and the Tags list with counts; the note count under the title; the Sam note open with its source chip, checklist, #tag and date chip; one note with a color label. | PH-4 | A full Markdown notes app. |
+| S-9 | The right-click menu open on a note in the sidebar: Open Note in New Window, Pin, Duplicate, Share, Move to, Color. | optional, PH (optional) | Organized like Apple Notes. |
 | S-5 | Calendar, week view, with Planned tasks on three days (one ticked) and edits below. | Medium `{{CALENDAR_URL}}`, X 5/7, PH-5 | Dated lines and tasks land on the calendar. |
 | S-6 | Graph (⌘3) with Slack, VS Code and github.com hubs, tag hubs (#dev with #dev/api under it), dashed similar links; toggles visible. | Medium `{{GRAPH_URL}}`, Reddit r/ObsidianMD `{{GRAPH_URL}}`, X 5/7, PH-6 | See how your notes connect. |
 | S-7 | The ✨ menu open on the release note (macOS 26), "Turn into Checklist" highlighted, "Apple Intelligence · on this Mac" footer visible. | PH (optional), dev.to (optional) | Apple Intelligence, on-device. |
