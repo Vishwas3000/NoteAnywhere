@@ -87,6 +87,22 @@ struct NotesWindow: View {
                 ForEach(NoteDates.sections(model.notes)) { section in
                     Section { ForEach(section.notes) { row($0) } } header: { sectionHeader(section.title) }
                 }
+                let tags = tagCounts
+                if !tags.isEmpty {
+                    Section {
+                        ForEach(tags, id: \.tag) { item in
+                            Button { query = "#" + item.tag } label: {
+                                LabeledContent {
+                                    Text("\(item.count)").monospacedDigit()
+                                } label: {
+                                    Label("#" + item.tag, systemImage: "number").foregroundStyle(Color.notesAccent)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint("Shows the notes with this tag")
+                        }
+                    } header: { sectionHeader("Tags") }
+                }
             }
         }
         .overlay {
@@ -111,8 +127,20 @@ struct NotesWindow: View {
             selection = id
             model.openRequest = nil
         }
+        .onChange(of: model.searchRequest, initial: true) { _, request in
+            guard let request else { return }
+            mode = .notes
+            query = request
+            model.searchRequest = nil
+        }
         .onChange(of: selection) { _, id in if id != nil { mode = .notes } }
         .navigationSplitViewColumnWidth(min: 240, ideal: 290)
+    }
+
+    /// Every #tag in use with its number of notes, most used first, like Obsidian's tag pane.
+    private var tagCounts: [(tag: String, count: Int)] {
+        let counts = model.notes.flatMap(\.tags).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+        return counts.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.map { (tag: $0.key, count: $0.value) }
     }
 
     /// Bold, sentence-case headers like Notes, instead of the sidebar's small grey ones.

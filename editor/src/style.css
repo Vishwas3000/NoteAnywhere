@@ -98,3 +98,5 @@
   background: var(--mn-code-bg); border-radius: 6px; }
 .mn-ai-menu[hidden] { display: none; }
 .mn-editor:has(.mn-ai) .mn-toolbar { padding-right: 34px; }  /* room for the ✨ button */
+/* #tags, like Obsidian: a soft accent pill. */
+.mn-content .mn-tag { color: var(--mn-link); background: color-mix(in srgb, var(--mn-check) 18%, transparent); border-radius: 4px; padding: 0 2px; }

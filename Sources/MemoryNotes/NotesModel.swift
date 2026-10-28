@@ -12,6 +12,8 @@ final class NotesModel: ObservableObject {
     @Published private(set) var snapshots = NoteStore.loadHistory()
     /// A note to select in the main window, e.g. after clicking a link to it inside another note.
     @Published var openRequest: String?
+    /// A search to run in the main window, e.g. "#ml" after ⌘-clicking that tag in a note.
+    @Published var searchRequest: String?
     /// The last frontmost app that isn't MemoryNotes itself.
     @Published private(set) var frontApp: NSRunningApplication?
     /// Where in that app you are, as an app-note target: "bundle.id/Workspace/Channel" (just "bundle.id" without

@@ -248,3 +248,13 @@ Made by the subagent that wrote the extension:
   enforces last-writer-wins on `updated_at`, keeps tombstones deleted and stamps a `seq` used as the pull cursor;
   Realtime on `notes` for live updates. Project "MemoryNotes" (ref strhaqnvxtpmlvcwkkne). Migration in `supabase/migrations`.
 - **Status:** Decided (user). Schema written; applying it needs the user's go-ahead (auto mode blocked the push).
+
+## D32 — Obsidian-style #tags (2026-10-28)
+- **Why:** user wants to tag like Obsidian so notes with the same tag connect on the map.
+- A tag is `#word` anywhere in the text: needs a letter, may nest (`#project/notes`), case-insensitive; not inside code,
+  link targets or headings. Parsed from the text (`Note.tags`), not stored, so sync and the browser need nothing new.
+- Graph: a "#" hub per tag, notes joined to their tags, nested tags to their parent; a Tags switch (hubs that are off
+  aren't built). Editor highlights tags; ⌘-click searches the tag. Searching `#tag` anywhere (main window, ⌥⇧Space,
+  overlays, browser) lists exactly the tagged notes. Sidebar has a Tags section with counts.
+- **Rejected:** the unused `tags` table (would need syncing; parsing is cheap); plain click on a tag (it would steal clicks meant for editing).
+- **Status:** Decided (Claude, Obsidian semantics as asked).

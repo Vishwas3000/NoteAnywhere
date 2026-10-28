@@ -102,3 +102,15 @@ private func distance(_ p: CGPoint, _ q: CGPoint) -> Double { hypot(p.x - q.x, p
     layout.settle()
     #expect(layout.isSettled)
 }
+
+@Test func notesSharingATagMeetAtItsHub() {
+    let notes = [note("a1", text: "#ml basics"), note("b2", text: "more #ML and #project/notes"), note("c3", text: "none")]
+    let graph = Graph(notes: notes, vectors: [:], sources: false)
+    #expect(graph.nodes.dropFirst(3).map(\.title) == ["#ml", "#project/notes", "#project"])
+    #expect(graph.nodes.dropFirst(3).allSatisfy { $0.isTag })
+    #expect(Set(graph.edges) == [
+        Graph.Edge(a: 0, b: 3, kind: .tag), Graph.Edge(a: 1, b: 3, kind: .tag),
+        Graph.Edge(a: 1, b: 4, kind: .tag), Graph.Edge(a: 4, b: 5, kind: .tag),  // nested tag under its parent
+    ])
+    #expect(Graph(notes: notes, vectors: [:], sources: false, tags: false).nodes.count == 3)
+}

@@ -9,6 +9,7 @@ struct NoteEditor: View {
     var fontSize = 13
     var titleLine = false  // first line styled as the title, like Apple Notes
     var fit: ClosedRange<CGFloat>?  // grow with the content within this range instead of filling the space
+    var onTag: ((String) -> Void)?  // after ⌘-clicking a #tag, which also asks the main window to search for it
     @ObservedObject private var model = NotesModel.shared
     @State private var contentHeight: CGFloat = 0
 
@@ -17,7 +18,7 @@ struct NoteEditor: View {
     var body: some View {
         if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
             EditorWebView(dir: dir, markdown: model.binding(noteID, \.text),
-                          options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine]) { contentHeight = $0 }
+                          options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine], onTag: onTag) { contentHeight = $0 }
                 .id(noteID)  // a fresh editor per note keeps undo history per note
                 .frame(height: fit.map { min(max(contentHeight, $0.lowerBound), $0.upperBound) })
         } else {
@@ -30,6 +31,7 @@ private struct EditorWebView: NSViewRepresentable {
     let dir: URL
     @Binding var markdown: String
     let options: [String: Any]
+    let onTag: ((String) -> Void)?
     let onHeight: (CGFloat) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -99,6 +101,10 @@ private struct EditorWebView: NSViewRepresentable {
                 }
             case "height":
                 if let value = body["value"] as? Double { parent.onHeight(value) }
+            case "tag":
+                guard let tag = body["tag"] as? String else { return }
+                NotesModel.shared.searchRequest = "#" + tag
+                parent.onTag?(tag)
             case "openNote":
                 if let id = body["id"] as? String { NotesModel.shared.openRequest = id }
             default:
