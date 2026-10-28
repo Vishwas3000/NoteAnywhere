@@ -1,4 +1,4 @@
-import { Editor, Extension } from "@tiptap/core";
+import { Editor, Extension, InputRule } from "@tiptap/core";
 import { NodeSelection, Plugin, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import StarterKit from "@tiptap/starter-kit";
@@ -283,6 +283,65 @@ function aiMenu(editor, onAI) {
   return wrap;
 }
 
+const CALENDAR_ICON = icon('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>');
+
+const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+/** "today", "tomorrow", "yesterday", or a weekday (its next one, today included) as yyyy-mm-dd. */
+export function dayFor(word, now = new Date()) {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const w = word.toLowerCase();
+  if (w === "tomorrow") d.setDate(d.getDate() + 1);
+  else if (w === "yesterday") d.setDate(d.getDate() - 1);
+  else if (w !== "today") d.setDate(d.getDate() + ((WEEKDAYS.indexOf(w.slice(0, 3)) - d.getDay() + 7) % 7));
+  return isoDay(d);
+}
+
+// Same rule as Note.dates in Swift: "@2026-10-30", or Obsidian Tasks' "📅 2026-10-30".
+const DATE = /(^|[\s(\[])((?:@|📅\s?)(\d{4}-\d{2}-\d{2}))(?![\w-])/gu;
+const SHORTHAND = /(?:^|\s)(@(today|tomorrow|yesterday|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?))\s$/i;
+
+/** Date chips (⌘-click opens the day via onDate) and "@today " / "@fri " typed into real dates. */
+function dates(onDate) {
+  return Extension.create({
+    name: "mnDates",
+    addInputRules: () => [new InputRule({
+      find: SHORTHAND,
+      handler: ({ state, range, match }) => {
+        const start = range.from + match[0].indexOf(match[1]);
+        state.tr.insertText(`@${dayFor(match[2])} `, start, range.to);
+      },
+    })],
+    addProseMirrorPlugins: () => [new Plugin({
+      props: {
+        decorations(state) {
+          const found = [];
+          state.doc.descendants((node, pos, parent) => {
+            if (parent?.type.name === "codeBlock" || !node.isText || node.marks.some((m) => m.type.name === "code")) return;
+            for (const m of node.text.matchAll(DATE)) {
+              const day = new Date(`${m[3]}T00:00`);
+              if (Number.isNaN(day.getTime()) || isoDay(day) !== m[3]) continue; // 2026-02-30 isn't a day
+              const from = pos + m.index + m[1].length;
+              found.push(Decoration.inline(from, from + m[2].length, {
+                class: "mn-date", "data-day": m[3],
+                title: day.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })
+                  + (onDate ? " · ⌘-click to open this day" : ""),
+              }));
+            }
+          });
+          return DecorationSet.create(state.doc, found);
+        },
+        handleClick(view, pos, event) {
+          const day = event.metaKey && event.target.closest?.(".mn-date")?.dataset.day;
+          if (!day || !onDate) return false;
+          onDate(day);
+          return true;
+        },
+      },
+    })],
+  });
+}
+
 const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>');
 
 /**
@@ -293,7 +352,7 @@ const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.0
  * Apple Intelligence edits (see AI_ACTIONS); the host runs the model, the editor applies the result as one undoable step.
  */
 export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
-  fontSize, titleLine = false, onHeight, onAI, onTag } = {}) {
+  fontSize, titleLine = false, onHeight, onAI, onTag, onDate } = {}) {
   const root = document.createElement("div");
   root.className = "mn-editor" + (titleLine ? " mn-title-line" : "");
   if (fontSize) root.style.setProperty("--mn-font-size", `${fontSize}px`);
@@ -310,9 +369,13 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   linkInput.placeholder = "https://… or note://id — empty removes";
   linkInput.setAttribute("aria-label", "Link address");
   linkForm.append(linkInput);
+  const dateForm = Object.assign(document.createElement("form"), { className: "mn-link mn-date-form", hidden: true });
+  const dateInput = Object.assign(document.createElement("input"), { type: "date" });
+  dateInput.setAttribute("aria-label", "Date for this line");
+  dateForm.append(dateInput);
   const body = document.createElement("div");
   body.className = "mn-body";
-  root.append(bar, linkForm, body);
+  root.append(bar, linkForm, dateForm, body);
   element.append(root);
 
   const openLink = () => {
@@ -351,6 +414,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     element: body,
     extensions: [
       tagHighlighter(onTag),
+      dates(onDate),
       dragHandle(),
       StarterKit.configure({ link: { openOnClick: false, protocols: ["note"], autolink: true },
         dropcursor: false }), // the drag handle draws its own line between blocks
@@ -400,6 +464,25 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     bar.append(b);
     return [b, active];
   }).filter(Boolean);
+  // 📅: pick a day, insert "@yyyy-mm-dd" at the cursor; the calendar then shows this line on that day.
+  const openDate = () => {
+    dateInput.value = isoDay(new Date());
+    dateForm.hidden = false;
+    dateInput.focus();
+    dateInput.showPicker?.();
+    return true;
+  };
+  const insertDate = () => {
+    if (dateInput.value) editor.chain().focus().insertContent(`@${dateInput.value} `).run();
+    dateForm.hidden = true;
+  };
+  dateForm.onsubmit = (e) => { e.preventDefault(); insertDate(); };
+  dateInput.onkeydown = (e) => { if (e.key === "Escape") { dateForm.hidden = true; editor.commands.focus(); } };
+  const dateButton = Object.assign(document.createElement("button"), { type: "button", innerHTML: CALENDAR_ICON, title: "Add a date" });
+  dateButton.setAttribute("aria-label", "Add a date");
+  dateButton.onmousedown = (e) => e.preventDefault();
+  dateButton.onclick = openDate;
+  bar.append(dateButton);
   const linkButton = document.createElement("button");
   linkButton.type = "button";
   linkButton.innerHTML = LINK_ICON;

@@ -70,6 +70,31 @@
     "action": "Drag the handle left of any block to move it"
   },
   {
+    "group": "Dates",
+    "keys": "@today / @tomorrow / @fri + Space",
+    "action": "Put this line on a day (shows in the calendar)"
+  },
+  {
+    "group": "Dates",
+    "keys": "📅 in the toolbar",
+    "action": "Pick any day from a calendar"
+  },
+  {
+    "group": "Dates",
+    "keys": "⌘-click a date",
+    "action": "Open that day in the calendar"
+  },
+  {
+    "group": "Tags",
+    "keys": "#tag",
+    "action": "Tag the note (nest with #area/topic)"
+  },
+  {
+    "group": "Tags",
+    "keys": "⌘-click a #tag",
+    "action": "See every note with that tag"
+  },
+  {
     "group": "Lists",
     "keys": "⌘⇧8",
     "action": "Bullet list"

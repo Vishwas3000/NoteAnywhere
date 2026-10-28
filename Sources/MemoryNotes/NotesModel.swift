@@ -14,6 +14,8 @@ final class NotesModel: ObservableObject {
     @Published var openRequest: String?
     /// A search to run in the main window, e.g. "#ml" after ⌘-clicking that tag in a note.
     @Published var searchRequest: String?
+    /// A day ("yyyy-MM-dd") to show in the calendar, e.g. after ⌘-clicking a date in a note.
+    @Published var calendarRequest: String?
     /// The last frontmost app that isn't MemoryNotes itself.
     @Published private(set) var frontApp: NSRunningApplication?
     /// Where in that app you are, as an app-note target: "bundle.id/Workspace/Channel" (just "bundle.id" without
@@ -87,6 +89,16 @@ final class NotesModel: ObservableObject {
         notes.removeAll { $0.id == id }
         snapshots.removeAll { $0.note.id == id }
         do { try NoteStore.delete(id) } catch { NSLog("MemoryNotes: delete failed: \(error)") }
+    }
+
+    /// Ticks or unticks a dated checklist line from the calendar.
+    func toggleTask(_ item: DatedLine) {
+        let text = binding(item.noteID, \.text)
+        var lines = text.wrappedValue.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        guard lines.indices.contains(item.line),
+              let box = lines[item.line].firstMatch(of: #/^\s*[-*+]\s+\[([ xX])\]/#) else { return }
+        lines[item.line].replaceSubrange(box.1.startIndex..<box.1.endIndex, with: box.1 == " " ? "x" : " ")
+        text.wrappedValue = lines.joined(separator: "\n")
     }
 
     func binding(_ id: String, _ field: WritableKeyPath<Note, String>) -> Binding<String> {

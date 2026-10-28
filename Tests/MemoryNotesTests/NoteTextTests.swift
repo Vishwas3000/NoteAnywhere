@@ -38,3 +38,20 @@ func plainLine(markdown: String, expected: String) {
     #expect(note.tags == ["ml", "project/notes", "paren", "release-1"])
     #expect(note.hasTag("project") && note.hasTag("project/notes") && !note.hasTag("proj"))
 }
+
+@Test func datedLines() {
+    let note = Note(id: "n", kind: .url, target: "", label: "", text: """
+        # Launch plan
+        - [ ] send build to QA @2026-10-30
+        - [x] book room 📅 2026-10-29
+        Party on @2026-11-01 and @2026-11-01, not `@2026-11-02`, not me@2026-11-03 or @2026-02-30
+        ```
+        @2026-11-04
+        ```
+        """)
+    #expect(note.dates.map(\.day) == ["2026-10-30", "2026-10-29", "2026-11-01"])
+    #expect(note.dates.map(\.text) == ["send build to QA", "book room", "Party on and , not , not me or"])
+    #expect(note.dates.map(\.isTask) == [true, true, false])
+    #expect(note.dates.map(\.done) == [false, true, false])
+    #expect(note.dates.map(\.line) == [1, 2, 3])
+}

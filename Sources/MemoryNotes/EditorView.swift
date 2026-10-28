@@ -9,7 +9,8 @@ struct NoteEditor: View {
     var fontSize = 13
     var titleLine = false  // first line styled as the title, like Apple Notes
     var fit: ClosedRange<CGFloat>?  // grow with the content within this range instead of filling the space
-    var onTag: ((String) -> Void)?  // after ⌘-clicking a #tag, which also asks the main window to search for it
+    /// After ⌘-clicking a #tag or a date, which ask the main window to search for it or show its day.
+    var showMainWindow: (() -> Void)?
     var focusIfEmpty = true  // a new note takes the cursor; off while something else (an address field) should have it
     @ObservedObject private var model = NotesModel.shared
     @State private var contentHeight: CGFloat = 0
@@ -19,7 +20,7 @@ struct NoteEditor: View {
     var body: some View {
         if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
             EditorWebView(dir: dir, markdown: model.binding(noteID, \.text),
-                          options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine], onTag: onTag,
+                          options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine], showMainWindow: showMainWindow,
                           focusIfEmpty: focusIfEmpty) { contentHeight = $0 }
                 .id(noteID)  // a fresh editor per note keeps undo history per note
                 .frame(height: fit.map { min(max(contentHeight, $0.lowerBound), $0.upperBound) })
@@ -33,7 +34,7 @@ private struct EditorWebView: NSViewRepresentable {
     let dir: URL
     @Binding var markdown: String
     let options: [String: Any]
-    let onTag: ((String) -> Void)?
+    let showMainWindow: (() -> Void)?
     let focusIfEmpty: Bool
     let onHeight: (CGFloat) -> Void
 
@@ -111,7 +112,11 @@ private struct EditorWebView: NSViewRepresentable {
             case "tag":
                 guard let tag = body["tag"] as? String else { return }
                 NotesModel.shared.searchRequest = "#" + tag
-                parent.onTag?(tag)
+                parent.showMainWindow?()
+            case "date":
+                guard let day = body["day"] as? String else { return }
+                NotesModel.shared.calendarRequest = day
+                parent.showMainWindow?()
             case "openNote":
                 if let id = body["id"] as? String { NotesModel.shared.openRequest = id }
             default:

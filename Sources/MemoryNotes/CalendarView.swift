@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// What was edited when: month / week / day views over the daily snapshots.
+/// What's planned and what was edited when: month / week / day views over the notes' dated lines (tasks first)
+/// and their daily snapshots.
 struct CalendarView: View {
     enum Mode: String, CaseIterable { case day = "Day", week = "Week", month = "Month" }
 
@@ -25,9 +26,9 @@ struct CalendarView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title).font(.largeTitle.bold()).lineLimit(1).padding([.horizontal, .top]).padding(.bottom, 8)
             Divider()
-            if days.isEmpty {
-                ContentUnavailableView("No Edits Yet", systemImage: "calendar",
-                                       description: Text("Notes appear here on the days you edit them."))
+            if days.isEmpty && due.isEmpty {
+                ContentUnavailableView("Nothing Here Yet", systemImage: "calendar", description: Text(
+                    "Notes appear on the days you edit them. Type @today or @tomorrow in a note to put a line or task on a day."))
             } else {
                 switch mode {
                 case .month: month(days)
@@ -36,6 +37,7 @@ struct CalendarView: View {
                 }
             }
         }
+        .onChange(of: model.calendarRequest, initial: true) { showRequestedDay() }
         .toolbar {
             // ⌘-arrows rather than bare arrows, so text fields keep their arrow keys.
             ToolbarItemGroup(placement: .navigation) {
@@ -95,15 +97,23 @@ struct CalendarView: View {
 
     private func monthCell(_ d: Date, _ items: [Snapshot]) -> some View {
         let inMonth = cal.isDate(d, equalTo: date, toGranularity: .month)
+        let planned = due[key(d)] ?? []
+        let edited = items.prefix(max(0, 3 - planned.count))
+        let hidden = planned.count + items.count - min(planned.count, 3) - edited.count
         return Button { open(d) } label: {
             VStack(alignment: .leading, spacing: 3) {
                 dayNumber(d)
-                ForEach(items.prefix(3)) { s in
+                ForEach(planned.prefix(3)) { item in
+                    Label { Text(item.text).strikethrough(item.done) } icon: { checkbox(item) }
+                        .font(.caption).lineLimit(1)
+                        .foregroundStyle(item.done ? .secondary : .primary)
+                }
+                ForEach(edited) { s in
                     Label { Text(s.note.title) } icon: { NoteIcon(note: s.note, size: 12) }
                         .font(.caption).lineLimit(1)
                 }
-                if items.count > 3 {
-                    Text("\(items.count - 3) more").font(.caption).foregroundStyle(.secondary)
+                if hidden > 0 {
+                    Text("\(hidden) more").font(.caption).foregroundStyle(.secondary)
                 }
             }
             .padding(6)
@@ -113,7 +123,7 @@ struct CalendarView: View {
         }
         .buttonStyle(.plain)
         .overlay(Rectangle().stroke(.separator, lineWidth: 0.5))
-        .accessibilityLabel("\(d.formatted(date: .complete, time: .omitted)), \(items.count) notes edited")
+        .accessibilityLabel("\(d.formatted(date: .complete, time: .omitted)), \(planned.count) planned, \(items.count) notes edited")
     }
 
     private func week(_ days: [String: [Snapshot]]) -> some View {
@@ -132,6 +142,7 @@ struct CalendarView: View {
                     .accessibilityLabel("Open \(d.formatted(date: .complete, time: .omitted))")
                     ScrollView {
                         VStack(alignment: .leading, spacing: 6) {
+                            ForEach(due[key(d)] ?? []) { plannedRow($0, compact: true) }
                             ForEach(days[key(d)] ?? []) { s in
                                 Button { open(d) } label: { card(s) }.buttonStyle(.plain)
                             }
@@ -144,9 +155,9 @@ struct CalendarView: View {
             }
         }
         .overlay {
-            if dates.allSatisfy({ days[key($0)] == nil }) {
-                ContentUnavailableView("Nothing Edited This Week", systemImage: "calendar",
-                                       description: Text("Notes you edit this week appear here."))
+            if dates.allSatisfy({ days[key($0)] == nil && due[key($0)] == nil }) {
+                ContentUnavailableView("Nothing This Week", systemImage: "calendar",
+                                       description: Text("Notes you edit or plan for this week appear here."))
             }
         }
     }
@@ -181,21 +192,75 @@ struct CalendarView: View {
 
     @ViewBuilder
     private func day(_ days: [String: [Snapshot]]) -> some View {
-        let items = days[key(date)] ?? []
-        if items.isEmpty {
-            ContentUnavailableView("Nothing Edited", systemImage: "calendar",
-                                   description: Text("Notes you edit on this day appear here."))
+        let items = days[key(date)] ?? [], planned = due[key(date)] ?? []
+        if items.isEmpty && planned.isEmpty {
+            ContentUnavailableView("Nothing on This Day", systemImage: "calendar",
+                                   description: Text("Notes you edit on this day, and lines dated for it, appear here."))
         } else {
-            List(items) { s in
-                Button { model.openRequest = s.note.id } label: {
-                    NoteRow(note: s.note, date: s.note.edited.formatted(date: .omitted, time: .shortened))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
+            List {
+                if !planned.isEmpty {
+                    Section("Planned") { ForEach(planned) { plannedRow($0, compact: false) } }
                 }
-                .buttonStyle(.plain)
-                .accessibilityHint("Opens the note")
+                if !items.isEmpty {
+                    Section("Edited") {
+                        ForEach(items) { s in
+                            Button { model.openRequest = s.note.id } label: {
+                                NoteRow(note: s.note, date: s.note.edited.formatted(date: .omitted, time: .shortened))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint("Opens the note")
+                        }
+                    }
+                }
             }
         }
+    }
+
+    // MARK: Planned (dated lines)
+
+    /// Dated lines by day, for the notes the filter lets through.
+    private var due: [String: [DatedLine]] {
+        Dictionary(grouping: model.notes.filter { filter.isEmpty || sourceKey($0) == filter }.flatMap(\.dates), by: \.day)
+    }
+
+    /// A tickable box for tasks (it edits the note's checklist), a calendar glyph for other dated lines.
+    @ViewBuilder
+    private func checkbox(_ item: DatedLine) -> some View {
+        if item.isTask {
+            Button { model.toggleTask(item) } label: {
+                Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(item.done ? Color.notesAccent : .secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(item.done ? "Done" : "Not done")
+            .accessibilityHint("Ticks the task in its note")
+        } else {
+            Image(systemName: "calendar").foregroundStyle(.secondary).accessibilityHidden(true)
+        }
+    }
+
+    private func plannedRow(_ item: DatedLine, compact: Bool) -> some View {
+        let note = model.notes.first { $0.id == item.noteID }
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            checkbox(item)
+            Button { model.openRequest = item.noteID } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.text).strikethrough(item.done).foregroundStyle(item.done ? .secondary : .primary)
+                        .font(compact ? .callout : .body).lineLimit(compact ? 3 : nil)
+                    if let note, note.title != item.text {
+                        Text(note.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the note")
+        }
+        .padding(compact ? 8 : 2)
+        .background { if compact { RoundedRectangle(cornerRadius: 8).fill(Color.notesAccent.opacity(0.12)) } }
     }
 
     // MARK: Helpers
@@ -234,6 +299,14 @@ struct CalendarView: View {
     private func step(_ n: Int) {
         let unit: Calendar.Component = mode == .month ? .month : mode == .week ? .weekOfYear : .day
         date = cal.date(byAdding: unit, value: n, to: date) ?? date
+    }
+
+    /// ⌘-clicked dates arrive here (via NotesWindow switching to the calendar).
+    private func showRequestedDay() {
+        guard let day = model.calendarRequest, let d = Self.dayKey.date(from: day) else { return }
+        date = d
+        mode = .day
+        model.calendarRequest = nil
     }
 
     private func open(_ d: Date) {

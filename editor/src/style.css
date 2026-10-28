@@ -111,3 +111,7 @@
 .mn-drag:active { cursor: grabbing; }
 .mn-content .ProseMirror-selectednode { outline: 2px solid color-mix(in srgb, var(--mn-check) 60%, transparent); outline-offset: 2px; border-radius: 4px; }
 .mn-drop { position: absolute; z-index: 2; height: 2px; border-radius: 1px; background: var(--mn-check); pointer-events: none; }
+/* Dates: a chip the calendar knows about. */
+.mn-content .mn-date { color: var(--mn-fg); background: var(--mn-code-bg); border: 1px solid var(--mn-line); border-radius: 5px; padding: 0 4px;
+  font-variant-numeric: tabular-nums; }
+.mn-date-form input { width: auto; }
