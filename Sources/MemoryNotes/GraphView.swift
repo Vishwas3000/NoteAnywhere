@@ -355,45 +355,6 @@ struct GraphView: View {
     }
 }
 
-/// Where the graph is on screen: `offset` is the graph origin's distance from the view's center.
-private struct Camera {
-    var scale: CGFloat = 1
-    var offset = CGSize.zero
-
-    func screen(_ p: CGPoint, in size: CGSize) -> CGPoint {
-        CGPoint(x: size.width / 2 + offset.width + p.x * scale, y: size.height / 2 + offset.height + p.y * scale)
-    }
-
-    func world(_ p: CGPoint, in size: CGSize) -> CGPoint {
-        CGPoint(x: (p.x - size.width / 2 - offset.width) / scale, y: (p.y - size.height / 2 - offset.height) / scale)
-    }
-
-    /// Keeps the graph point under `p` where it is.
-    func zoomed(by factor: CGFloat, around p: CGPoint, in size: CGSize) -> Camera {
-        let s = min(max(scale * factor, 0.1), 5), k = s / scale
-        let x = p.x - size.width / 2, y = p.y - size.height / 2
-        return Camera(scale: s, offset: CGSize(width: x - (x - offset.width) * k, height: y - (y - offset.height) * k))
-    }
-
-    static func fitting(_ points: [CGPoint], in size: CGSize) -> Camera {
-        guard !points.isEmpty, size.width > 0, size.height > 0 else { return Camera() }
-        let xs = points.map(\.x), ys = points.map(\.y)
-        let (minX, maxX, minY, maxY) = (xs.min()!, xs.max()!, ys.min()!, ys.max()!)
-        let margin: CGFloat = 60  // room for node radii and labels
-        let s = min((size.width - 2 * margin) / max(maxX - minX, 1), (size.height - 2 * margin) / max(maxY - minY, 1))
-        let scale = min(max(s, 0.1), 1.5)
-        return Camera(scale: scale, offset: CGSize(width: -(minX + maxX) / 2 * scale, height: -(minY + maxY) / 2 * scale))
-    }
-
-    /// A step of the way there, so following the settling graph is smooth.
-    func approaching(_ target: Camera) -> Camera {
-        let k: CGFloat = 0.15
-        return Camera(scale: scale + (target.scale - scale) * k,
-                      offset: CGSize(width: offset.width + (target.offset.width - offset.width) * k,
-                                     height: offset.height + (target.offset.height - offset.height) * k))
-    }
-}
-
 /// What VoiceOver reads instead of the canvas: every node with its connections, and an action to open it.
 /// Equatable so the list isn't rebuilt on every animation frame.
 private struct AccessibleNodes: View, Equatable {

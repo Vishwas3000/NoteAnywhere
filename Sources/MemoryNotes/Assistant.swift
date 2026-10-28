@@ -3,7 +3,7 @@ import Foundation
 import FoundationModels
 #endif
 
-/// One-click edits with Apple Intelligence's on-device model (macOS 26+). Nothing leaves the Mac.
+/// One-click edits with Apple Intelligence's on-device model (macOS 26+, iOS 26+). Nothing leaves the device.
 /// Used by the app's editors and, through the native host, by the browser overlay.
 enum Assistant {
     enum Action: String, CaseIterable {
@@ -22,15 +22,21 @@ enum Assistant {
 
     struct Failure: LocalizedError { let errorDescription: String? }
 
+    #if os(iOS)
+    private static let (device, os, settings) = ("iPhone", "iOS", "Settings")
+    #else
+    private static let (device, os, settings) = ("Mac", "macOS", "System Settings")
+    #endif
+
     /// Why the model can't run, or nil when it can.
     static var unavailableReason: String? {
         #if canImport(FoundationModels)
-        guard #available(macOS 26, iOS 26, *) else { return "Apple Intelligence needs macOS 26 or later." }
+        guard #available(macOS 26, iOS 26, *) else { return "Apple Intelligence needs \(os) 26 or later." }
         switch SystemLanguageModel.default.availability {
         case .available: return nil
-        case .unavailable(.appleIntelligenceNotEnabled): return "Turn on Apple Intelligence in System Settings to use this."
+        case .unavailable(.appleIntelligenceNotEnabled): return "Turn on Apple Intelligence in \(settings) to use this."
         case .unavailable(.modelNotReady): return "Apple Intelligence is still getting ready. Try again in a few minutes."
-        case .unavailable(.deviceNotEligible): return "This Mac doesn't support Apple Intelligence."
+        case .unavailable(.deviceNotEligible): return "This \(device) doesn't support Apple Intelligence."
         case .unavailable: return "Apple Intelligence isn't available right now."
         }
         #else

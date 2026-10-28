@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import MemoryNotes
 
@@ -23,4 +24,14 @@ func plainLine(markdown: String, expected: String) {
     #expect(note.title == "Plan")
     #expect(note.preview == "one code two")
     #expect(Note(kind: .app, target: "x", label: "X").title == "New Note")
+}
+
+@Test(arguments: [
+    ("https://www.github.com/vercel/next.js/", "github.com/vercel/next.js"),
+    ("https://GitHub.com/?tab=1#top", "github.com"),
+    ("http://localhost:3000/a%20b", "localhost:3000/a%20b"),
+    ("mailto:someone@example.com", ""),
+])
+func pageTargets(url: String, expected: String) {
+    #expect(Note.pageTarget(URL(string: url)!) == expected)
 }

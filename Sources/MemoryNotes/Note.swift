@@ -42,6 +42,19 @@ extension Note {
     }
 }
 
+extension Note {
+    /// A website note's target for a page, the way the browser extension makes it: "github.com/vercel/next.js",
+    /// without scheme, "www.", query, hash or trailing "/". Empty for addresses that aren't web pages.
+    static func pageTarget(_ url: URL) -> String {
+        guard ["http", "https"].contains(url.scheme?.lowercased()),
+              let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let host = parts.percentEncodedHost, !host.isEmpty else { return "" }
+        var path = parts.percentEncodedPath  // still encoded, like location.pathname
+        if path.hasSuffix("/") { path.removeLast() }
+        return host.lowercased().replacing(#/^www\./#, with: "") + (parts.port.map { ":\($0)" } ?? "") + path
+    }
+}
+
 /// Apple Intelligence's title and tags for one version of a note.
 struct Suggestion: Hashable {
     let noteID: String
