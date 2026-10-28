@@ -91,7 +91,10 @@ struct GraphView: View {
         .accessibilityLabel("Graph of notes")
         .accessibilityChildren {
             if let graph {
-                AccessibleNodes(nodes: Array(graph.nodes.prefix(placed.count)), degree: degree, activate: activate).equatable()
+                // Frames only once settled, so the list isn't rebuilt on every frame of the simulation.
+                AccessibleNodes(nodes: Array(graph.nodes.prefix(placed.count)), degree: degree,
+                                points: layout.isSettled ? layout.positions.map { camera.screen($0, in: size) } : [],
+                                activate: activate).equatable()
             }
         }
     }
@@ -348,25 +351,31 @@ private struct HoldGesture: UIGestureRecognizerRepresentable {
 }
 
 /// What VoiceOver reads instead of the canvas: every node with its connections, and an action to open it.
+/// Each sits on its dot (a 44 pt target), so VoiceOver's cursor and touch exploration find it where it's drawn.
 /// Equatable so the list isn't rebuilt on every animation frame.
 private struct AccessibleNodes: View, Equatable {
     let nodes: [Graph.Node]
     let degree: [Int]
+    let points: [CGPoint]  // on screen; empty while the layout is still moving
     let activate: (Int) -> Void
 
     static func == (a: Self, b: Self) -> Bool {
-        a.degree == b.degree && a.nodes.map(\.note) == b.nodes.map(\.note) && a.nodes.map(\.id) == b.nodes.map(\.id)
+        a.degree == b.degree && a.points == b.points && a.nodes.map(\.note) == b.nodes.map(\.note) && a.nodes.map(\.id) == b.nodes.map(\.id)
     }
 
     var body: some View {
-        ForEach(nodes.indices, id: \.self) { i in
-            let node = nodes[i]
-            Text(node.title)
-                .accessibilityValue(node.isHub ? Text("^[\(degree[i]) note](inflect: true)")
-                                               : Text("^[\(degree[i]) connection](inflect: true), \(node.note.place)"))
-                .accessibilityHint(node.isHub ? "Highlights its notes" : "Opens the note")
-                .accessibilityAddTraits(.isButton)
-                .accessibilityAction { activate(i) }
+        ZStack {
+            ForEach(nodes.indices, id: \.self) { i in
+                let node = nodes[i]
+                Text(node.title)
+                    .frame(width: 44, height: 44)
+                    .position(points.indices.contains(i) ? points[i] : .zero)
+                    .accessibilityValue(node.isHub ? Text("^[\(degree[i]) note](inflect: true)")
+                                                   : Text("^[\(degree[i]) connection](inflect: true), \(node.note.place)"))
+                    .accessibilityHint(node.isHub ? "Highlights its notes" : "Opens the note")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { activate(i) }
+            }
         }
     }
 }

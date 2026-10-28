@@ -30,7 +30,7 @@ private struct EditorWebView: UIViewRepresentable {
     let openNote: (String) -> Void
 
     /// iPhone-only styling on top of the shared page: side margins, no text inflation on rotation, one scrolling row
-    /// of finger-sized toolbar buttons, a ✨ button that's always visible (there's no hover), and no ✨ menu before
+    /// of finger-sized toolbar buttons, a ✨ button that's always visible and no block-drag gutter (both are hover UI), and no ✨ menu before
     /// iOS 26 (Apple Intelligence's on-device model needs it).
     private static var css: String {
         var css = """
@@ -40,6 +40,7 @@ private struct EditorWebView: UIViewRepresentable {
             .mn-toolbar button { min-width: 36px; height: 36px; flex: none; }
             .mn-editor:has(.mn-ai) .mn-toolbar { padding-right: 0; margin-right: 44px; }
             .mn-ai > button { width: 36px; height: 36px; opacity: 1; }
+            .mn-content { padding-left: 0; } .mn-drag { display: none; } .mn-content .mn-date { white-space: nowrap; }
             """
         if #unavailable(iOS 26) { css += " .mn-ai { display: none; } .mn-editor:has(.mn-ai) .mn-toolbar { margin-right: 0; }" }
         return css

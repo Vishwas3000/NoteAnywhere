@@ -113,18 +113,28 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Safari/MemoryNotesSafari.entitlements
         INFOPLIST_KEY_CFBundleDisplayName: MemoryNotes
     postBuildScripts:
-      # The Chrome extension as is; only the manifest differs (no Chrome id key, a background page instead of a worker).
+      # The Chrome extension as is; the two Safari-only shims (Safari/*-shim.js, bundled as resources) are wired in here.
       - name: Copy browser extension
         basedOnDependencyAnalysis: false
         script: |
           dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
           rsync -a --exclude manifest.json "$SRCROOT/../extension/" "$dest/"
-          /usr/bin/python3 - "$SRCROOT/../extension/manifest.json" "$dest/manifest.json" <<'PY'
+          /usr/bin/python3 - "$SRCROOT/../extension/manifest.json" "$dest" <<'PY'
           import json, sys
           m = json.load(open(sys.argv[1]))
           m.pop("key", None)  # pins the unpacked Chrome extension's id; Safari doesn't use it
-          m["background"] = {"scripts": [m["background"]["service_worker"]]}  # Safari on iOS: non-persistent background page
-          json.dump(m, open(sys.argv[2], "w"), indent=2)
+          # Safari on iOS: a non-persistent background page, with the relay for the overlay frame.
+          m["background"] = {"scripts": ["background-shim.js", m["background"]["service_worker"]]}
+          json.dump(m, open(sys.argv[2] + "/manifest.json", "w"), indent=2)
+          html = open(sys.argv[2] + "/overlay.html").read()
+          tag = '<script src="overlay.js"></script>'
+          assert tag in html, "overlay.html changed: load overlay-shim.js before overlay.js by hand"
+          open(sys.argv[2] + "/overlay.html", "w").write(html.replace(tag, '<script src="overlay-shim.js"></script>' + tag))
+          js = open(sys.argv[2] + "/overlay.js").read()
+          for call, shim in [("chrome.tabs.sendMessage(", "mnTabsSendMessage("), ("chrome.runtime.sendNativeMessage(", "mnSendNativeMessage(")]:
+              assert call in js, "overlay.js changed: update the Safari rewrite in project.yml"
+              js = js.replace(call, shim)
+          open(sys.argv[2] + "/overlay.js", "w").write(js)
           PY
 
   MemoryNotesUITests:
