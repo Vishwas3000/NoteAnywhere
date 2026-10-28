@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import Carbon
 import Combine
 import SwiftUI
@@ -32,7 +33,7 @@ final class OverlayController {
     }()
 
     func start() {
-        subscription = model.$frontContext.removeDuplicates().sink { [weak self] context in self?.contextChanged(context) }
+        subscription = FrontWindow.shared.$context.removeDuplicates().sink { [weak self] context in self?.contextChanged(context) }
         HotKeys.register(kVK_ANSI_M, optionKey | shiftKey, name: "⌥⇧M") { [weak self] in self?.toggle() }
     }
 
@@ -93,6 +94,7 @@ extension View {
 
 struct OverlayView: View {
     @ObservedObject private var model = NotesModel.shared
+    @ObservedObject private var front = FrontWindow.shared  // redraw when the app or place in front changes
     @Environment(\.openWindow) private var openWindow
     @State private var searching = false
     @State private var query = ""
@@ -160,6 +162,20 @@ struct OverlayView: View {
                 .foregroundStyle(.secondary)  // borderless icons would take the yellow tint, too faint on light glass
             }
             .padding(.leading, 22)  // clear of the close button in the transparent title bar
+
+            if !AXIsProcessTrusted() {  // without it, notes can only follow the app, not the chat or file
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Text("Allow Accessibility to see which chat or file you're in.").font(.caption)
+                    Spacer(minLength: 4)
+                    Button("Open Settings") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                    }
+                    .controlSize(.small)
+                }
+                .padding(8)
+                .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+            }
 
             if searching {
                 TextField("Search all notes", text: $query, prompt: Text("\(Image(systemName: "magnifyingglass")) Search all notes"))
@@ -264,6 +280,12 @@ private struct NoteCard: View {
         }
         .padding(10)
         .background(hovering ? .quaternary : .quinary, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(alignment: .leading) {  // the note's colour label, like a Chrome tab group's strip
+            if let color = note.color {
+                UnevenRoundedRectangle(topLeadingRadius: 10, bottomLeadingRadius: 10).fill(color.swatch).frame(width: 4)
+                    .accessibilityHidden(true)
+            }
+        }
         .overlay {
             if contrast == .increased { RoundedRectangle(cornerRadius: 10).strokeBorder(.secondary) }
         }

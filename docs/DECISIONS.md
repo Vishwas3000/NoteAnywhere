@@ -287,3 +287,14 @@ Made by the subagent that wrote the extension:
 - Parsed from text (`Note.dates`), so no schema change; it syncs and works in the browser and on iPhone as is.
 - **Rejected:** a due-date column (needs migrations + sync); natural-language parsing of free text (surprising edits).
 - **Status:** Decided (Claude). Parser + editor covered by tests; chips checked in WebKit; calendar not yet seen with dated notes.
+
+## D36 — Going public as NoteAnywhere (2026-10-28)
+- **Why:** user wants to open-source the app, post about it (Medium, dev.to, Reddit r/macapps, more) and make it easy to try.
+- **Decided by the user:** public name **NoteAnywhere**; license **GPL-3.0**; Mac app as a **notarized DMG** (Developer ID,
+  team GH5YVSN865); extension on the **Chrome Web Store**.
+- Internal identifiers stay (`com.memorynotes.*` bundle id, native host name, `memorynotes://` scheme, data folder) so the
+  current install keeps its notes, permission and sync; only user-visible names change.
+- Dependencies are MIT (TipTap, swift-embeddings, the vendored ui-review-tahoe skill), compatible with GPL-3.0.
+- `install.sh` remembers its signing certificate in an untracked `.signing-identity`, since with several valid
+  certificates keychain order could change it and reset the Accessibility permission.
+- **Status:** Decided (user); release engineering and launch copy in progress.

@@ -12,13 +12,49 @@ struct Note: Codable, Identifiable, Hashable {
     var text = ""
     var createdAt = Date().timeIntervalSince1970 * 1000
     var updatedAt = Date().timeIntervalSince1970 * 1000
+    var pinned = false
+    var folderID: String?
+    var color: NoteColor?
+    /// The text is an encrypted envelope (see NoteLock); title, preview, tags and dates stay hidden.
+    var locked = false
+}
+
+/// Colour labels, the same set as Chrome's tab groups.
+enum NoteColor: String, Codable, CaseIterable {
+    case grey, blue, red, yellow, green, pink, purple, cyan, orange
+}
+
+extension Note {
+    // The browser sends notes without the newer fields, so they decode as optional with defaults.
+    private enum CodingKeys: String, CodingKey {
+        case id, kind, target, label, text, createdAt, updatedAt, pinned, folderID, color, locked
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try c.decode(String.self, forKey: .id), kind: try c.decode(Kind.self, forKey: .kind),
+                  target: try c.decode(String.self, forKey: .target), label: try c.decode(String.self, forKey: .label),
+                  text: try c.decodeIfPresent(String.self, forKey: .text) ?? "",
+                  createdAt: try c.decode(Double.self, forKey: .createdAt), updatedAt: try c.decode(Double.self, forKey: .updatedAt),
+                  pinned: try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false,
+                  folderID: try c.decodeIfPresent(String.self, forKey: .folderID),
+                  color: try c.decodeIfPresent(NoteColor.self, forKey: .color),
+                  locked: try c.decodeIfPresent(Bool.self, forKey: .locked) ?? false)
+    }
+}
+
+/// A folder, like Apple Notes'. Deleting one is a tombstone (for sync); its notes go back to All Notes.
+struct Folder: Identifiable, Hashable {
+    var id = UUID().uuidString
+    var name: String
+    var updatedAt = Date().timeIntervalSince1970 * 1000
 }
 
 extension Note {
     /// The first line without Markdown, like the title Apple Notes shows in its list.
-    var title: String { plainLines.first ?? "New Note" }
+    var title: String { locked ? "Locked Note" : plainLines.first ?? "New Note" }
     /// What follows the title, flattened to one line.
-    var preview: String { plainLines.dropFirst().prefix(4).joined(separator: " ") }
+    var preview: String { locked ? "" : plainLines.dropFirst().prefix(4).joined(separator: " ") }
     var edited: Date { Date(timeIntervalSince1970: updatedAt / 1000) }
     /// A note can stand alone: no app or website, stored as a website note without an address.
     var hasSource: Bool { !target.isEmpty }
@@ -26,6 +62,7 @@ extension Note {
     /// Obsidian-style #tags, lowercased and in order of first use: "#ML", "#project/notes". A tag needs a letter
     /// ("#2024" isn't one) and doesn't count inside code or a link's address; "# Heading" has a space, so it's no tag.
     var tags: [String] {
+        guard !locked else { return [] }
         var inFence = false, seen = Set<String>(), found: [String] = []
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
             if line.hasPrefix("```") { inFence.toggle(); continue }
@@ -42,6 +79,7 @@ extension Note {
     /// Lines with a date: "@2026-10-30" (what the editor writes) or Obsidian Tasks' "📅 2026-10-30". A checklist
     /// line is a task, shown done when checked. The calendar puts each on its day.
     var dates: [DatedLine] {
+        guard !locked else { return [] }
         var inFence = false, found: [DatedLine] = []
         for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
             if line.hasPrefix("```") { inFence.toggle(); continue }
@@ -165,7 +203,7 @@ enum NoteStore {
 
     static func loadAll() -> [Note] {
         (try? query("""
-            SELECT id, kind, target, title, body_md, created_at, updated_at FROM notes
+            SELECT id, kind, target, title, body_md, created_at, updated_at, pinned, folder_id, color, locked FROM notes
             WHERE deleted_at IS NULL ORDER BY created_at
             """, [], note)) ?? []
     }
@@ -177,7 +215,7 @@ enum NoteStore {
         while page.hasSuffix("/") { page.removeLast() }
         // "0" sorts right after "/", so [page/, page0) is exactly the targets under this page, on the (kind, target) index.
         return (try? query("""
-            SELECT id, kind, target, title, body_md, created_at, updated_at FROM notes
+            SELECT id, kind, target, title, body_md, created_at, updated_at, pinned, folder_id, color, locked FROM notes
             WHERE deleted_at IS NULL AND kind = 'url' AND (target = ?1 OR (target >= ?2 AND target < ?3))
             ORDER BY created_at
             """, [page, page + "/", page + "0"], note)) ?? []
@@ -185,10 +223,11 @@ enum NoteStore {
 
     static func loadHistory() -> [Snapshot] {
         (try? query("""
-            SELECT n.id, n.kind, n.target, n.title, s.body_md, n.created_at, s.updated_at, s.day
+            SELECT n.id, n.kind, n.target, n.title, s.body_md, n.created_at, s.updated_at,
+                n.pinned, n.folder_id, n.color, n.locked, s.day
             FROM snapshots s JOIN notes n ON n.id = s.note_id
             WHERE n.deleted_at IS NULL ORDER BY s.updated_at
-            """, []) { Snapshot(day: text($0, 7), note: note($0)) }) ?? []
+            """, []) { Snapshot(day: text($0, 11), note: note($0)) }) ?? []
     }
 
     /// Upserts the note and that day's snapshot together. Saving a deleted note, or one whose kind differs
@@ -218,12 +257,70 @@ enum NoteStore {
         notify_post(changed)
     }
 
+    // MARK: Pins, colours, folders
+
+    /// Pin, colour or folder changes. They add a millisecond to updated_at rather than taking "now": enough for
+    /// sync's newer-wins rule to carry them, without moving the note to "Today" in the list.
+    static func saveMeta(_ note: Note) throws {
+        try validate(note.id)
+        let folder: Any = note.folderID ?? NSNull(), color: Any = note.color?.rawValue ?? NSNull()
+        try transaction {
+            try run("""
+                UPDATE notes SET pinned = ?, folder_id = (SELECT id FROM folders WHERE id = ? AND deleted_at IS NULL),
+                    color = ?, updated_at = updated_at + 1, dirty = 1
+                WHERE id = ? AND deleted_at IS NULL
+                """, [note.pinned ? 1 : 0, folder, color, note.id])
+        }
+        notify_post(changed)
+    }
+
+    static func folders() -> [Folder] {
+        (try? query("SELECT id, name, updated_at FROM folders WHERE deleted_at IS NULL ORDER BY name COLLATE NOCASE", []) {
+            Folder(id: text($0, 0), name: text($0, 1), updatedAt: sqlite3_column_double($0, 2))
+        }) ?? []
+    }
+
+    static func saveFolder(_ folder: Folder) throws {
+        try validate(folder.id)
+        try transaction {
+            try run("""
+                INSERT INTO folders (id, name, updated_at, dirty) VALUES (?, ?, ?, 1)
+                ON CONFLICT (id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, dirty = 1
+                """, [folder.id, folder.name, Date().timeIntervalSince1970 * 1000])
+        }
+        notify_post(changed)
+    }
+
+    /// A tombstone; its notes return to All Notes (they aren't deleted with it).
+    static func deleteFolder(_ id: String) throws {
+        try validate(id)
+        let now = Date().timeIntervalSince1970 * 1000
+        try transaction {
+            try run("UPDATE folders SET deleted_at = ?, updated_at = ?, dirty = 1 WHERE id = ?", [now, now, id])
+            try run("UPDATE notes SET folder_id = NULL, updated_at = updated_at + 1, dirty = 1 WHERE folder_id = ?", [id])
+        }
+        notify_post(changed)
+    }
+
     // MARK: Cloud sync (rows as the server stores them; see CloudSync)
 
     struct CloudNote: Codable, Equatable {
         var id: String, kind: String, target: String, label: String, body_md: String
         var created_at: Double, updated_at: Double, deleted_at: Double?
+        var pinned: Bool?, folder_id: String?, color: String?, locked: Bool?
         var seq: Int?
+    }
+
+    struct CloudFolder: Codable, Equatable {
+        var id: String, name: String, updated_at: Double, deleted_at: Double?
+        var seq: Int?
+    }
+
+    static func dirtyFolders() -> [CloudFolder] {
+        (try? query("SELECT id, name, updated_at, deleted_at FROM folders WHERE dirty = 1", []) { row in
+            CloudFolder(id: text(row, 0), name: text(row, 1), updated_at: sqlite3_column_double(row, 2),
+                        deleted_at: sqlite3_column_type(row, 3) == SQLITE_NULL ? nil : sqlite3_column_double(row, 3))
+        }) ?? []
     }
 
     struct CloudSnapshot: Codable, Equatable {
@@ -233,11 +330,16 @@ enum NoteStore {
 
     static func dirtyNotes(limit: Int = 200) -> [CloudNote] {
         (try? query("""
-            SELECT id, kind, target, title, body_md, created_at, updated_at, deleted_at FROM notes WHERE dirty = 1 LIMIT ?
+            SELECT id, kind, target, title, body_md, created_at, updated_at, deleted_at, pinned, folder_id, color, locked
+            FROM notes WHERE dirty = 1 LIMIT ?
             """, [limit]) { row in
             CloudNote(id: text(row, 0), kind: text(row, 1), target: text(row, 2), label: text(row, 3), body_md: text(row, 4),
                       created_at: sqlite3_column_double(row, 5), updated_at: sqlite3_column_double(row, 6),
-                      deleted_at: sqlite3_column_type(row, 7) == SQLITE_NULL ? nil : sqlite3_column_double(row, 7))
+                      deleted_at: sqlite3_column_type(row, 7) == SQLITE_NULL ? nil : sqlite3_column_double(row, 7),
+                      pinned: sqlite3_column_int(row, 8) != 0,
+                      folder_id: sqlite3_column_type(row, 9) == SQLITE_NULL ? nil : text(row, 9),
+                      color: sqlite3_column_type(row, 10) == SQLITE_NULL ? nil : text(row, 10),
+                      locked: sqlite3_column_int(row, 11) != 0)
         }) ?? []
     }
 
@@ -248,8 +350,9 @@ enum NoteStore {
     }
 
     /// After a push: clean only rows nobody edited meanwhile.
-    static func markPushed(notes: [CloudNote] = [], snapshots: [CloudSnapshot] = []) throws {
+    static func markPushed(notes: [CloudNote] = [], snapshots: [CloudSnapshot] = [], folders: [CloudFolder] = []) throws {
         try transaction {
+            for f in folders { try run("UPDATE folders SET dirty = 0 WHERE id = ? AND updated_at = ?", [f.id, f.updated_at]) }
             for n in notes { try run("UPDATE notes SET dirty = 0 WHERE id = ? AND updated_at = ?", [n.id, n.updated_at]) }
             for s in snapshots {
                 try run("UPDATE snapshots SET dirty = 0 WHERE note_id = ? AND day = ? AND updated_at = ?", [s.note_id, s.day, s.updated_at])
@@ -258,20 +361,32 @@ enum NoteStore {
     }
 
     /// Pulled rows: the newer edit wins and deletes stick, as on the server. Posts `changed` when anything changed.
-    static func applyRemote(notes: [CloudNote], snapshots: [CloudSnapshot]) throws {
+    static func applyRemote(notes: [CloudNote], snapshots: [CloudSnapshot], folders: [CloudFolder] = []) throws {
         var changes: Int32 = 0
         try transaction {
             let handle = try db()
             let before = sqlite3_total_changes(handle)
+            for f in folders where (try? validate(f.id)) != nil {  // before notes, which may point at them
+                try run("""
+                    INSERT INTO folders (id, name, updated_at, deleted_at, dirty) VALUES (?, ?, ?, ?, 0)
+                    ON CONFLICT (id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at,
+                        deleted_at = coalesce(folders.deleted_at, excluded.deleted_at), dirty = 0
+                    WHERE excluded.updated_at > folders.updated_at
+                    """, [f.id, f.name, f.updated_at, f.deleted_at ?? NSNull()])
+            }
             for n in notes where (try? validate(n.id)) != nil && (n.kind == "app" || n.kind == "url") {
                 let deleted: Any = n.deleted_at ?? NSNull()
                 try run("""
-                    INSERT INTO notes (id, kind, target, title, body_md, created_at, updated_at, deleted_at, dirty)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                    INSERT INTO notes (id, kind, target, title, body_md, created_at, updated_at, deleted_at,
+                        pinned, folder_id, color, locked, dirty)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT id FROM folders WHERE id = ?), ?, ?, 0)
                     ON CONFLICT (id) DO UPDATE SET target = excluded.target, title = excluded.title, body_md = excluded.body_md,
-                        updated_at = excluded.updated_at, deleted_at = coalesce(notes.deleted_at, excluded.deleted_at), dirty = 0
+                        updated_at = excluded.updated_at, deleted_at = coalesce(notes.deleted_at, excluded.deleted_at),
+                        pinned = excluded.pinned, folder_id = excluded.folder_id, color = excluded.color,
+                        locked = excluded.locked, dirty = 0
                     WHERE excluded.updated_at > notes.updated_at
-                    """, [n.id, n.kind, n.target, n.label, n.body_md, n.created_at, n.updated_at, deleted])
+                    """, [n.id, n.kind, n.target, n.label, n.body_md, n.created_at, n.updated_at, deleted,
+                          (n.pinned ?? false) ? 1 : 0, n.folder_id ?? NSNull(), n.color ?? NSNull(), (n.locked ?? false) ? 1 : 0])
                 if let at = n.deleted_at {  // deleted elsewhere, even if edited here later
                     try run("UPDATE notes SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL", [at, n.id])
                 }
@@ -304,6 +419,7 @@ enum NoteStore {
     static func resetSync() throws {
         try transaction {
             try run("UPDATE notes SET dirty = 1", [])
+            try run("UPDATE folders SET dirty = 1", [])
             try run("UPDATE snapshots SET dirty = 1", [])
             try run("DELETE FROM sync_state WHERE key LIKE 'cursor.%'", [])
         }
@@ -440,6 +556,17 @@ enum NoteStore {
                     PRAGMA user_version = 3;
                     """)
             }
+            if try userVersion(handle) < 4 {
+                // Colour labels, locked (encrypted) notes, and folders that sync (pinned and folder_id came with v1).
+                try exec(handle, """
+                    ALTER TABLE notes ADD COLUMN color TEXT;
+                    ALTER TABLE notes ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;
+                    ALTER TABLE folders ADD COLUMN updated_at REAL NOT NULL DEFAULT 0;
+                    ALTER TABLE folders ADD COLUMN deleted_at REAL;
+                    ALTER TABLE folders ADD COLUMN dirty INTEGER NOT NULL DEFAULT 1;
+                    PRAGMA user_version = 4;
+                    """)
+            }
             try exec(handle, "COMMIT")
         } catch {
             try? exec(handle, "ROLLBACK")
@@ -558,7 +685,10 @@ enum NoteStore {
 
     private static func note(_ row: OpaquePointer) -> Note {
         Note(id: text(row, 0), kind: Note.Kind(rawValue: text(row, 1)) ?? .url, target: text(row, 2), label: text(row, 3),
-             text: text(row, 4), createdAt: sqlite3_column_double(row, 5), updatedAt: sqlite3_column_double(row, 6))
+             text: text(row, 4), createdAt: sqlite3_column_double(row, 5), updatedAt: sqlite3_column_double(row, 6),
+             pinned: sqlite3_column_int(row, 7) != 0,
+             folderID: sqlite3_column_type(row, 8) == SQLITE_NULL ? nil : text(row, 8),
+             color: NoteColor(rawValue: text(row, 9)), locked: sqlite3_column_int(row, 10) != 0)
     }
 
     private static func text(_ row: OpaquePointer, _ column: Int32) -> String {

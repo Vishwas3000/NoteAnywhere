@@ -27,7 +27,10 @@ mkdir -p "$APP/Contents/Resources/editor"
 cp editor/dist/* app/editor.html "$APP/Contents/Resources/editor/"
 # macOS ties the Accessibility permission to the signature. An ad-hoc signature changes with every build, so each
 # reinstall would look like a new app and ask again; a real certificate keeps it. Override with MEMORYNOTES_SIGN_ID.
-SIGN_ID=${MEMORYNOTES_SIGN_ID:-$(security find-identity -v -p codesigning | sed -n 's/.*"\(Apple Development[^"]*\)".*/\1/p' | head -1)}
+# The choice is remembered in .signing-identity (untracked): with several certificates, keychain order can change.
+SIGN_ID=${MEMORYNOTES_SIGN_ID:-$(cat .signing-identity 2>/dev/null || true)}
+[ -n "$SIGN_ID" ] || SIGN_ID=$(security find-identity -v -p codesigning | sed -n 's/.*"\(Apple Development[^"]*\)".*/\1/p' | head -1)
+[ -z "$SIGN_ID" ] || [ -f .signing-identity ] || printf '%s\n' "$SIGN_ID" > .signing-identity
 if [ -z "$SIGN_ID" ]; then
   echo "No Apple Development certificate: signing ad-hoc, so Accessibility must be re-allowed after each install."
   SIGN_ID=-

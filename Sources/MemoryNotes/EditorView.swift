@@ -21,7 +21,8 @@ struct NoteEditor: View {
         if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
             EditorWebView(dir: dir, markdown: model.binding(noteID, \.text),
                           options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine], showMainWindow: showMainWindow,
-                          focusIfEmpty: focusIfEmpty) { contentHeight = $0 }
+                          focusIfEmpty: focusIfEmpty,
+                          passesScroll: fit.map { contentHeight <= $0.upperBound } ?? false) { contentHeight = $0 }
                 .id(noteID)  // a fresh editor per note keeps undo history per note
                 .frame(height: fit.map { min(max(contentHeight, $0.lowerBound), $0.upperBound) })
         } else {
@@ -36,15 +37,25 @@ private struct EditorWebView: NSViewRepresentable {
     let options: [String: Any]
     let showMainWindow: (() -> Void)?
     let focusIfEmpty: Bool
+    let passesScroll: Bool
     let onHeight: (CGFloat) -> Void
+
+    /// A web view swallows scroll gestures even when it has nothing to scroll. An editor sized to its content
+    /// (the overlay's cards, search results) passes them on, so the list around it scrolls.
+    final class WebView: WKWebView {
+        var passesScroll = false
+        override func scrollWheel(with event: NSEvent) {
+            if passesScroll { nextResponder?.scrollWheel(with: event) } else { super.scrollWheel(with: event) }
+        }
+    }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
-    func makeNSView(context: Context) -> WKWebView {
+    func makeNSView(context: Context) -> WebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "mn")
         config.writingToolsBehavior = .complete  // Apple Intelligence Writing Tools rewrite in place, like in Notes
-        let web = WKWebView(frame: .zero, configuration: config)
+        let web = WebView(frame: .zero, configuration: config)
         web.setValue(false, forKey: "drawsBackground")  // transparent, so the panel/window material shows through
         web.navigationDelegate = context.coordinator
         web.loadFileURL(dir.appendingPathComponent("editor.html"), allowingReadAccessTo: dir)
@@ -52,12 +63,13 @@ private struct EditorWebView: NSViewRepresentable {
         return web
     }
 
-    func updateNSView(_ web: WKWebView, context: Context) {
+    func updateNSView(_ web: WebView, context: Context) {
+        web.passesScroll = passesScroll
         context.coordinator.parent = self
         context.coordinator.push(markdown)  // e.g. the same note was edited in the browser
     }
 
-    static func dismantleNSView(_ web: WKWebView, coordinator: Coordinator) {
+    static func dismantleNSView(_ web: WebView, coordinator: Coordinator) {
         web.configuration.userContentController.removeScriptMessageHandler(forName: "mn")
     }
 

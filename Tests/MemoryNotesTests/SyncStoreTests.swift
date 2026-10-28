@@ -50,6 +50,28 @@ import Testing
         #expect(!NoteStore.loadAll().contains { $0.id == id }, "a later edit can't revive it")
     }
 
+    @Test func pinsColoursAndFoldersArriveWithTheirNotes() throws {
+        let note = UUID().uuidString, folder = UUID().uuidString, missing = UUID().uuidString
+        var pinned = remote(note, "x", at: 10)
+        pinned.pinned = true
+        pinned.color = "blue"
+        pinned.folder_id = folder
+        var orphan = remote(UUID().uuidString, "y", at: 10)
+        orphan.folder_id = missing  // its folder hasn't arrived: lands in All Notes rather than failing
+        try NoteStore.applyRemote(notes: [pinned, orphan], snapshots: [],
+                                  folders: [.init(id: folder, name: "Work", updated_at: 1, deleted_at: nil)])
+        let local = try #require(NoteStore.loadAll().first { $0.id == note })
+        #expect(local.pinned && local.color == .blue && local.folderID == folder)
+        #expect(NoteStore.loadAll().first { $0.id == orphan.id }?.folderID == nil)
+        #expect(NoteStore.folders().contains { $0.id == folder && $0.name == "Work" })
+        // A local pin is a change to push, without counting as an edit.
+        var edited = local
+        edited.pinned = false
+        try NoteStore.saveMeta(edited)
+        let pushed = try #require(NoteStore.dirtyNotes().first { $0.id == note })
+        #expect(pushed.pinned == false && pushed.updated_at == 11)
+    }
+
     @Test func snapshotsNeedTheirNoteAndCursorsPersist() throws {
         let id = UUID().uuidString
         let snap = NoteStore.CloudSnapshot(note_id: id, day: "2026-10-01", body_md: "s", updated_at: 3)

@@ -301,8 +301,8 @@ export function dayFor(word, now = new Date()) {
 const DATE = /(^|[\s(\[])((?:@|📅\s?)(\d{4}-\d{2}-\d{2}))(?![\w-])/gu;
 const SHORTHAND = /(?:^|\s)(@(today|tomorrow|yesterday|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?))\s$/i;
 
-/** Date chips (⌘-click opens the day via onDate) and "@today " / "@fri " typed into real dates. */
-function dates(onDate) {
+/** Date chips (⌘-click opens the day via onDate), "@today " / "@fri " typed into real dates, and an "@" menu. */
+function dates(onDate, pickDate) {
   return Extension.create({
     name: "mnDates",
     addInputRules: () => [new InputRule({
@@ -312,7 +312,7 @@ function dates(onDate) {
         state.tr.insertText(`@${dayFor(match[2])} `, start, range.to);
       },
     })],
-    addProseMirrorPlugins: () => [new Plugin({
+    addProseMirrorPlugins: () => [atMenu(pickDate), new Plugin({
       props: {
         decorations(state) {
           const found = [];
@@ -342,6 +342,106 @@ function dates(onDate) {
   });
 }
 
+const AT_QUERY = /(?:^|[\s(\[])@([a-z]*)$/i;
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** The "@" menu, like Notion's: Today, Tomorrow, the next weekdays, or "Pick a date…"; typing filters it. */
+function atMenu(pickDate) {
+  let menuView;
+  return new Plugin({
+    view: (view) => (menuView = atMenuView(view, pickDate)),
+    props: { handleKeyDown: (view, event) => menuView?.key(event) ?? false },
+  });
+}
+
+function atMenuView(view, pickDate) {
+  const menu = Object.assign(document.createElement("div"), { className: "mn-at-menu" });
+  menu.setAttribute("role", "listbox");
+  menu.setAttribute("aria-label", "Dates");
+  let options = [], active = 0, at = null, dismissed = null;
+
+  const choices = (query) => {
+    const now = new Date(), q = query.toLowerCase();
+    const fmt = (d) => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    // Today, Tomorrow, then the next six days by name; a week out is "Next <today's weekday>".
+    const days = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      const name = DAY_NAMES[d.getDay()];
+      return { label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : i === 7 ? `Next ${name}` : name, hint: fmt(d), day: isoDay(d) };
+    });
+    return [...days, { label: "Pick a date…", hint: "", day: null }]
+      .filter((o) => !q || o.label.toLowerCase().startsWith(q) || (o.day === null && "pick".startsWith(q)));
+  };
+  const close = () => { menu.remove(); at = null; const root = view.dom.closest(".mn-editor"); if (root) root.style.minHeight = ""; };
+  const choose = (option) => {
+    if (at == null) return;
+    const { from } = view.state.selection;
+    const tr = view.state.tr;
+    if (option.day) tr.insertText(`@${option.day} `, at, from);
+    else tr.delete(at, from);
+    close();
+    view.dispatch(tr);
+    view.focus();
+    if (!option.day) pickDate?.();
+  };
+  const render = () => {
+    menu.replaceChildren(...options.map((o, i) => {
+      const item = document.createElement("div");
+      item.className = "mn-at-item" + (i === active ? " active" : "");
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", String(i === active));
+      item.append(Object.assign(document.createElement("span"), { textContent: o.label }),
+        Object.assign(document.createElement("span"), { className: "mn-at-hint", textContent: o.hint }));
+      item.onmousedown = (e) => { e.preventDefault(); choose(o); };
+      item.onmouseenter = () => { active = i; render(); };
+      return item;
+    }));
+  };
+  const update = () => {
+    const { $from, empty } = view.state.selection;
+    const inCode = $from.parent.type.name === "codeBlock" || $from.marks().some((m) => m.type.name === "code");
+    const before = empty && !inCode ? $from.parent.textBetween(Math.max(0, $from.parentOffset - 20), $from.parentOffset, null, "\ufffc") : "";
+    const match = before.match(AT_QUERY);
+    const start = match ? $from.pos - match[1].length - 1 : null;
+    if (start == null || start === dismissed) return close();
+    if (start !== at) active = 0;
+    at = start;
+    options = choices(match[1]);
+    if (!options.length) return close();
+    active = Math.min(active, options.length - 1);
+    render();
+    const body = view.dom.parentElement;
+    if (!body) return;
+    if (menu.parentElement !== body) body.append(menu);
+    const coords = view.coordsAtPos(start), frame = body.getBoundingClientRect();
+    menu.style.top = `${coords.bottom - frame.top + 4}px`;
+    menu.style.left = `${Math.max(0, coords.left - frame.left)}px`;
+    // An editor sized to its content (onHeight) grows so the menu isn't cut off below a short note.
+    const root = view.dom.closest(".mn-editor");
+    if (root) root.style.minHeight = `${menu.offsetTop + menu.offsetHeight + 8}px`;
+  };
+
+  return {
+    update,
+    destroy: close,
+    key(event) {
+      if (at == null) return false;
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        active = (active + (event.key === "ArrowDown" ? 1 : options.length - 1)) % options.length;
+        render();
+      } else if (event.key === "Enter" || event.key === "Tab") {
+        choose(options[active]);
+      } else if (event.key === "Escape") {
+        dismissed = at;
+        close();
+      } else {
+        return false;
+      }
+      return true;
+    },
+  };
+}
+
 const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>');
 
 /**
@@ -361,6 +461,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   bar.setAttribute("role", "toolbar");
   bar.setAttribute("aria-label", "Formatting");
   bar.hidden = !toolbar;
+  let pickDate; // set once the date form exists; the "@" menu's "Pick a date…" uses it
   const linkForm = document.createElement("form");
   linkForm.className = "mn-link";
   linkForm.hidden = true;
@@ -414,7 +515,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     element: body,
     extensions: [
       tagHighlighter(onTag),
-      dates(onDate),
+      dates(onDate, () => pickDate?.()),
       dragHandle(),
       StarterKit.configure({ link: { openOnClick: false, protocols: ["note"], autolink: true },
         dropcursor: false }), // the drag handle draws its own line between blocks
@@ -477,6 +578,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     dateForm.hidden = true;
   };
   dateForm.onsubmit = (e) => { e.preventDefault(); insertDate(); };
+  pickDate = openDate;
   dateInput.onkeydown = (e) => { if (e.key === "Escape") { dateForm.hidden = true; editor.commands.focus(); } };
   const dateButton = Object.assign(document.createElement("button"), { type: "button", innerHTML: CALENDAR_ICON, title: "Add a date" });
   dateButton.setAttribute("aria-label", "Add a date");

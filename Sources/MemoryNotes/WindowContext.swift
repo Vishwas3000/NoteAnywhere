@@ -7,7 +7,7 @@ enum WindowContext {
     static func path(title: String?, appName: String) -> [String] {
         guard let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else { return [] }
         var parts = title.split(separator: #/\s[-—–|]\s/#).map { clean(String($0)) }
-        let app = appName.lowercased()
+        let app = clean(appName).lowercased()  // macOS names WhatsApp "\u{200E}WhatsApp"
         // The app's own name ("Slack", "Brave" for "Brave Browser", "Visual Studio Code" for "Code") marks which end
         // of the title is the broad one.
         let isApp = { (part: String) in
@@ -44,7 +44,7 @@ enum WindowContext {
     /// Drops what changes without the place changing: unsaved dots, unread counts like "(3) Inbox" / "Inbox (3)".
     private static func clean(_ part: String) -> String {
         part.filter { !("\u{200E}\u{200F}\u{202A}\u{202B}\u{202C}\u{202D}\u{202E}\u{2066}\u{2067}\u{2068}\u{2069}".contains($0)) }  // bidi marks (WhatsApp)
-            .replacing(#/^[●•*]\s*/#, with: "")
+            .replacing(#/^[^\p{L}\p{N}(\[#@~]+/#, with: "")  // unsaved dots, spinners ("✳ Claude Code"), bullets
             .replacing(#/^\(\d+\)\s*/#, with: "")
             .replacing(#/\s*\(\d+\)$/#, with: "")
             .trimmingCharacters(in: .whitespaces)

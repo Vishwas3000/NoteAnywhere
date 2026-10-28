@@ -153,6 +153,22 @@ check("Obsidian 📅 dates are chips too; impossible dates aren't", () => {
   const ed = mount("a 📅 2026-10-30 b @2026-02-30");
   assert.deepEqual([...ed.editor.view.dom.querySelectorAll(".mn-date")].map((c) => c.dataset.day), ["2026-10-30"]);
 });
+check("typing @ opens the date menu; Return picks Today, typing filters, Esc closes", () => {
+  const ed = mount("Ship ");
+  ed.editor.commands.focus("end");
+  ed.editor.commands.insertContent("@");
+  const menu = () => ed.editor.view.dom.parentElement.querySelector(".mn-at-menu");
+  assert.ok(menu(), "menu shows after @");
+  assert.equal(menu().querySelector(".mn-at-item").textContent.startsWith("Today"), true);
+  ed.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+  assert.equal(ed.getMarkdown().trim(), `Ship @${MNEditor.dayFor("today")}`);
+  assert.equal(menu(), null);
+  ed.editor.commands.insertContent(" @tom");
+  assert.deepEqual([...menu().querySelectorAll(".mn-at-item")].map((i) => i.firstChild.textContent), ["Tomorrow"]);
+  ed.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+  assert.equal(menu(), null);
+  assert.match(ed.getMarkdown(), /@tom$/);
+});
 check("shortcuts list is exported", () => assert.ok(MNEditor.shortcuts.length >= 20));
 
 // ✨ menu: the host's reply replaces the whole note (or the selection) as one undoable step; titles go on top.

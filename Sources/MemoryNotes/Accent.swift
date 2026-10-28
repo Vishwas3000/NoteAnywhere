@@ -1,5 +1,22 @@
 import SwiftUI
 
+extension NoteColor {
+    var title: String { rawValue.capitalized }
+    var swatch: Color {
+        switch self {
+        case .grey: .gray
+        case .blue: .blue
+        case .red: .red
+        case .yellow: .yellow
+        case .green: .green
+        case .pink: .pink
+        case .purple: .purple
+        case .cyan: .cyan
+        case .orange: .orange
+        }
+    }
+}
+
 extension Color {
     /// Apple Notes' warm yellow, same values as the editor CSS: darker in light mode so text drawn in it stays legible.
     static let notesAccent: Color = {

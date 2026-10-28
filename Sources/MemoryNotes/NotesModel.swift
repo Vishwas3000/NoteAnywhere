@@ -3,11 +3,20 @@ import Combine
 import notify
 import SwiftUI
 
+/// Which app, and which place in it, is in front. Its own object, so views that don't show it (the main window)
+/// don't redraw every time a window title changes.
+final class FrontWindow: ObservableObject {
+    static let shared = FrontWindow()
+    @Published fileprivate(set) var app: NSRunningApplication?
+    @Published fileprivate(set) var context: String?
+}
+
 /// Shared state for the main window and the overlay: all notes, plus which app is in front.
 final class NotesModel: ObservableObject {
     static let shared = NotesModel()
 
     @Published private(set) var notes = NoteStore.loadAll()
+    @Published private(set) var folders = NoteStore.folders()
     /// One entry per note per day it was edited; feeds the calendar.
     @Published private(set) var snapshots = NoteStore.loadHistory()
     /// A note to select in the main window, e.g. after clicking a link to it inside another note.
@@ -17,10 +26,10 @@ final class NotesModel: ObservableObject {
     /// A day ("yyyy-MM-dd") to show in the calendar, e.g. after ⌘-clicking a date in a note.
     @Published var calendarRequest: String?
     /// The last frontmost app that isn't MemoryNotes itself.
-    @Published private(set) var frontApp: NSRunningApplication?
+    var frontApp: NSRunningApplication? { FrontWindow.shared.app }
     /// Where in that app you are, as an app-note target: "bundle.id/Workspace/Channel" (just "bundle.id" without
     /// the Accessibility permission or a useful window title).
-    @Published private(set) var frontContext: String?
+    var frontContext: String? { FrontWindow.shared.context }
 
     private let titles = WindowTitleWatcher()
 
@@ -39,7 +48,7 @@ final class NotesModel: ObservableObject {
         titles.onChange = { [weak self] title, conversation in
             guard let self, let app = self.frontApp, let id = app.bundleIdentifier else { return }
             let context = WindowContext.target(bundleID: id, appName: app.localizedName ?? id, title: title, conversation: conversation)
-            if context != self.frontContext { self.frontContext = context }
+            if context != self.frontContext { FrontWindow.shared.context = context }
         }
         WindowTitleWatcher.requestPermission()
         setFront(Self.otherApp(NSWorkspace.shared.frontmostApplication))
@@ -53,7 +62,7 @@ final class NotesModel: ObservableObject {
     }
 
     private func setFront(_ app: NSRunningApplication?) {
-        frontApp = app
+        FrontWindow.shared.app = app
         titles.watch(app)  // reports the window title right away, which sets frontContext
     }
 
@@ -64,6 +73,8 @@ final class NotesModel: ObservableObject {
     func reload() {
         let fresh = NoteStore.loadAll()
         if fresh != notes { notes = fresh }
+        let freshFolders = NoteStore.folders()
+        if freshFolders != folders { folders = freshFolders }
         let history = NoteStore.loadHistory()
         if history != snapshots { snapshots = history }
     }
@@ -78,11 +89,61 @@ final class NotesModel: ObservableObject {
     }
 
     @discardableResult
-    func add(kind: Note.Kind, target: String, label: String) -> Note {
-        let note = Note(kind: kind, target: target, label: label)
+    func add(kind: Note.Kind, target: String, label: String, folderID: String? = nil, text: String = "") -> Note {
+        var note = Note(kind: kind, target: target, label: label, text: text)
         notes.append(note)
         persist(note)
+        if folderID != nil {
+            note.folderID = folderID
+            setMeta(note)
+        }
         return note
+    }
+
+    /// A copy with the same text, place, folder and colour (unpinned), like Apple Notes' Duplicate.
+    @discardableResult
+    func duplicate(_ note: Note) -> Note {
+        var copy = add(kind: note.kind, target: note.target, label: note.label, folderID: note.folderID, text: note.text)
+        copy.color = note.color
+        copy.folderID = note.folderID
+        setMeta(copy)
+        return copy
+    }
+
+    /// Pin, colour or folder changes (see NoteStore.saveMeta for why they don't count as edits).
+    func update(_ id: String, _ change: (inout Note) -> Void) {
+        guard let i = notes.firstIndex(where: { $0.id == id }) else { return }
+        change(&notes[i])
+        setMeta(notes[i])
+    }
+
+    private func setMeta(_ note: Note) {
+        if let i = notes.firstIndex(where: { $0.id == note.id }) {
+            notes[i] = note
+            notes[i].updatedAt += 1
+        }
+        do { try NoteStore.saveMeta(note) } catch { NSLog("MemoryNotes: save failed: \(error)") }
+    }
+
+    @discardableResult
+    func addFolder(_ name: String) -> Folder {
+        let folder = Folder(name: name)
+        folders.append(folder)
+        folders.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        do { try NoteStore.saveFolder(folder) } catch { NSLog("MemoryNotes: folder save failed: \(error)") }
+        return folder
+    }
+
+    func renameFolder(_ id: String, to name: String) {
+        guard let i = folders.firstIndex(where: { $0.id == id }) else { return }
+        folders[i].name = name
+        do { try NoteStore.saveFolder(folders[i]) } catch { NSLog("MemoryNotes: folder save failed: \(error)") }
+    }
+
+    func deleteFolder(_ id: String) {
+        folders.removeAll { $0.id == id }
+        for i in notes.indices where notes[i].folderID == id { notes[i].folderID = nil }
+        do { try NoteStore.deleteFolder(id) } catch { NSLog("MemoryNotes: folder delete failed: \(error)") }
     }
 
     func delete(_ id: String) {

@@ -150,6 +150,11 @@ final class CloudSync: ObservableObject {
     }
 
     private func push() async throws {
+        let folders = NoteStore.dirtyFolders()  // first: notes point at them
+        if !folders.isEmpty {
+            try await rest("folders?on_conflict=id", method: "POST", body: folders.map(\.row))
+            try NoteStore.markPushed(folders: folders)
+        }
         while true {
             let notes = NoteStore.dirtyNotes()
             if !notes.isEmpty {
@@ -175,12 +180,15 @@ final class CloudSync: ObservableObject {
             return try JSONDecoder().decode([Row].self, from: data)
         }
         while true {
-            let notes = try await page("notes", "id,kind,target,label,body_md,created_at,updated_at,deleted_at", NoteStore.CloudNote.self)
+            let folders = try await page("folders", "id,name,updated_at,deleted_at", NoteStore.CloudFolder.self)
+            let notes = try await page("notes", "id,kind,target,label,body_md,created_at,updated_at,deleted_at,pinned,folder_id,color,locked",
+                                       NoteStore.CloudNote.self)
             let snapshots = try await page("snapshots", "note_id,day,body_md,updated_at", NoteStore.CloudSnapshot.self)
-            try NoteStore.applyRemote(notes: notes, snapshots: snapshots)
+            try NoteStore.applyRemote(notes: notes, snapshots: snapshots, folders: folders)
+            if let last = folders.last?.seq { try NoteStore.setSyncValue("cursor.folders", String(last)) }
             if let last = notes.last?.seq { try NoteStore.setSyncValue("cursor.notes", String(last)) }
             if let last = snapshots.last?.seq { try NoteStore.setSyncValue("cursor.snapshots", String(last)) }
-            if notes.count < 500 && snapshots.count < 500 { return }
+            if notes.count < 500 && snapshots.count < 500 && folders.count < 500 { return }
         }
     }
 
@@ -253,8 +261,13 @@ extension NoteStore.CloudNote {
     /// Every column on every row: PostgREST takes a batch's columns from its first object, so nulls must be explicit.
     var row: [String: Any] {
         ["id": id, "kind": kind, "target": target, "label": label, "body_md": body_md,
-         "created_at": created_at, "updated_at": updated_at, "deleted_at": deleted_at ?? NSNull()]
+         "created_at": created_at, "updated_at": updated_at, "deleted_at": deleted_at ?? NSNull(),
+         "pinned": pinned ?? false, "folder_id": folder_id ?? NSNull(), "color": color ?? NSNull(), "locked": locked ?? false]
     }
+}
+
+extension NoteStore.CloudFolder {
+    var row: [String: Any] { ["id": id, "name": name, "updated_at": updated_at, "deleted_at": deleted_at ?? NSNull()] }
 }
 
 extension NoteStore.CloudSnapshot {
@@ -318,7 +331,8 @@ private final class Realtime: NSObject {
         let socket = URLSession.shared.webSocketTask(with: url.url!)
         self.socket = socket
         socket.resume()
-        send(topic, "phx_join", ["config": ["postgres_changes": [["event": "*", "schema": "public", "table": "notes"]]],
+        send(topic, "phx_join", ["config": ["postgres_changes": [["event": "*", "schema": "public", "table": "notes"],
+                                                                 ["event": "*", "schema": "public", "table": "folders"]]],
                                  "access_token": token])
         heartbeat = Timer.scheduledTimer(withTimeInterval: 25, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.send("phoenix", "heartbeat", [:]) }

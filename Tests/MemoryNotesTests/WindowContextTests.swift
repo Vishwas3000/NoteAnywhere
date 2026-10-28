@@ -19,6 +19,9 @@ import Testing
     ("a/b.txt", "TextEdit", ["a∕b.txt"]),
     // Window titled just like the app, or nothing.
     ("Slack", "Slack", []),  // no "Slack › Slack"
+    // Animated titles (a terminal spinner) stay one place.
+    ("✳ Claude Code", "Terminal", ["Claude Code"]),
+    ("⠋ Claude Code", "Terminal", ["Claude Code"]),
     ("", "Slack", []),
 ])
 func windowTitlePath(title: String, app: String, expected: [String]) {
@@ -45,6 +48,9 @@ func windowTitlePath(title: String, app: String, expected: [String]) {
     let target = WindowContext.target(bundleID: "net.whatsapp.WhatsApp", appName: "WhatsApp", title: "\u{200E}WhatsApp",
                                       conversation: "\u{200E}Project / Team")
     #expect(target == "net.whatsapp.WhatsApp/Project ∕ Team")
+    // macOS itself reports the app as "\u{200E}WhatsApp".
+    #expect(WindowContext.target(bundleID: "net.whatsapp.WhatsApp", appName: "\u{200E}WhatsApp", title: "\u{200E}WhatsApp",
+                                 conversation: "Book Club") == "net.whatsapp.WhatsApp/Book Club")
     #expect(Note(kind: .app, target: target, label: "WhatsApp").place == "WhatsApp › Project ∕ Team")
     // A title that already names the place wins over the header.
     #expect(WindowContext.target(bundleID: "x", appName: "Slack", title: "general - Acme - Slack", conversation: "other")

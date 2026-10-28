@@ -4,3 +4,4 @@
 node_modules/
 supabase/.temp/
 ios/MemoryNotes.xcodeproj/
+.signing-identity
