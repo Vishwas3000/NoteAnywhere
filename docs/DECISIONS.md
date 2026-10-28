@@ -203,3 +203,48 @@ Made by the subagent that wrote the extension:
   requirement is identifier + certificate and survives rebuilds. Falls back to ad-hoc, with a warning, when there is none.
 - **Rejected:** a self-signed certificate (extra keychain setup; a valid Apple Development identity already exists).
 - **Status:** Decided (Claude, fixing a reported bug). One last grant was needed after switching.
+
+## D27 — Apple Notes–style redesign, guided by ui-review-tahoe (2026-10-28)
+- **Why:** user found the UI "not that great". Chose the Apple Notes feel (over Raycast/Linear or Notion), date-grouped
+  sidebar (over by-source or Apps/Websites), and all four surfaces. Built by four parallel agents in worktrees, each
+  applying the vendored `ui-review-tahoe` skill (user: "use the skill").
+- Shared: Markdown-free `Note.title`/`preview`; editor with icon toolbar, round yellow checkboxes, 15 px + title line in
+  the main window (only when the note starts with a line or heading), fit-to-content editors in panels; one accent
+  (`Color.notesAccent`, #c78a00 light / #ffd60a dark).
+- Main window: Today / Yesterday / Previous 7 Days / Previous 30 Days / Month Year; rows title → time + preview → source;
+  source chip + "Edited …"; address field only while empty or via Edit Address…; last tab remembered (`windowMode`).
+  Day view rows open the note instead of showing full text (agent's call, easy to revert).
+- Overlay: header with search/+ buttons, note cards newest first with hover actions; search popup with Notes rows and a key-hint footer.
+- **Status:** Decided (user chose direction); visuals of main window checked by screenshot, panels not yet.
+
+## D28 — Apple Intelligence (2026-10-28)
+- **Why:** user asked to use Apple Intelligence for improving text and grammar; chose all four options.
+- System Writing Tools in the app's editors (`writingToolsBehavior = .complete`). A ✨ menu in the shared editor (Fix
+  Spelling & Grammar, Make Clearer, Make Shorter, Turn into Checklist, Add Title) runs Apple's on-device Foundation Models
+  model; selection or whole note; one undoable step; refuses to apply if the note changed meanwhile. The browser asks
+  the native host (`op: "ai"`), so it runs on the Mac too. Suggested title + tags are stored per note version
+  (`suggestions` table, schema v2), apart from the user's own #tags.
+- **Rejected:** cloud LLMs (privacy, cost; on-device is free and good enough for rewrites).
+- **Status:** Decided (user). Proofread verified end to end through the host.
+
+## D29 — Live updates app → browser (2026-10-28)
+- **Why:** user wants edits to show both ways. Browser → app was already live (Darwin notify); app → browser only on tab focus.
+- The extension keeps one `connectNative` port open; the host answers `op: "watch"` by streaming `{event: "changed"}`
+  on every save (any process). Background debounces 250 ms and broadcasts `mn:changed`; visible overlays reload,
+  never replacing an editor that has focus.
+- **Status:** Decided (Claude). Host side covered by `scripts/test_host.py`.
+
+## D30 — Conversation from inside the window for apps whose title doesn't name it (2026-10-28)
+- **Why:** WhatsApp's window title is only "WhatsApp", so notes couldn't follow the open chat.
+- Per-app table of the accessibility identifier that names the open conversation (WhatsApp: the chat header button).
+  Read only that element; message lists are skipped. No notification fires on chat switch, so it's checked once a
+  second while such an app is in front. Bidi marks are stripped and a title that only names the app adds no level.
+- Narrows D23's "no per-app parsers": titles stay generic; this table is only for apps whose titles carry nothing.
+- **Status:** Decided (Claude, fixing a user report). Covered by `swift test`.
+
+## D31 — Sync through Supabase (2026-10-28)
+- **Why:** an iPhone app needs the notes. User chose Supabase (over iCloud/CloudKit and same-Wi-Fi sync).
+- Each device keeps its SQLite database; cloud tables `notes` and `snapshots` mirror it with RLS per user. A trigger
+  enforces last-writer-wins on `updated_at`, keeps tombstones deleted and stamps a `seq` used as the pull cursor;
+  Realtime on `notes` for live updates. Project "MemoryNotes" (ref strhaqnvxtpmlvcwkkne). Migration in `supabase/migrations`.
+- **Status:** Decided (user). Schema written; applying it needs the user's go-ahead (auto mode blocked the push).
