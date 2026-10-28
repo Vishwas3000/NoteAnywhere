@@ -5,6 +5,8 @@ struct SyncSettingsView: View {
     @ObservedObject private var sync = CloudSync.shared
     @State private var email = ""
     @State private var code = ""
+    @State private var passphrase = ""
+    @State private var confirm = ""
     @FocusState private var codeFocused: Bool
 
     var body: some View {
@@ -12,7 +14,7 @@ struct SyncSettingsView: View {
             Section {
                 Picker("Sync", selection: $sync.mode) {
                     Text("Off").tag(CloudSync.Mode.off)
-                    Text("MemoryNotes Cloud").tag(CloudSync.Mode.cloud)
+                    Text("NoteAnywhere Cloud").tag(CloudSync.Mode.cloud)
                     Text("iCloud (coming soon)").tag(CloudSync.Mode.icloud).selectionDisabled()
                 }
             } footer: {
@@ -22,6 +24,32 @@ struct SyncSettingsView: View {
             }
 
             if sync.mode == .cloud {
+                if sync.email != nil, sync.vault == .create {
+                    Section {
+                        SecureField("Sync passphrase", text: $passphrase)
+                        SecureField("Type it again", text: $confirm)
+                        Button("Turn On Encrypted Sync") { Task { await sync.createVault(passphrase: passphrase); clear() } }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(passphrase.count < 8 || passphrase != confirm || sync.busy)
+                    } header: {
+                        Text("Encrypt your notes")
+                    } footer: {
+                        Text("Your notes are encrypted on this device before they're uploaded; the server can't read them. Use at least 8 characters. Your other devices ask for this passphrase once. If you forget it, the synced copy can't be read (the notes on your devices are fine).")
+                    }
+                } else if sync.email != nil, sync.vault == .enter {
+                    Section {
+                        SecureField("Sync passphrase", text: $passphrase).onSubmit(enter)
+                        Button("Unlock Synced Notes", action: enter)
+                            .buttonStyle(.borderedProminent)
+                            .disabled(passphrase.isEmpty || sync.busy)
+                    } header: {
+                        Text("Enter your sync passphrase")
+                    } footer: {
+                        Text("You chose it when you first turned on sync on another device.")
+                    }
+                } else if sync.email != nil, sync.vault == nil {
+                    Section { ProgressView("Checking your account…") }
+                }
                 if let account = sync.email {
                     Section("Account") {
                         LabeledContent("Signed in as", value: account)
@@ -81,6 +109,15 @@ struct SyncSettingsView: View {
     private func sendLink() {
         guard email.contains("@") else { return }
         Task { await sync.sendLink(to: email) }
+    }
+
+    private func enter() { Task { await sync.enterVault(passphrase: passphrase); clear() } }
+
+    private func clear() {
+        if sync.vault == .ready {
+            passphrase = ""
+            confirm = ""
+        }
     }
 
     private func verify() {

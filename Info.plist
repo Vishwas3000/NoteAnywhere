@@ -3,7 +3,8 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key><string>com.memorynotes.app</string>
-	<key>CFBundleName</key><string>MemoryNotes</string>
+	<key>CFBundleName</key><string>NoteAnywhere</string>
+	<key>CFBundleDisplayName</key><string>NoteAnywhere</string>
 	<key>CFBundleExecutable</key><string>MemoryNotes</string>
 	<key>CFBundleIconFile</key><string>AppIcon</string>
 	<key>CFBundlePackageType</key><string>APPL</string>

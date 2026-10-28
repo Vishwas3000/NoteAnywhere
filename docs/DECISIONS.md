@@ -298,3 +298,44 @@ Made by the subagent that wrote the extension:
 - `install.sh` remembers its signing certificate in an untracked `.signing-identity`, since with several valid
   certificates keychain order could change it and reset the Accessibility permission.
 - **Status:** Decided (user); release engineering and launch copy in progress.
+
+## D38 — Launch copy and privacy policy (2026-10-28, subagent)
+- **Why:** D36 needs posts, a store listing and a privacy policy. Written in `launch/` and `PRIVACY.md`, from the code
+  on `main`, not from memory: anything not merged (locked notes, iPhone app, iCloud) is listed as coming soon.
+- Claims are limited to what was measured: idle CPU ~0%, 37–65 MB, MiniLM ~87 MB, the 8-note × 7-query search test.
+  Posts use demo names only (Acme, Sam, weather-app); screenshots come from a separate macOS Demo account, because
+  the browser host always opens the default database, so `MEMORYNOTES_DIR` alone would leak real notes.
+- PRIVACY.md says plainly that deleted notes stay in the database as tombstones (soft delete, for sync) and that
+  sync isn't end-to-end encrypted. The Web Store disclosure declares web history and website content (page address
+  and title) even though they only reach the app on the same Mac.
+- Order: long posts (dev.to, Medium) first so later posts can link them, then Show HN, r/macapps, one subreddit a day,
+  Product Hunt last. AI-assisted build disclosed in the dev-facing posts; optional line in r/macapps.
+- **Rejected:** one-day blast across every site (no time to answer or fix); a contact email baked in (left as
+  `{{CONTACT_EMAIL}}` for the user to choose).
+- **Status:** Proposed. Nothing is posted; the user posts.
+
+## D37 — Apple Notes right-click menu: folders, pins, colours, lock (2026-10-28)
+- **Why:** user wants Apple Notes' note menu (screenshot) plus colour codes like Chrome's tab groups, and a total count.
+- Open Note in New Window, Pin, Lock, New, Duplicate, Share, Move to ▸ folders (New Folder…), Color ▸ (Chrome's nine
+  tab-group colours), Delete. Sidebar: Folders (All Notes + folders with counts), Pinned, then dates; count under the title.
+- Pins/colours/folders change `updated_at` by +1 ms: enough for newer-wins sync, without moving the note to "Today".
+  Folders are tombstoned; their notes go back to All Notes. All of it syncs (local schema v4, Supabase migration 2).
+- **Lock** (user chose real encryption over hiding): one notes password; text becomes an AES-GCM envelope keyed by
+  PBKDF2-SHA256(password, per-note salt, 310k). Touch ID unlocks via LocalAuthentication + a Keychain copy on this
+  device. Locked notes hide title/preview/tags/dates and are skipped by search and the browser.
+- **Status:** Decided (user). Menu, folders, pins, colours shipped; lock UI in progress.
+
+## D39 — Supabase sync is end-to-end encrypted (2026-10-28)
+- **Why:** user: "make sure when data is stored on Supabase it is encrypted; if the user chooses iCloud, follow the regular route".
+- A random 256-bit vault key per account seals each note's text, place (page address / app-chat path) and title, folder
+  names and history (AES-GCM, `mne2e:v1:`) before upload. The server stores the key only wrapped by
+  PBKDF2(sync passphrase, salt) in `vaults` (RLS). First device creates the passphrase (plain insert, so a racing second
+  device can't replace it); others enter it once; the key lives in this device's Keychain. Sync refuses to run without it.
+- Visible to the server: ids, times, kind, pin/colour/folder ids, locked flag, account email.
+- **Rejected:** server-side encryption only (Supabase could read); reusing the notes (lock) password (different purposes).
+- Forgetting the passphrase loses the cloud copy, not local notes. iCloud (when built) uses Apple's own protection.
+- **Status:** Decided (user asked). Needs `supabase db push` (migration 3). Covered by a test that rows carry no readable text.
+
+## D40 — No real people or workspaces in the repo (2026-10-28)
+- Comments, tests and decisions used a colleague's name, a work Slack workspace and a WhatsApp group from screenshots;
+  replaced with demo names before going public. They remain in git history until the user decides on a rewrite.

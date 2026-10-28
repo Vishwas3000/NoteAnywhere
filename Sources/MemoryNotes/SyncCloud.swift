@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import notify
 import Security
@@ -20,6 +21,10 @@ final class CloudSync: ObservableObject {
     @Published private(set) var lastSynced: Date?
     @Published private(set) var busy = false
     @Published var error: String?
+    /// End-to-end encryption step after signing in: nil until known, then create/enter a passphrase, or ready.
+    @Published private(set) var vault: VaultStep?
+    enum VaultStep { case create, enter, ready }
+    private var vaultKey: SymmetricKey?
 
     private var session: Session? { didSet { email = session?.email } }
     private var timer: Timer?
@@ -33,15 +38,19 @@ final class CloudSync: ObservableObject {
         mode = Mode(rawValue: UserDefaults.standard.string(forKey: "syncMode") ?? "") ?? .off
         session = Keychain.load()
         email = session?.email
+        vaultKey = session.flatMap { Keychain.vaultKey(for: $0.userID) }
+        vault = vaultKey != nil ? .ready : nil
         realtime.onChange = { [weak self] in self?.syncNow() }
         modeChanged()
     }
 
-    var active: Bool { mode == .cloud && session != nil }
+    /// Syncing needs an account and the vault key: nothing goes up unencrypted.
+    var active: Bool { mode == .cloud && session != nil && vaultKey != nil }
 
     private func modeChanged() {
         UserDefaults.standard.set(mode.rawValue, forKey: "syncMode")
         stop()
+        if mode == .cloud, session != nil, vaultKey == nil { Task { await checkVault() } }
         guard active else { return }
         // Local saves (this app, the browser host, the share extension) post this; push them shortly after.
         notify_register_dispatch(NoteStore.changed, &notifyToken, .main) { [weak self] _ in
@@ -117,6 +126,8 @@ final class CloudSync: ObservableObject {
         Keychain.save(session)
         self.session = session
         pendingEmail = nil
+        vaultKey = Keychain.vaultKey(for: session.userID)
+        vault = vaultKey != nil ? .ready : nil
         modeChanged()
     }
 
@@ -125,9 +136,62 @@ final class CloudSync: ObservableObject {
     /// Stops syncing and forgets the account on this device; notes stay here.
     func signOut() {
         stop()
+        if let id = session?.userID { Keychain.deleteVaultKey(for: id) }
         Keychain.delete()
         session = nil
+        vaultKey = nil
+        vault = nil
         lastSynced = nil
+    }
+
+    // MARK: End-to-end encryption
+
+    /// Is there a vault for this account yet (another device made it), or is this the first device?
+    private func checkVault() async {
+        await perform {
+            let rows = try JSONSerialization.jsonObject(with: try await self.rest("vaults?select=salt,wrapped", method: "GET")) as? [Any]
+            self.vault = (rows ?? []).isEmpty ? .create : .enter
+        }
+    }
+
+    /// First device: a random vault key, stored on the server only wrapped by the passphrase.
+    func createVault(passphrase: String) async {
+        await perform {
+            let key = SymmetricKey(size: .bits256)
+            let salt = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
+            let wrapped = try AES.GCM.seal(key.withUnsafeBytes { Data($0) }, using: NoteLock.key(passphrase, salt)).combined!
+            // A plain insert: if another device just made the vault, this fails rather than replacing its key.
+            do {
+                try await self.rest("vaults", method: "POST", body: [["salt": salt.base64EncodedString(), "wrapped": wrapped.base64EncodedString()]],
+                                    upsert: false)
+            } catch {
+                self.vault = .enter
+                throw Failure(errorDescription: "Another device already set a sync passphrase. Enter that one.")
+            }
+            self.unlocked(key)
+        }
+    }
+
+    /// Any other device: unwrap the vault key with the passphrase.
+    func enterVault(passphrase: String) async {
+        await perform {
+            let data = try await self.rest("vaults?select=salt,wrapped", method: "GET")
+            guard let row = (try JSONSerialization.jsonObject(with: data) as? [[String: String]])?.first,
+                  let salt = row["salt"].flatMap({ Data(base64Encoded: $0) }),
+                  let wrapped = row["wrapped"].flatMap({ Data(base64Encoded: $0) }) else { throw Failure(errorDescription: "No vault yet.") }
+            guard let raw = try? AES.GCM.open(AES.GCM.SealedBox(combined: wrapped), using: NoteLock.key(passphrase, salt)) else {
+                throw Failure(errorDescription: "That passphrase doesn't open your synced notes.")
+            }
+            self.unlocked(SymmetricKey(data: raw))
+        }
+    }
+
+    private func unlocked(_ key: SymmetricKey) {
+        guard let id = session?.userID else { return }
+        Keychain.saveVaultKey(key, for: id)
+        vaultKey = key
+        vault = .ready
+        modeChanged()
     }
 
     // MARK: Sync
@@ -150,21 +214,22 @@ final class CloudSync: ObservableObject {
     }
 
     private func push() async throws {
+        guard let key = vaultKey else { return }
         let folders = NoteStore.dirtyFolders()  // first: notes point at them
         if !folders.isEmpty {
-            try await rest("folders?on_conflict=id", method: "POST", body: folders.map(\.row))
+            try await rest("folders?on_conflict=id", method: "POST", body: try folders.map { try $0.row(sealing: key) })
             try NoteStore.markPushed(folders: folders)
         }
         while true {
             let notes = NoteStore.dirtyNotes()
             if !notes.isEmpty {
-                try await rest("notes?on_conflict=id", method: "POST", body: notes.map(\.row))
+                try await rest("notes?on_conflict=id", method: "POST", body: try notes.map { try $0.row(sealing: key) })
                 try NoteStore.markPushed(notes: notes)
             }
             // Snapshots reference notes, so they go up after them.
             let snapshots = NoteStore.dirtySnapshots()
             if !snapshots.isEmpty {
-                try await rest("snapshots?on_conflict=note_id,day", method: "POST", body: snapshots.map(\.row))
+                try await rest("snapshots?on_conflict=note_id,day", method: "POST", body: try snapshots.map { try $0.row(sealing: key) })
                 try NoteStore.markPushed(snapshots: snapshots)
             }
             if notes.count < 200 && snapshots.count < 500 { return }
@@ -172,6 +237,7 @@ final class CloudSync: ObservableObject {
     }
 
     private func pull() async throws {
+        guard let key = vaultKey else { return }
         // shortcut: a row committed out of seq order by a concurrent writer could be skipped until it changes again;
         // fine for one person's devices, switch to a server-side "changes since" function if that ever matters.
         func page<Row: Decodable>(_ table: String, _ columns: String, _ type: Row.Type) async throws -> [Row] {
@@ -184,7 +250,9 @@ final class CloudSync: ObservableObject {
             let notes = try await page("notes", "id,kind,target,label,body_md,created_at,updated_at,deleted_at,pinned,folder_id,color,locked",
                                        NoteStore.CloudNote.self)
             let snapshots = try await page("snapshots", "note_id,day,body_md,updated_at", NoteStore.CloudSnapshot.self)
-            try NoteStore.applyRemote(notes: notes, snapshots: snapshots, folders: folders)
+            try NoteStore.applyRemote(notes: try notes.map { try $0.opened(with: key) },
+                                      snapshots: try snapshots.map { try $0.opened(with: key) },
+                                      folders: try folders.map { try $0.opened(with: key) })
             if let last = folders.last?.seq { try NoteStore.setSyncValue("cursor.folders", String(last)) }
             if let last = notes.last?.seq { try NoteStore.setSyncValue("cursor.notes", String(last)) }
             if let last = snapshots.last?.seq { try NoteStore.setSyncValue("cursor.snapshots", String(last)) }
@@ -216,13 +284,13 @@ final class CloudSync: ObservableObject {
     }
 
     @discardableResult
-    private func rest(_ path: String, method: String, body: [[String: Any]]? = nil) async throws -> Data {
+    private func rest(_ path: String, method: String, body: [[String: Any]]? = nil, upsert: Bool = true) async throws -> Data {
         var request = URLRequest(url: URL(string: "rest/v1/\(path)", relativeTo: Self.projectURL)!)
         request.httpMethod = method
         request.setValue("Bearer \(try await accessToken())", forHTTPHeaderField: "Authorization")
         if let body {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
-            request.setValue("resolution=merge-duplicates,return=minimal", forHTTPHeaderField: "Prefer")
+            request.setValue(upsert ? "resolution=merge-duplicates,return=minimal" : "return=minimal", forHTTPHeaderField: "Prefer")
         }
         return try await send(request)
     }
@@ -257,21 +325,64 @@ final class CloudSync: ObservableObject {
     }
 }
 
+/// What the server sees of a note: ids, times, kind, pin/colour/folder ids and the locked flag. The text, the place
+/// (page address or app/chat path), the title and folder names are AES-GCM sealed with the vault key.
+enum SyncVault {
+    static let prefix = "mne2e:v1:"
+
+    static func seal(_ text: String, _ key: SymmetricKey) throws -> String {
+        prefix + (try AES.GCM.seal(Data(text.utf8), using: key).combined!).base64EncodedString()
+    }
+
+    static func open(_ text: String, _ key: SymmetricKey) throws -> String {
+        guard text.hasPrefix(prefix), let data = Data(base64Encoded: String(text.dropFirst(prefix.count))),
+              let plain = try? AES.GCM.open(AES.GCM.SealedBox(combined: data), using: key) else {
+            throw CloudSync.Failure(errorDescription: "A synced note can't be read with this passphrase.")
+        }
+        return String(decoding: plain, as: UTF8.self)
+    }
+}
+
 extension NoteStore.CloudNote {
     /// Every column on every row: PostgREST takes a batch's columns from its first object, so nulls must be explicit.
-    var row: [String: Any] {
-        ["id": id, "kind": kind, "target": target, "label": label, "body_md": body_md,
+    func row(sealing key: SymmetricKey) throws -> [String: Any] {
+        ["id": id, "kind": kind, "target": try SyncVault.seal(target, key), "label": try SyncVault.seal(label, key),
+         "body_md": try SyncVault.seal(body_md, key),
          "created_at": created_at, "updated_at": updated_at, "deleted_at": deleted_at ?? NSNull(),
          "pinned": pinned ?? false, "folder_id": folder_id ?? NSNull(), "color": color ?? NSNull(), "locked": locked ?? false]
+    }
+
+    func opened(with key: SymmetricKey) throws -> Self {
+        var n = self
+        n.target = try SyncVault.open(target, key)
+        n.label = try SyncVault.open(label, key)
+        n.body_md = try SyncVault.open(body_md, key)
+        return n
     }
 }
 
 extension NoteStore.CloudFolder {
-    var row: [String: Any] { ["id": id, "name": name, "updated_at": updated_at, "deleted_at": deleted_at ?? NSNull()] }
+    func row(sealing key: SymmetricKey) throws -> [String: Any] {
+        ["id": id, "name": try SyncVault.seal(name, key), "updated_at": updated_at, "deleted_at": deleted_at ?? NSNull()]
+    }
+
+    func opened(with key: SymmetricKey) throws -> Self {
+        var f = self
+        f.name = try SyncVault.open(name, key)
+        return f
+    }
 }
 
 extension NoteStore.CloudSnapshot {
-    var row: [String: Any] { ["note_id": note_id, "day": day, "body_md": body_md, "updated_at": updated_at] }
+    func row(sealing key: SymmetricKey) throws -> [String: Any] {
+        ["note_id": note_id, "day": day, "body_md": try SyncVault.seal(body_md, key), "updated_at": updated_at]
+    }
+
+    func opened(with key: SymmetricKey) throws -> Self {
+        var s = self
+        s.body_md = try SyncVault.open(body_md, key)
+        return s
+    }
 }
 
 private struct Session: Codable {
@@ -310,6 +421,28 @@ private enum Keychain {
     }
 
     static func delete() { SecItemDelete(query as CFDictionary) }
+
+    /// The vault key for one account, on this device only.
+    private static func vaultQuery(_ userID: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "com.memorynotes.sync",
+         kSecAttrAccount as String: "vault-\(userID)"]
+    }
+
+    static func vaultKey(for userID: String) -> SymmetricKey? {
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(vaultQuery(userID).merging([kSecReturnData as String: true]) { $1 } as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data, data.count == 32 else { return nil }
+        return SymmetricKey(data: data)
+    }
+
+    static func saveVaultKey(_ key: SymmetricKey, for userID: String) {
+        SecItemDelete(vaultQuery(userID) as CFDictionary)
+        SecItemAdd(vaultQuery(userID).merging([kSecValueData as String: key.withUnsafeBytes { Data($0) },
+                                               kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]) { $1 }
+                   as CFDictionary, nil)
+    }
+
+    static func deleteVaultKey(for userID: String) { SecItemDelete(vaultQuery(userID) as CFDictionary) }
 }
 
 /// Supabase Realtime over a plain WebSocket (Phoenix protocol): any change to this account's notes triggers a pull.
