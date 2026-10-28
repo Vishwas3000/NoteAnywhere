@@ -15,15 +15,6 @@ extension FocusedValues {
     @Entry var windowActions: WindowActions?
 }
 
-extension Color {
-    /// Apple Notes' warm yellow, same values as the editor CSS: darker in light mode so text drawn in it stays legible.
-    static let notesAccent = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            ? NSColor(srgbRed: 1, green: 0.84, blue: 0.04, alpha: 1)
-            : NSColor(srgbRed: 0.78, green: 0.54, blue: 0, alpha: 1)
-    })
-}
-
 /// Every note in one place: a sidebar of app and website notes (including ones written in the browser),
 /// with the selected note or the calendar on the right.
 struct NotesWindow: View {
