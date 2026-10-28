@@ -30,7 +30,7 @@ struct MemoryNotesApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
 
     var body: some Scene {
-        Window("MemoryNotes", id: "notes") {
+        Window("NoteAnywhere", id: "notes") {
             NotesWindow()
         }
         .defaultSize(width: 960, height: 640)
@@ -45,7 +45,7 @@ struct MemoryNotesApp: App {
         }
         .defaultSize(width: 480, height: 560)
 
-        MenuBarExtra("MemoryNotes", systemImage: "note.text") {
+        MenuBarExtra("NoteAnywhere", systemImage: "note.text") {
             MenuContent(overlay: delegate.overlay)
         }
     }
@@ -109,6 +109,6 @@ private struct MenuContent: View {
         SettingsLink { Text("Sync Settings…") }
             .simultaneousGesture(TapGesture().onEnded { NSApp.activate() })
         Divider()
-        Button("Quit MemoryNotes") { NSApp.terminate(nil) }.keyboardShortcut("q")
+        Button("Quit NoteAnywhere") { NSApp.terminate(nil) }.keyboardShortcut("q")
     }
 }

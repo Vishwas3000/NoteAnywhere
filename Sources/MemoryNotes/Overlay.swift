@@ -46,7 +46,7 @@ final class OverlayController {
     }
 
     private func show(_ app: NSRunningApplication?) {
-        panel.title = app?.localizedName ?? "MemoryNotes"
+        panel.title = app?.localizedName ?? "NoteAnywhere"
         panel.moveToMouseScreen()
         panel.orderFrontRegardless()
     }
@@ -246,8 +246,8 @@ private struct NoteCard: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 Group {
-                    Button(action: open) { Label("Open in MemoryNotes", systemImage: "arrow.up.forward.app") }
-                        .help("Open in MemoryNotes")
+                    Button(action: open) { Label("Open in NoteAnywhere", systemImage: "arrow.up.forward.app") }
+                        .help("Open in NoteAnywhere")
                         .focused($focusedAction, equals: 0)
                     Button(action: delete) { Label("Delete Note", systemImage: "trash") }
                         .help("Delete Note")
@@ -272,7 +272,7 @@ private struct NoteCard: View {
         .animation(.easeOut(duration: 0.15), value: hovering)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(note.title)
-        .accessibilityAction(named: "Open in MemoryNotes", open)
+        .accessibilityAction(named: "Open in NoteAnywhere", open)
         .accessibilityAction(named: "Delete Note", delete)
     }
 }

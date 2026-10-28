@@ -11,7 +11,7 @@ final class WindowTitleWatcher {
     private var headerID: String?
     private var poll: Timer?
 
-    /// Shows the system prompt the first time; afterwards the user toggles MemoryNotes in Privacy & Security ▸ Accessibility.
+    /// Shows the system prompt the first time; afterwards the user toggles NoteAnywhere in Privacy & Security ▸ Accessibility.
     static func requestPermission() {
         let prompt = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         _ = AXIsProcessTrustedWithOptions([prompt: true] as CFDictionary)

@@ -12,7 +12,7 @@ if (window.top === window && !window.__memoryNotes) (() => {
 
   const frame = document.createElement("iframe");
   frame.src = chrome.runtime.getURL("overlay.html");
-  frame.title = "MemoryNotes";
+  frame.title = "NoteAnywhere";
   // The frosted glass lives here: a backdrop-filter inside the cross-origin frame can't see the page behind it.
   frame.style.cssText = "all: initial; position: fixed; top: 8px; right: 8px; width: 340px; height: 0; border: 0;" +
     "z-index: 2147483647; display: none; color-scheme: normal; border-radius: 14px;" +
