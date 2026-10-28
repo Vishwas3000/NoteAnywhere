@@ -40,7 +40,8 @@ enum NoteLock {
 
     private static let keys = NSCache<NSString, NSData>()  // derived keys by password+salt, for this run only
 
-    private static func key(_ password: String, _ salt: Data) -> SymmetricKey {
+    /// PBKDF2-SHA256 → 256-bit key; also the sync passphrase's key (see SyncVault).
+    static func key(_ password: String, _ salt: Data) -> SymmetricKey {
         let id = "\(password.hashValue)/\(salt.base64EncodedString())" as NSString
         if let cached = keys.object(forKey: id) { return SymmetricKey(data: cached as Data) }
         var derived = Data(count: 32)
