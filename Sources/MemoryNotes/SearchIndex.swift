@@ -12,6 +12,10 @@ actor SearchIndex {
     static let shared = SearchIndex()
     private static let modelID = NoteStore.embeddingModel
     private static let modelsDir = NoteStore.root.appendingPathComponent("models")
+    private static let localModel = modelsDir.appendingPathComponent("models/" + modelID)
+
+    /// Whether the model is on disk, so searching won't start the one-time download.
+    static var hasModel: Bool { FileManager.default.fileExists(atPath: localModel.appendingPathComponent("config.json").path) }
 
     private var bundle: Bert.ModelBundle?
     private var loading: Task<Bert.ModelBundle?, Never>?
@@ -22,9 +26,7 @@ actor SearchIndex {
         if let bundle { return bundle }
         if loading == nil {
             loading = Task {
-                let local = Self.modelsDir.appendingPathComponent("models/" + Self.modelID)
-                if FileManager.default.fileExists(atPath: local.appendingPathComponent("config.json").path),
-                   let bundle = try? await Bert.loadModelBundle(from: local) {
+                if Self.hasModel, let bundle = try? await Bert.loadModelBundle(from: Self.localModel) {
                     return bundle
                 }
                 do {
