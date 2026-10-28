@@ -5,8 +5,8 @@ const MISSING = "Mac app not installed — run scripts/install.sh";
 
 let tabId, page = {};
 let notes = [], visible = false, dismissed = false, collapsed = false, forced = false, error = "";
-let query = "", results = [], searchSeq = 0, searchTimer;
-let editors = [], stamps = [], toolbarOn = false, expanded = false, hostH;
+let query = "", results = [], searchSeq = 0, searchTimer, changeTimer;
+let editors = [], stamps = [], toolbarOn = false, expanded = false, watching = false, hostH;
 
 const $ = (s) => document.querySelector(s);
 const [panel, count, body, list, empty, errBox] = [".panel", ".count", ".body", ".notes", ".empty", ".error"].map($);
@@ -138,6 +138,9 @@ function render() {
   resultList.hidden = !searching;
   noResults.hidden = !searching || results.length > 0;
   if (searching) resultList.replaceChildren(...results.map(resultRow));
+  // The background keeps a native port open while some panel shows, and broadcasts mn:changed on every DB change.
+  if (visible && !watching) chrome.runtime.sendMessage({ type: "mn:watch" }).catch(() => {});
+  watching = visible;
   report();
 }
 
@@ -251,6 +254,11 @@ function noteRow(note) {
       clearTimeout(timer);
       timer = setTimeout(() => save(note), 400);
     },
+    // Ignored by editor bundles that predate the ✨ menu.
+    onAI: (action, markdown) => send({ op: "ai", action, text: markdown }).then((r) => {
+      if (!r.ok) throw new Error(r.error);
+      return r.text;
+    }),
   }));
   stamps.push(stamp);
   row.append(box, meta);
@@ -309,6 +317,11 @@ async function load(nav) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (msg.type === "mn:changed") { // from background.js, so no sender tab
+    clearTimeout(changeTimer);
+    changeTimer = setTimeout(() => { if (visible && document.visibilityState === "visible") load(false); }, 300);
+    return;
+  }
   if (sender.tab?.id !== tabId) return; // content scripts in other tabs broadcast too
   if (msg.type === "mn:toggle") {
     visible = !visible;
