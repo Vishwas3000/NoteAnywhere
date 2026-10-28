@@ -11,5 +11,12 @@
 	<key>CFBundleVersion</key><string>1</string>
 	<key>LSMinimumSystemVersion</key><string>15.0</string>
 	<key>NSHighResolutionCapable</key><true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key><string>com.memorynotes.auth</string>
+			<key>CFBundleURLSchemes</key><array><string>memorynotes</string></array>
+		</dict>
+	</array>
 </dict>
 </plist>

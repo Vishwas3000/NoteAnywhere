@@ -66,12 +66,16 @@ final class CloudSync: ObservableObject {
         realtime.disconnect()
     }
 
-    // MARK: Sign in with an emailed code
+    // MARK: Sign in by email: a link that opens the app, or the code if the email carries one
 
-    func sendCode(to email: String) async {
+    /// Where sign-in links land; allowed in supabase/config.toml and registered as the apps' URL scheme.
+    static let callback = "memorynotes://auth-callback"
+
+    func sendLink(to email: String) async {
         let email = email.trimmingCharacters(in: .whitespaces).lowercased()
         await perform {
-            _ = try await self.auth("otp", ["email": email, "create_user": true])
+            _ = try await self.auth("otp", ["email": email, "create_user": true],
+                                    query: "redirect_to=" + Self.callback.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!)
             self.pendingEmail = email
         }
     }
@@ -79,18 +83,41 @@ final class CloudSync: ObservableObject {
     func verify(code: String) async {
         guard let email = pendingEmail else { return }
         await perform {
-            let reply = try await self.auth("verify", ["type": "email", "email": email,
-                                                     "token": code.filter(\.isNumber)])
-            let session = try Session(reply)
-            if NoteStore.syncValue("user") != session.userID {
-                try NoteStore.resetSync()  // another account: send it everything, fetch all of its notes
-                try NoteStore.setSyncValue("user", session.userID)
-            }
-            Keychain.save(session)
-            self.session = session
-            self.pendingEmail = nil
-            self.modeChanged()
+            try self.signedIn(try await self.auth("verify", ["type": "email", "email": email, "token": code.filter(\.isNumber)]))
         }
+    }
+
+    /// The sign-in link's redirect: memorynotes://auth-callback#access_token=…&refresh_token=…&expires_at=…
+    func handle(_ url: URL) async {
+        guard url.absoluteString.hasPrefix(Self.callback) else { return }
+        var fields: [String: String] = [:]
+        for part in [url.fragment, URLComponents(url: url, resolvingAgainstBaseURL: false)?.query].compactMap({ $0 }) {
+            for item in URLComponents(string: "?" + part)?.queryItems ?? [] { fields[item.name] = item.value }
+        }
+        await perform {
+            if let problem = fields["error_description"] { throw Failure(errorDescription: problem.replacingOccurrences(of: "+", with: " ")) }
+            guard let access = fields["access_token"], let refresh = fields["refresh_token"] else {
+                throw Failure(errorDescription: "That sign-in link didn't work. Send a new one.")
+            }
+            var request = URLRequest(url: URL(string: "auth/v1/user", relativeTo: Self.projectURL)!)
+            request.setValue("Bearer \(access)", forHTTPHeaderField: "Authorization")
+            let user = (try JSONSerialization.jsonObject(with: try await self.send(request))) as? [String: Any] ?? [:]
+            try self.signedIn(["access_token": access, "refresh_token": refresh, "user": user,
+                               "expires_at": Double(fields["expires_at"] ?? "") as Any,
+                               "expires_in": Double(fields["expires_in"] ?? "") as Any])
+        }
+    }
+
+    private func signedIn(_ reply: [String: Any]) throws {
+        let session = try Session(reply)
+        if NoteStore.syncValue("user") != session.userID {
+            try NoteStore.resetSync()  // another account: send it everything, fetch all of its notes
+            try NoteStore.setSyncValue("user", session.userID)
+        }
+        Keychain.save(session)
+        self.session = session
+        pendingEmail = nil
+        modeChanged()
     }
 
     func cancelCode() { pendingEmail = nil }

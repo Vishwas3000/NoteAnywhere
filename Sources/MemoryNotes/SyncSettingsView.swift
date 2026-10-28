@@ -34,7 +34,9 @@ struct SyncSettingsView: View {
                     }
                 } else if let sentTo = sync.pendingEmail {
                     Section {
-                        TextField("6-digit code", text: $code)
+                        Label("Open the email on this device and click its link. It brings you back here, signed in.",
+                              systemImage: "envelope.open")
+                        TextField("Or enter the code from the email", text: $code)
                             .focused($codeFocused)
                             .textContentType(.oneTimeCode)
                             .onSubmit(verify)
@@ -43,12 +45,12 @@ struct SyncSettingsView: View {
                             Spacer()
                             Button("Sign In", action: verify)
                                 .buttonStyle(.borderedProminent)
-                                .disabled(code.filter(\.isNumber).count < 6 || sync.busy)
+                                .disabled(!(6...8).contains(code.filter(\.isNumber).count) || sync.busy)
                         }
                     } header: {
-                        Text("Enter the code")
+                        Text("Check your email")
                     } footer: {
-                        Text("We emailed a code to \(sentTo). It expires in an hour.")
+                        Text("We sent a sign-in link to \(sentTo). It expires in an hour.")
                     }
                     .onAppear { codeFocused = true }
                 } else {
@@ -56,14 +58,14 @@ struct SyncSettingsView: View {
                         TextField("Email", text: $email)
                             .textContentType(.emailAddress)
                             .autocorrectionDisabled()
-                            .onSubmit(sendCode)
-                        Button("Send Code", action: sendCode)
+                            .onSubmit(sendLink)
+                        Button("Email Me a Sign-In Link", action: sendLink)
                             .buttonStyle(.borderedProminent)
                             .disabled(!email.contains("@") || sync.busy)
                     } header: {
                         Text("Sign in to sync")
                     } footer: {
-                        Text("No password: we email you a one-time code.")
+                        Text("No password: we email you a one-time sign-in link.")
                     }
                 }
             }
@@ -76,9 +78,9 @@ struct SyncSettingsView: View {
         .tint(.notesAccent)
     }
 
-    private func sendCode() {
+    private func sendLink() {
         guard email.contains("@") else { return }
-        Task { await sync.sendCode(to: email) }
+        Task { await sync.sendLink(to: email) }
     }
 
     private func verify() {

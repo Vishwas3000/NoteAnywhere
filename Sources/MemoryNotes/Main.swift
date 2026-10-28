@@ -19,6 +19,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SearchPopup.shared.start()
         _ = CloudSync.shared  // starts syncing if it was turned on
     }
+
+    /// memorynotes://auth-callback from a sync sign-in email.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls { Task { await CloudSync.shared.handle(url) } }
+    }
 }
 
 struct MemoryNotesApp: App {
