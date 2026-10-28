@@ -15,17 +15,27 @@ extension FocusedValues {
     @Entry var windowActions: WindowActions?
 }
 
+extension Color {
+    /// Apple Notes' warm yellow, same values as the editor CSS: darker in light mode so text drawn in it stays legible.
+    static let notesAccent = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 1, green: 0.84, blue: 0.04, alpha: 1)
+            : NSColor(srgbRed: 0.78, green: 0.54, blue: 0, alpha: 1)
+    })
+}
+
 /// Every note in one place: a sidebar of app and website notes (including ones written in the browser),
 /// with the selected note or the calendar on the right.
 struct NotesWindow: View {
     @ObservedObject private var model = NotesModel.shared
-    @State private var mode = WindowMode.notes
+    @AppStorage("windowMode") private var mode = WindowMode.notes
     @State private var selection: String?
     @State private var query = ""
     @State private var hits: [SearchIndex.Hit] = []
     @State private var searchedQuery = ""  // the query `hits` belong to, so "no results" never flashes mid-debounce
     @State private var searchFocused = false
     @State private var pendingDelete: Note?
+    @State private var editingAddress = false  // shows the address field for a note that already has one
     @FocusState private var targetFocused: Bool
 
     private var searching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -66,8 +76,9 @@ struct NotesWindow: View {
                             presenting: pendingDelete) { note in
             Button("Delete", role: .destructive) { delete(note) }
         } message: { note in
-            Text(note.text.isEmpty ? "This empty note will be removed." : "“\(firstLine(note))” will be removed.")
+            Text(note.text.isEmpty ? "This empty note will be removed." : "“\(note.title)” will be removed.")
         }
+        .tint(.notesAccent)
         .frame(minWidth: 760, minHeight: 480)
     }
 
@@ -79,18 +90,11 @@ struct NotesWindow: View {
         List(selection: $selection) {
             if searching {
                 if !hits.isEmpty {
-                    Section("Results") {
-                        ForEach(hits, id: \.note.id) { row($0.note, title: $0.note.source) }
-                    }
+                    Section { ForEach(hits, id: \.note.id) { row($0.note) } } header: { sectionHeader("Results") }
                 }
             } else {
-                let apps = model.notes.filter { $0.kind == .app }
-                let sites = model.notes.filter { $0.kind == .url }
-                if !apps.isEmpty {
-                    Section("Apps") { ForEach(apps) { row($0, title: $0.place) } }
-                }
-                if !sites.isEmpty {
-                    Section("Websites") { ForEach(sites) { row($0, title: $0.target.isEmpty ? "New website note" : $0.place) } }
+                ForEach(NoteDates.sections(model.notes)) { section in
+                    Section { ForEach(section.notes) { row($0) } } header: { sectionHeader(section.title) }
                 }
             }
         }
@@ -117,34 +121,24 @@ struct NotesWindow: View {
             model.openRequest = nil
         }
         .onChange(of: selection) { _, id in if id != nil { mode = .notes } }
-        .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+        .navigationSplitViewColumnWidth(min: 240, ideal: 290)
     }
 
-    private func row(_ note: Note, title: String) -> some View {
-        HStack(spacing: 8) {
-            NoteIcon(note: note, size: 20)
-            VStack(alignment: .leading) {
-                Text(title).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                Text(firstLine(note)).lineLimit(1)
-            }
-        }
-        .accessibilityElement(children: .combine)
-        .tag(note.id)
-        .contextMenu {
-            if note.kind == .url, let url = URL(string: "https://\(note.target)") {
-                Button("Open Page") { NSWorkspace.shared.open(url) }
-                Button("Copy Link") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(url.absoluteString, forType: .string)
+    /// Bold, sentence-case headers like Notes, instead of the sidebar's small grey ones.
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title).font(.headline).foregroundStyle(.primary).textCase(nil).padding(.top, 4)
+    }
+
+    private func row(_ note: Note) -> some View {
+        NoteRow(note: note, date: NoteDates.short(note.edited))
+            .tag(note.id)
+            .contextMenu {
+                if let url = pageURL(note) {
+                    pageActions(url)
+                    Divider()
                 }
-                Divider()
+                Button("Delete…", role: .destructive) { pendingDelete = note }
             }
-            Button("Delete…", role: .destructive) { pendingDelete = note }
-        }
-    }
-
-    private func firstLine(_ note: Note) -> String {
-        note.text.split(separator: "\n").first.map(String.init) ?? "Empty note"
     }
 
     // MARK: Detail
@@ -153,26 +147,83 @@ struct NotesWindow: View {
     private var detail: some View {
         if let note = selectedNote {
             VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
-                    NoteIcon(note: note, size: 28)
-                    if note.kind == .url {
-                        TextField("Page address, e.g. github.com/vercel/next.js", text: targetBinding(note.id))
-                            .textFieldStyle(.roundedBorder)
-                            .focused($targetFocused)
-                    } else {
-                        VStack(alignment: .leading) {
-                            Text(note.place).font(.headline)
-                            Text(note.target.prefix { $0 != "/" }).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                NoteEditor(noteID: note.id)
+                header(note)
+                Text("Edited \(note.edited.formatted(date: .long, time: .shortened))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                NoteEditor(noteID: note.id, fontSize: 15, titleLine: true)
             }
-            .padding()
+            .frame(maxWidth: 720)
+            .padding(.horizontal, 40)
+            .padding(.top, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .textBackgroundColor))
+            .onChange(of: targetFocused) { _, focused in editingAddress = focused }
         } else {
             ContentUnavailableView("No Note Selected", systemImage: "note.text",
                                    description: Text("Pick a note in the sidebar, or press ⌘N to start one."))
         }
+    }
+
+    /// The address field while a website note has no page yet (or after "Edit Address…"), otherwise the source chip.
+    @ViewBuilder
+    private func header(_ note: Note) -> some View {
+        if note.kind == .url && (note.target.isEmpty || editingAddress) {
+            TextField("Page address, e.g. github.com/vercel/next.js", text: targetBinding(note.id))
+                .textFieldStyle(.roundedBorder)
+                .focused($targetFocused)
+                .task(id: note.id) { if editingAddress { targetFocused = true } }
+                .onSubmit { targetFocused = false }
+                .onExitCommand { targetFocused = false }
+        } else if let url = pageURL(note) {
+            HStack(spacing: 4) {
+                Button { NSWorkspace.shared.open(url) } label: { chip(note) }
+                    .buttonStyle(.plain)
+                    .help("Open \(url.absoluteString)")
+                    .contextMenu { pageActions(url) }
+                Menu {
+                    pageActions(url)
+                    Divider()
+                    Button("Edit Address…") { editingAddress = true }
+                } label: {
+                    Label("Page Actions", systemImage: "ellipsis.circle")
+                }
+                .labelStyle(.iconOnly)
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Open Page, Copy Link, Edit Address")
+            }
+        } else {
+            chip(note)
+        }
+    }
+
+    private func chip(_ note: Note) -> some View {
+        HStack(spacing: 6) {
+            NoteIcon(note: note, size: 16)
+            Text(note.place).lineLimit(1)
+        }
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(.quinary, in: Capsule())
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func pageActions(_ url: URL) -> some View {
+        Button("Open Page") { NSWorkspace.shared.open(url) }
+        Button("Copy Link") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        }
+    }
+
+    private func pageURL(_ note: Note) -> URL? {
+        note.kind == .url && !note.target.isEmpty ? URL(string: "https://\(note.target)") : nil
     }
 
     // MARK: Actions
@@ -201,7 +252,7 @@ struct NotesWindow: View {
         mode = .notes
         query = ""
         selection = model.add(kind: .url, target: "", label: "").id
-        targetFocused = true
+        editingAddress = true  // keeps the field up once the first typed character makes the target non-empty
     }
 
     private func delete(_ note: Note) {
@@ -227,5 +278,82 @@ struct NotesWindow: View {
         let icon = (app.icon?.copy() as? NSImage) ?? NSImage()  // copy: NSRunningApplication shares its icon instance
         icon.size = NSSize(width: 16, height: 16)
         return icon
+    }
+}
+
+/// An Apple Notes list row: bold title; the date then the preview; the app or site it belongs to.
+struct NoteRow: View {
+    let note: Note
+    let date: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(note.title).font(.headline).lineLimit(1)
+            (Text(date) + Text("  ") + Text(note.preview.isEmpty ? "No additional text" : note.preview).foregroundStyle(.secondary))
+                .font(.subheadline)
+                .lineLimit(1)
+            HStack(spacing: 4) {
+                NoteIcon(note: note, size: 12)
+                Text(note.shortSource).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
+            }
+        }
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+extension Note {
+    /// "Slack · Alex Rivera (DM)" or "chatgpt.com": the app with its narrowest place, or the site's host.
+    var shortSource: String {
+        if kind == .url { return target.isEmpty ? "New Website Note" : String(target.prefix { $0 != "/" }) }
+        let parts = target.split(separator: "/")
+        return parts.count > 1 ? "\(label) · \(parts.last!)" : label
+    }
+}
+
+/// Apple Notes' date wording; `now` and `calendar` are parameters so tests can pin them.
+enum NoteDates {
+    struct Section: Identifiable {
+        let title: String
+        var notes: [Note]
+        var id: String { title }
+    }
+
+    /// Sidebar sections, newest edit first: Today, Yesterday, Previous 7 Days, Previous 30 Days, then "October 2026".
+    static func sections(_ notes: [Note], now: Date = .now, calendar: Calendar = .current) -> [Section] {
+        var sections: [Section] = []
+        for note in notes.sorted(by: { $0.updatedAt > $1.updatedAt }) {
+            let title = switch days(note.edited, before: now, calendar) {
+            case ...0: "Today"
+            case 1: "Yesterday"
+            case ...7: "Previous 7 Days"
+            case ...30: "Previous 30 Days"
+            default: note.edited.formatted(style(calendar).month(.wide).year())
+            }
+            if sections.last?.title == title {
+                sections[sections.count - 1].notes.append(note)
+            } else {
+                sections.append(Section(title: title, notes: [note]))
+            }
+        }
+        return sections
+    }
+
+    /// A row's date: the time today, the weekday within the past week, otherwise a short date.
+    static func short(_ date: Date, now: Date = .now, calendar: Calendar = .current) -> String {
+        switch days(date, before: now, calendar) {
+        case ...0: date.formatted(style(calendar).hour().minute())
+        case ...6: date.formatted(style(calendar).weekday(.wide))
+        default: date.formatted(style(calendar).day().month(.defaultDigits).year(.twoDigits))
+        }
+    }
+
+    /// Calendar days between the two dates; edits from the future (clock changes) count as today.
+    private static func days(_ date: Date, before now: Date, _ calendar: Calendar) -> Int {
+        calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)).day ?? 0
+    }
+
+    private static func style(_ calendar: Calendar) -> Date.FormatStyle {
+        Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone)
     }
 }
