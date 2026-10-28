@@ -29,6 +29,20 @@ struct NotesWindow: View {
     @State private var pendingDelete: Note?
     @State private var editingAddress = false  // shows the address field for a note that already has one
     @FocusState private var targetFocused: Bool
+    @State private var folderFilter: String?  // nil: All Notes
+    @State private var folderPrompt: FolderPrompt?
+    @State private var folderName = ""
+    @Environment(\.openWindow) private var openWindow
+
+    /// "New Folder…" (optionally moving a note into it) or "Rename…".
+    private struct FolderPrompt: Identifiable {
+        var id = UUID()
+        var moving: String?  // note to move into the new folder
+        var renaming: Folder?
+    }
+
+    /// The notes in the selected folder (all of them in All Notes).
+    private var visibleNotes: [Note] { model.notes.filter { folderFilter == nil || $0.folderID == folderFilter } }
 
     private var searching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
 
@@ -86,7 +100,13 @@ struct NotesWindow: View {
                     Section { ForEach(hits, id: \.note.id) { row($0.note) } } header: { sectionHeader("Results") }
                 }
             } else {
-                ForEach(NoteDates.sections(model.notes)) { section in
+                folderSection
+                let shown = visibleNotes
+                let pinned = shown.filter(\.pinned).sorted { $0.updatedAt > $1.updatedAt }
+                if !pinned.isEmpty {
+                    Section { ForEach(pinned) { row($0) } } header: { sectionHeader("Pinned") }
+                }
+                ForEach(NoteDates.sections(shown.filter { !$0.pinned })) { section in
                     Section { ForEach(section.notes) { row($0) } } header: { sectionHeader(section.title) }
                 }
                 let tags = tagCounts
@@ -116,6 +136,15 @@ struct NotesWindow: View {
             }
         }
         .searchable(text: $query, isPresented: $searchFocused, placement: .sidebar, prompt: "Search by meaning or keyword")
+        .navigationSubtitle(searching ? "^[\(hits.count) result](inflect: true)" : "^[\(visibleNotes.count) note](inflect: true)")
+        .alert(folderPrompt?.renaming == nil ? "New Folder" : "Rename Folder", isPresented: Binding(
+            get: { folderPrompt != nil }, set: { if !$0 { folderPrompt = nil } }
+        ), presenting: folderPrompt) { prompt in
+            TextField("Name", text: $folderName)
+            Button(prompt.renaming == nil ? "Create" : "Rename") { finishFolderPrompt(prompt) }
+                .disabled(folderName.trimmingCharacters(in: .whitespaces).isEmpty)
+            Button("Cancel", role: .cancel) {}
+        }
         .task(id: query) {
             try? await Task.sleep(for: .milliseconds(250))  // debounce typing
             guard !Task.isCancelled else { return }
@@ -154,13 +183,120 @@ struct NotesWindow: View {
     private func row(_ note: Note) -> some View {
         NoteRow(note: note, date: NoteDates.short(note.edited))
             .tag(note.id)
-            .contextMenu {
-                if let url = pageURL(note) {
-                    pageActions(url)
-                    Divider()
-                }
-                Button("Delete…", role: .destructive) { pendingDelete = note }
+            .contextMenu { noteMenu(note) }
+    }
+
+    /// Apple Notes' note menu, plus colour labels like Chrome's tab groups.
+    @ViewBuilder
+    private func noteMenu(_ note: Note) -> some View {
+        Button { openWindow(id: "note", value: note.id) } label: { Label("Open Note in New Window", systemImage: "macwindow.badge.plus") }
+        Divider()
+        Button { model.update(note.id) { $0.pinned.toggle() } } label: {
+            Label(note.pinned ? "Unpin Note" : "Pin Note", systemImage: note.pinned ? "pin.slash" : "pin")
+        }
+        Divider()
+        Button(action: newNote) { Label("New Note", systemImage: "square.and.pencil") }
+        Button { selection = model.duplicate(note).id } label: { Label("Duplicate Note", systemImage: "plus.square.on.square") }
+            .disabled(note.locked)
+        Divider()
+        ShareLink(item: note.text, subject: Text(note.title), preview: SharePreview(note.title)) {
+            Label("Share Note", systemImage: "square.and.arrow.up")
+        }
+        .disabled(note.locked)
+        Divider()
+        Menu {
+            Button("All Notes (No Folder)") { model.update(note.id) { $0.folderID = nil } }.disabled(note.folderID == nil)
+            if !model.folders.isEmpty { Divider() }
+            ForEach(model.folders) { folder in
+                Button(folder.name) { model.update(note.id) { $0.folderID = folder.id } }.disabled(note.folderID == folder.id)
             }
+            Divider()
+            Button("New Folder…") { promptFolder(moving: note.id) }
+        } label: { Label("Move to", systemImage: "folder") }
+        Menu {
+            Button("None") { model.update(note.id) { $0.color = nil } }.disabled(note.color == nil)
+            Divider()
+            ForEach(NoteColor.allCases, id: \.self) { color in
+                Button { model.update(note.id) { $0.color = color } } label: {
+                    Label { Text(color.title) } icon: { Image(nsImage: Self.dot(color)) }
+                }
+                .disabled(note.color == color)
+            }
+        } label: { Label("Color", systemImage: "circle.lefthalf.filled") }
+        if let url = pageURL(note) {
+            Divider()
+            pageActions(url)
+        }
+        Divider()
+        Button(role: .destructive) { pendingDelete = note } label: { Label("Delete", systemImage: "trash") }
+    }
+
+    /// Menus draw images as-is but tint SF Symbols, so colour swatches go in as plain images.
+    private static func dot(_ color: NoteColor) -> NSImage {
+        let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
+            NSColor(color.swatch).setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+
+    // MARK: Folders
+
+    @ViewBuilder
+    private var folderSection: some View {
+        Section {
+            folderRow(nil, name: "All Notes", count: model.notes.count)
+            ForEach(model.folders) { folder in
+                folderRow(folder, name: folder.name, count: model.notes.filter { $0.folderID == folder.id }.count)
+                    .contextMenu {
+                        Button("Rename…") { folderName = folder.name; folderPrompt = FolderPrompt(renaming: folder) }
+                        Button("Delete Folder", role: .destructive) {
+                            if folderFilter == folder.id { folderFilter = nil }
+                            model.deleteFolder(folder.id)
+                        }
+                    }
+            }
+            Button { promptFolder(moving: nil) } label: { Label("New Folder…", systemImage: "folder.badge.plus") }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+        } header: { sectionHeader("Folders") }
+    }
+
+    private func folderRow(_ folder: Folder?, name: String, count: Int) -> some View {
+        let current = folderFilter == folder?.id
+        return Button { folderFilter = folder?.id } label: {
+            LabeledContent {
+                Text("\(count)").monospacedDigit().foregroundStyle(.secondary)
+            } label: {
+                Label(name, systemImage: folder == nil ? "tray.full" : "folder")
+                    .fontWeight(current ? .semibold : .regular)
+            }
+            .padding(.vertical, 2)
+            .padding(.horizontal, 6)
+            .background(current ? AnyShapeStyle(Color.notesAccent.opacity(0.18)) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(current ? .isSelected : [])
+        .accessibilityHint(folder == nil ? "Shows every note" : "Shows the notes in this folder")
+    }
+
+    private func promptFolder(moving noteID: String?) {
+        folderName = ""
+        folderPrompt = FolderPrompt(moving: noteID)
+    }
+
+    private func finishFolderPrompt(_ prompt: FolderPrompt) {
+        let name = folderName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        if let folder = prompt.renaming {
+            model.renameFolder(folder.id, to: name)
+        } else {
+            let folder = model.addFolder(name)
+            if let id = prompt.moving { model.update(id) { $0.folderID = folder.id } }
+        }
     }
 
     // MARK: Detail
@@ -282,7 +418,7 @@ struct NotesWindow: View {
         mode = .notes
         query = ""
         editingAddress = false
-        selection = model.add(kind: .url, target: "", label: "").id
+        selection = model.add(kind: .url, target: "", label: "", folderID: folderFilter).id  // in the folder you're looking at
     }
 
     private func newWebsiteNote() {
@@ -323,7 +459,13 @@ struct NoteRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(note.title).font(.headline).lineLimit(1)
+            HStack(spacing: 5) {
+                if let color = note.color {
+                    Circle().fill(color.swatch).frame(width: 8, height: 8).accessibilityLabel("\(color.title) label")
+                }
+                if note.locked { Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary) }
+                Text(note.title).font(.headline).lineLimit(1)
+            }
             (Text(date) + Text("  ") + Text(note.preview.isEmpty ? "No additional text" : note.preview).foregroundStyle(.secondary))
                 .font(.subheadline)
                 .lineLimit(1)
@@ -392,5 +534,28 @@ enum NoteDates {
 
     private static func style(_ calendar: Calendar) -> Date.FormatStyle {
         Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone)
+    }
+}
+
+/// One note in its own window ("Open Note in New Window").
+struct NoteWindow: View {
+    let noteID: String
+    @ObservedObject private var model = NotesModel.shared
+
+    var body: some View {
+        if let note = model.notes.first(where: { $0.id == noteID }) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Edited \(note.edited.formatted(date: .long, time: .shortened))")
+                    .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                NoteEditor(noteID: note.id, fontSize: 15, titleLine: true)
+            }
+            .padding(.horizontal, 32)
+            .padding(.top, 12)
+            .background(Color(nsColor: .textBackgroundColor))
+            .navigationTitle(note.title)
+            .tint(.notesAccent)
+        } else {
+            ContentUnavailableView("Note Deleted", systemImage: "trash", description: Text("This note no longer exists."))
+        }
     }
 }

@@ -265,6 +265,12 @@ private struct NoteCard: View {
         }
         .padding(10)
         .background(hovering ? .quaternary : .quinary, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(alignment: .leading) {  // the note's colour label, like a Chrome tab group's strip
+            if let color = note.color {
+                UnevenRoundedRectangle(topLeadingRadius: 10, bottomLeadingRadius: 10).fill(color.swatch).frame(width: 4)
+                    .accessibilityHidden(true)
+            }
+        }
         .overlay {
             if contrast == .increased { RoundedRectangle(cornerRadius: 10).strokeBorder(.secondary) }
         }

@@ -36,6 +36,12 @@ struct MemoryNotesApp: App {
         .defaultSize(width: 960, height: 640)
         .commands { NotesCommands() }
 
+        // "Open Note in New Window"
+        WindowGroup("Note", id: "note", for: String.self) { $id in
+            if let id { NoteWindow(noteID: id) }
+        }
+        .defaultSize(width: 640, height: 720)
+
         Settings {
             SyncSettingsView().frame(width: 460).fixedSize(horizontal: false, vertical: true)
         }
