@@ -15,6 +15,7 @@ enum Main {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let overlay = OverlayController()
     func applicationDidFinishLaunching(_ notification: Notification) {
+        BrowserBridge.registerThisApp()
         overlay.start()
         SearchPopup.shared.start()
         _ = CloudSync.shared  // starts syncing if it was turned on
