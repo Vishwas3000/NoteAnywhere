@@ -14,6 +14,34 @@ struct Note: Codable, Identifiable, Hashable {
     var updatedAt = Date().timeIntervalSince1970 * 1000
 }
 
+extension Note {
+    /// The first line without Markdown, like the title Apple Notes shows in its list.
+    var title: String { plainLines.first ?? "New Note" }
+    /// What follows the title, flattened to one line.
+    var preview: String { plainLines.dropFirst().prefix(4).joined(separator: " ") }
+    var edited: Date { Date(timeIntervalSince1970: updatedAt / 1000) }
+
+    private var plainLines: [String] {
+        var inFence = false
+        return text.split(separator: "\n").compactMap { line in
+            if line.hasPrefix("```") { inFence.toggle(); return nil }
+            let plain = inFence ? String(line).trimmingCharacters(in: .whitespaces) : Self.plain(line)
+            return plain.isEmpty ? nil : plain
+        }
+    }
+
+    /// One line of Markdown as plain text: no heading/list/quote/checkbox markers, emphasis, code ticks or link targets.
+    static func plain(_ line: Substring) -> String {
+        line.replacing(#/^\s*(#{1,6}\s+|>\s*|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)*/#, with: "")
+            .replacing(#/^\s*(-{3,}|\*{3,}|_{3,}|\|?[\s:|-]+\|[\s:|-]*)\s*$/#, with: "")  // rules, table separators
+            .replacing(#/!?\[([^\]]*)\]\([^)]*\)/#) { $0.1 }
+            .replacing(#/\*\*|__|~~|`/#, with: "")
+            .replacing(#/\*(\S|\S[^*]*\S)\*/#) { $0.1 }  // *italic*, but not "2 * 3"
+            .replacing(#/\s*\|\s*/#, with: "  ")
+            .trimmingCharacters(in: .whitespaces)
+    }
+}
+
 /// A note as it was at the end of one local day (its last save that day).
 struct Snapshot: Identifiable, Hashable {
     let day: String  // "yyyy-MM-dd", local time

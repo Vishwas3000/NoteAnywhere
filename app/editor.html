@@ -16,12 +16,14 @@
   let editor;
   const post = (msg) => webkit.messageHandlers.mn.postMessage(msg);
   window.MNHost = {
-    load(markdown, toolbar) {
+    // options: { toolbar, fontSize, titleLine }
+    load(markdown, options) {
       editor?.destroy();
       editor = MNEditor.mount(document.getElementById("editor"), {
-        markdown, toolbar, placeholder: "Write a note…",
+        markdown, ...options, placeholder: "Write a note…",
         onChange: (md) => post({ type: "change", markdown: md }),
         onLinkNote: (id) => post({ type: "openNote", id }),
+        onHeight: (px) => post({ type: "height", value: px }),
       });
     },
     set(markdown) { if (editor && editor.getMarkdown() !== markdown) editor.setMarkdown(markdown); },

@@ -66,6 +66,7 @@ private struct NotesCommands: Commands {
         CommandGroup(before: .toolbar) {
             Button("Notes") { actions?.show(.notes) }.keyboardShortcut("1")
             Button("Calendar") { actions?.show(.calendar) }.keyboardShortcut("2")
+            Button("Graph") { actions?.show(.graph) }.keyboardShortcut("3")
             Divider()
         }
         CommandGroup(replacing: .help) {

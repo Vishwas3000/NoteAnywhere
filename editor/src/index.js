@@ -10,27 +10,44 @@ import "./style.css";
 
 export { shortcuts };
 
+// Stroke icons in a 24 px box; a few paths follow Lucide (ISC license).
+const icon = (paths) =>
+  `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+const text = (t, style = "") => `<span class="mn-glyph" style="${style}">${t}</span>`;
+const LINES = (x) => `<path d="M${x} 6h11M${x} 12h11M${x} 18h11"/>`;
+
+// [icon, name, command, active state]; null starts a new group.
 const TOOLBAR = [
-  ["B", "Bold", (c) => c.toggleBold(), "bold"],
-  ["I", "Italic", (c) => c.toggleItalic(), "italic"],
-  ["S", "Strikethrough", (c) => c.toggleStrike(), "strike"],
-  ["</>", "Inline code", (c) => c.toggleCode(), "code"],
-  ["H1", "Heading 1", (c) => c.toggleHeading({ level: 1 }), ["heading", { level: 1 }]],
-  ["H2", "Heading 2", (c) => c.toggleHeading({ level: 2 }), ["heading", { level: 2 }]],
-  ["•", "Bullet list", (c) => c.toggleBulletList(), "bulletList"],
-  ["1.", "Numbered list", (c) => c.toggleOrderedList(), "orderedList"],
-  ["☐", "Checklist", (c) => c.toggleTaskList(), "taskList"],
-  ["❝", "Quote", (c) => c.toggleBlockquote(), "blockquote"],
-  ["⊞", "Insert table", (c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }), "table"],
+  [text("B", "font-weight:700"), "Bold", (c) => c.toggleBold(), "bold"],
+  [text("I", "font-style:italic;font-family:Georgia,serif"), "Italic", (c) => c.toggleItalic(), "italic"],
+  [text("S", "text-decoration:line-through"), "Strikethrough", (c) => c.toggleStrike(), "strike"],
+  [icon('<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>'), "Inline code", (c) => c.toggleCode(), "code"],
+  null,
+  [text("H1"), "Heading 1", (c) => c.toggleHeading({ level: 1 }), ["heading", { level: 1 }]],
+  [text("H2"), "Heading 2", (c) => c.toggleHeading({ level: 2 }), ["heading", { level: 2 }]],
+  null,
+  [icon(LINES(9) + '<circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>'),
+    "Bullet list", (c) => c.toggleBulletList(), "bulletList"],
+  [icon(LINES(10) + '<path d="M4 4h1v5M4 9h2M6 19H4c0-1 2-2 2-3s-1-1.5-2-1"/>'), "Numbered list", (c) => c.toggleOrderedList(), "orderedList"],
+  [icon('<rect x="3" y="4" width="6" height="6" rx="1.5"/><path d="m3 17 2 2 4-4M13 7h8M13 17h8"/>'), "Checklist", (c) => c.toggleTaskList(), "taskList"],
+  [icon('<path d="M17 6H3M21 12H8M21 18H8M3 12v6"/>'), "Quote", (c) => c.toggleBlockquote(), "blockquote"],
+  null,
+  [icon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M12 3v18"/>'), "Insert table",
+    (c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }), "table"],
 ];
+const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>');
 
 /**
  * Mounts a Markdown-backed rich editor into `element`.
  * onChange(markdown) fires on every user edit (never for setMarkdown); onLinkNote(id) fires for note://<id> links.
+ * fontSize is in px; titleLine styles the first block as the note's title (Apple Notes); onHeight(px) reports the
+ * content height so a host can size the editor to fit.
  */
-export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true } = {}) {
+export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
+  fontSize, titleLine = false, onHeight } = {}) {
   const root = document.createElement("div");
-  root.className = "mn-editor";
+  root.className = "mn-editor" + (titleLine ? " mn-title-line" : "");
+  if (fontSize) root.style.setProperty("--mn-font-size", `${fontSize}px`);
   const bar = document.createElement("div");
   bar.className = "mn-toolbar";
   bar.setAttribute("role", "toolbar");
@@ -111,20 +128,25 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     onUpdate: () => onChange?.(editor.getMarkdown()),
   });
 
-  const buttons = TOOLBAR.map(([label, name, run, active]) => {
+  const buttons = TOOLBAR.map((item) => {
+    if (!item) {
+      bar.append(Object.assign(document.createElement("span"), { className: "mn-sep" }));
+      return null;
+    }
+    const [label, name, run, active] = item;
     const b = document.createElement("button");
     b.type = "button";
-    b.textContent = label;
+    b.innerHTML = label; // our own constant markup
     b.title = name;
     b.setAttribute("aria-label", name);
     b.onmousedown = (e) => e.preventDefault(); // keep the editor's selection
     b.onclick = () => run(editor.chain().focus()).run();
     bar.append(b);
     return [b, active];
-  });
+  }).filter(Boolean);
   const linkButton = document.createElement("button");
   linkButton.type = "button";
-  linkButton.textContent = "🔗";
+  linkButton.innerHTML = LINK_ICON;
   linkButton.title = linkButton.ariaLabel = "Link";
   linkButton.onmousedown = (e) => e.preventDefault();
   linkButton.onclick = openLink;
@@ -136,6 +158,11 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   };
   editor.on("transaction", refreshToolbar);
   refreshToolbar();
+  let observer;
+  if (onHeight && typeof ResizeObserver !== "undefined") {
+    observer = new ResizeObserver(() => onHeight(Math.ceil(root.getBoundingClientRect().height)));
+    observer.observe(root);
+  }
 
   return {
     editor,
@@ -144,6 +171,6 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     focus: () => editor.commands.focus("end"),
     isFocused: () => editor.isFocused || root.contains(document.activeElement),
     setToolbar: (on) => { bar.hidden = !on; },
-    destroy: () => { editor.destroy(); root.remove(); },
+    destroy: () => { observer?.disconnect(); editor.destroy(); root.remove(); },
   };
 }

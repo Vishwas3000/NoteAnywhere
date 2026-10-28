@@ -6,14 +6,20 @@ import WebKit
 struct NoteEditor: View {
     let noteID: String
     var toolbar = true
+    var fontSize = 13
+    var titleLine = false  // first line styled as the title, like Apple Notes
+    var fit: ClosedRange<CGFloat>?  // grow with the content within this range instead of filling the space
     @ObservedObject private var model = NotesModel.shared
+    @State private var contentHeight: CGFloat = 0
 
     static let editorDir = Bundle.main.resourceURL?.appendingPathComponent("editor")
 
     var body: some View {
         if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
-            EditorWebView(dir: dir, markdown: model.binding(noteID, \.text), toolbar: toolbar)
+            EditorWebView(dir: dir, markdown: model.binding(noteID, \.text),
+                          options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine]) { contentHeight = $0 }
                 .id(noteID)  // a fresh editor per note keeps undo history per note
+                .frame(height: fit.map { min(max(contentHeight, $0.lowerBound), $0.upperBound) })
         } else {
             TextEditor(text: model.binding(noteID, \.text)).font(.body)
         }
@@ -23,7 +29,8 @@ struct NoteEditor: View {
 private struct EditorWebView: NSViewRepresentable {
     let dir: URL
     @Binding var markdown: String
-    let toolbar: Bool
+    let options: [String: Any]
+    let onHeight: (CGFloat) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -73,11 +80,13 @@ private struct EditorWebView: NSViewRepresentable {
             case "ready":
                 ready = true
                 shown = parent.markdown
-                call("load", parent.markdown, parent.toolbar)
+                call("load", parent.markdown, parent.options)
             case "change":
                 guard let markdown = body["markdown"] as? String else { return }
                 shown = markdown
                 parent.markdown = markdown
+            case "height":
+                if let value = body["value"] as? Double { parent.onHeight(value) }
             case "openNote":
                 if let id = body["id"] as? String { NotesModel.shared.openRequest = id }
             default:

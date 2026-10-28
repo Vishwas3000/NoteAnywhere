@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-enum WindowMode: String, CaseIterable { case notes = "Notes", calendar = "Calendar" }
+enum WindowMode: String, CaseIterable { case notes = "Notes", calendar = "Calendar", graph = "Graph" }
 
 /// What the menu commands can do in the focused notes window.
 struct WindowActions {
@@ -36,6 +36,7 @@ struct NotesWindow: View {
         } detail: {
             switch mode {
             case .calendar: CalendarView()
+            case .graph: GraphView()
             case .notes: detail
             }
         }
