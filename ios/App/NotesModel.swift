@@ -1,0 +1,72 @@
+import Combine
+import notify
+import SwiftUI
+
+/// All notes and their daily snapshots. Reloads whenever any process saves: this app, the Share or Safari
+/// extension, or a sync pull. Same surface as the Mac's NotesModel, minus the front-app tracking.
+final class NotesModel: ObservableObject {
+    static let shared = NotesModel()
+
+    @Published private(set) var notes = NoteStore.loadAll()
+    /// One entry per note per day it was edited; feeds the calendar.
+    @Published private(set) var snapshots = NoteStore.loadHistory()
+
+    private var notifyToken: Int32 = 0
+    private var indexing: AnyCancellable?
+
+    private init() {
+        notify_register_dispatch(NoteStore.changed, &notifyToken, .main) { [weak self] _ in self?.reload() }
+        // Re-embed changed notes once typing pauses, but only once the user's first search has downloaded the model:
+        // 90 MB shouldn't download on launch, maybe over cellular.
+        indexing = $notes.debounce(for: .seconds(2), scheduler: RunLoop.main).sink { notes in
+            guard SearchIndex.hasModel else { return }
+            Task { await SearchIndex.shared.update(notes) }
+        }
+    }
+
+    func note(_ id: String) -> Note? { notes.first { $0.id == id } }
+
+    func reload() {
+        let fresh = NoteStore.loadAll()
+        if fresh != notes { notes = fresh }
+        let history = NoteStore.loadHistory()
+        if history != snapshots { snapshots = history }
+    }
+
+    func search(_ query: String) async -> [SearchIndex.Hit] {
+        let hits = await SearchIndex.shared.search(query, in: notes)
+        if SearchIndex.hasModel { Task { await SearchIndex.shared.update(notes) } }  // first search: index the rest now
+        return hits
+    }
+
+    /// A note with no app or website: the phone has neither, and the Mac shows such a note as a website note
+    /// still waiting for its address (the same thing its own ⌘N makes).
+    func add() -> Note {
+        let note = Note(kind: .url, target: "", label: "")
+        notes.append(note)
+        persist(note)
+        return note
+    }
+
+    func delete(_ id: String) {
+        notes.removeAll { $0.id == id }
+        snapshots.removeAll { $0.note.id == id }
+        do { try NoteStore.delete(id) } catch { NSLog("MemoryNotes: delete failed: \(error)") }
+    }
+
+    func binding(_ id: String, _ field: WritableKeyPath<Note, String>) -> Binding<String> {
+        Binding(
+            get: { self.note(id)?[keyPath: field] ?? "" },
+            set: { value in
+                guard let i = self.notes.firstIndex(where: { $0.id == id }), self.notes[i][keyPath: field] != value else { return }
+                self.notes[i][keyPath: field] = value
+                self.notes[i].updatedAt = Date().timeIntervalSince1970 * 1000
+                self.persist(self.notes[i])
+            }
+        )
+    }
+
+    private func persist(_ note: Note) {
+        do { try NoteStore.save(note) } catch { NSLog("MemoryNotes: save failed: \(error)") }
+    }
+}

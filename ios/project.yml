@@ -1,0 +1,128 @@
+# Generate the Xcode project with `xcodegen generate` (in this folder); the .xcodeproj is not committed.
+name: MemoryNotes
+options:
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: YES
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""  # set your team to run on an iPhone
+    ENABLE_USER_SCRIPT_SANDBOXING: NO  # the copy phases read editor/ and extension/ from the repo
+    TARGETED_DEVICE_FAMILY: "1,2"
+packages:
+  swift-embeddings:
+    url: https://github.com/jkrukowski/swift-embeddings
+    from: 0.1.1
+
+targets:
+  MemoryNotes:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - path: ../Sources/MemoryNotes/Note.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/NoteDates.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/WindowContext.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/SearchIndex.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/Assistant.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/GraphLayout.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/Accent.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/SyncCloud.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/SyncSettingsView.swift
+        group: Shared
+    dependencies:
+      - package: swift-embeddings
+        product: Embeddings
+      - target: MemoryNotesShare
+      - target: MemoryNotesSafari
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.memorynotes.ios
+        PRODUCT_NAME: MemoryNotes
+        INFOPLIST_FILE: App/Info.plist  # only the memorynotes:// URL scheme; the rest is generated
+        CODE_SIGN_ENTITLEMENTS: App/MemoryNotes.entitlements
+        INFOPLIST_KEY_CFBundleDisplayName: MemoryNotes
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""  # no iPhone icon yet
+    postBuildScripts:
+      # The same shared editor the Mac app bundles (scripts/install.sh): editor/dist plus app/editor.html, side by side.
+      - name: Copy shared editor
+        basedOnDependencyAnalysis: false
+        script: |
+          dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/editor"
+          mkdir -p "$dest"
+          cp "$SRCROOT/../editor/dist/"* "$SRCROOT/../app/editor.html" "$dest/"
+
+  MemoryNotesShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Share
+      - path: App/Assets.xcassets
+      - path: ../Sources/MemoryNotes/Note.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/Accent.swift
+        group: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.memorynotes.ios.share
+        INFOPLIST_FILE: Share/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Share/MemoryNotesShare.entitlements
+        INFOPLIST_KEY_CFBundleDisplayName: MemoryNotes
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""  # no iPhone icon yet
+
+  MemoryNotesSafari:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Safari
+      - path: ../Sources/MemoryNotes/Note.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/SearchIndex.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/Assistant.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/NativeHost.swift
+        group: Shared
+    dependencies:
+      - package: swift-embeddings
+        product: Embeddings
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.memorynotes.ios.safari
+        INFOPLIST_FILE: Safari/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Safari/MemoryNotesSafari.entitlements
+        INFOPLIST_KEY_CFBundleDisplayName: MemoryNotes
+    postBuildScripts:
+      # The Chrome extension as is; only the manifest differs (no Chrome id key, a background page instead of a worker).
+      - name: Copy browser extension
+        basedOnDependencyAnalysis: false
+        script: |
+          dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          rsync -a --exclude manifest.json "$SRCROOT/../extension/" "$dest/"
+          /usr/bin/python3 - "$SRCROOT/../extension/manifest.json" "$dest/manifest.json" <<'PY'
+          import json, sys
+          m = json.load(open(sys.argv[1]))
+          m.pop("key", None)  # pins the unpacked Chrome extension's id; Safari doesn't use it
+          m["background"] = {"scripts": [m["background"]["service_worker"]]}  # Safari on iOS: non-persistent background page
+          json.dump(m, open(sys.argv[2], "w"), indent=2)
+          PY

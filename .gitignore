@@ -3,3 +3,4 @@
 *.pem
 node_modules/
 supabase/.temp/
+ios/MemoryNotes.xcodeproj/
