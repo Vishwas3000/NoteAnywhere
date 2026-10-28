@@ -13,7 +13,8 @@
 <script src="mn-editor.js"></script>
 <script>
   // Bridge for EditorView.swift. Every edit goes straight to Swift, which saves it, so switching notes loses nothing.
-  let editor;
+  let editor, aiCount = 0;
+  const aiPending = new Map();  // ✨ requests waiting for Swift to run the on-device model
   const post = (msg) => webkit.messageHandlers.mn.postMessage(msg);
   window.MNHost = {
     // options: { toolbar, fontSize, titleLine }
@@ -24,7 +25,17 @@
         onChange: (md) => post({ type: "change", markdown: md }),
         onLinkNote: (id) => post({ type: "openNote", id }),
         onHeight: (px) => post({ type: "height", value: px }),
+        onAI: (action, text) => new Promise((resolve, reject) => {
+          const id = ++aiCount;
+          aiPending.set(id, { resolve, reject });
+          post({ type: "ai", id, action, text });
+        }),
       });
+    },
+    aiDone(id, text, error) {
+      const p = aiPending.get(id);
+      aiPending.delete(id);
+      error == null ? p?.resolve(text) : p?.reject(new Error(error));
     },
     set(markdown) { if (editor && editor.getMarkdown() !== markdown) editor.setMarkdown(markdown); },
     focus() { editor?.focus(); },

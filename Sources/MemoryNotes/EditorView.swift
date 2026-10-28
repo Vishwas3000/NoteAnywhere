@@ -37,6 +37,7 @@ private struct EditorWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "mn")
+        config.writingToolsBehavior = .complete  // Apple Intelligence Writing Tools rewrite in place, like in Notes
         let web = WKWebView(frame: .zero, configuration: config)
         web.setValue(false, forKey: "drawsBackground")  // transparent, so the panel/window material shows through
         web.navigationDelegate = context.coordinator
@@ -85,6 +86,17 @@ private struct EditorWebView: NSViewRepresentable {
                 guard let markdown = body["markdown"] as? String else { return }
                 shown = markdown
                 parent.markdown = markdown
+            case "ai":
+                guard let id = body["id"] as? Int, let text = body["text"] as? String else { return }
+                let action = (body["action"] as? String).flatMap(Assistant.Action.init(rawValue:))
+                Task { @MainActor in
+                    do {
+                        guard let action else { throw Assistant.Failure(errorDescription: "Unknown action.") }
+                        call("aiDone", id, try await Assistant.run(action, on: text), NSNull())
+                    } catch {
+                        call("aiDone", id, NSNull(), error.localizedDescription)
+                    }
+                }
             case "height":
                 if let value = body["value"] as? Double { parent.onHeight(value) }
             case "openNote":

@@ -73,3 +73,25 @@
 .mn-content .selectedCell { background: var(--mn-selection); }
 .mn-content p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--mn-muted); float: left; height: 0; pointer-events: none; }
 .mn-content .ProseMirror-gapcursor:after { border-top-color: var(--mn-fg); }
+
+/* ✨ Apple Intelligence: a quiet button in the top-right corner, shown on hover/focus or while it works. */
+.mn-editor { position: relative; }
+.mn-ai { position: absolute; top: 0; right: 0; z-index: 2; display: flex; flex-direction: column; align-items: flex-end; }
+.mn-ai > button { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  color: var(--mn-accent); background: var(--mn-hover); border: none; border-radius: 7px; cursor: default;
+  opacity: 0; transition: opacity 0.15s; }
+.mn-editor:hover .mn-ai > button, .mn-ai:focus-within > button, .mn-ai.busy > button, .mn-ai > button[aria-expanded="true"] { opacity: 1; }
+.mn-ai > button:focus-visible { outline: 2px solid var(--mn-accent); outline-offset: 1px; }
+.mn-ai.busy > button svg { animation: mn-pulse 1s ease-in-out infinite; }
+@keyframes mn-pulse { 50% { opacity: 0.35; transform: scale(0.85); } }
+.mn-ai-menu { margin-top: 4px; min-width: 200px; padding: 4px; border-radius: 10px; border: 1px solid var(--mn-line);
+  background: color-mix(in srgb, Canvas 88%, transparent); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
+.mn-ai-menu button { display: block; width: 100%; text-align: left; padding: 5px 10px; font: 13px -apple-system, system-ui, sans-serif;
+  color: var(--mn-fg); background: none; border: none; border-radius: 6px; cursor: default; }
+.mn-ai-menu button:hover, .mn-ai-menu button:focus-visible { background: var(--mn-accent); color: #fff; outline: none; }
+@media (prefers-color-scheme: dark) { .mn-ai-menu button:hover, .mn-ai-menu button:focus-visible { color: #1d1d1f; } }
+.mn-ai-footer { padding: 5px 10px 3px; font-size: 11px; color: var(--mn-muted); border-top: 1px solid var(--mn-line); margin-top: 4px; }
+.mn-ai-status:not(:empty) { margin-top: 4px; max-width: 240px; padding: 4px 8px; font-size: 11.5px; color: var(--mn-fg);
+  background: var(--mn-code-bg); border-radius: 6px; }
+.mn-ai-menu[hidden] { display: none; }

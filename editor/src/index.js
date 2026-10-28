@@ -35,16 +35,97 @@ const TOOLBAR = [
   [icon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M12 3v18"/>'), "Insert table",
     (c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }), "table"],
 ];
+export const AI_ACTIONS = [
+  ["proofread", "Fix Spelling & Grammar"],
+  ["improve", "Make Clearer"],
+  ["shorten", "Make Shorter"],
+  ["checklist", "Turn into Checklist"],
+  ["title", "Add Title"],
+];
+const SPARKLE = icon('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/>');
+
+/** The ✨ button and its menu. Works on the selection if there is one, otherwise on the whole note. */
+function aiMenu(editor, onAI) {
+  const wrap = Object.assign(document.createElement("div"), { className: "mn-ai" });
+  const button = Object.assign(document.createElement("button"), { type: "button", innerHTML: SPARKLE, title: "Apple Intelligence" });
+  button.setAttribute("aria-label", "Apple Intelligence");
+  button.setAttribute("aria-haspopup", "menu");
+  button.setAttribute("aria-expanded", "false");
+  const menu = Object.assign(document.createElement("div"), { className: "mn-ai-menu", hidden: true });
+  menu.setAttribute("role", "menu");
+  const status = Object.assign(document.createElement("div"), { className: "mn-ai-status" });
+  status.setAttribute("role", "status");
+  const items = AI_ACTIONS.map(([action, label]) => {
+    const item = Object.assign(document.createElement("button"), { type: "button", textContent: label });
+    item.setAttribute("role", "menuitem");
+    item.onmousedown = (e) => e.preventDefault(); // keep the editor's selection
+    item.onclick = () => run(action);
+    return item;
+  });
+  const footer = Object.assign(document.createElement("div"), { className: "mn-ai-footer", textContent: "Apple Intelligence · on this Mac" });
+  menu.append(...items, footer);
+  wrap.append(button, menu, status);
+
+  const toggle = (open) => {
+    menu.hidden = !open;
+    button.setAttribute("aria-expanded", String(open));
+    if (open) items[0].focus();
+  };
+  button.onmousedown = (e) => e.preventDefault();
+  button.onclick = () => toggle(menu.hidden);
+  menu.onkeydown = (e) => {
+    const i = items.indexOf(document.activeElement);
+    if (e.key === "Escape") { toggle(false); editor.commands.focus(); }
+    else if (e.key === "ArrowDown") items[(i + 1) % items.length].focus();
+    else if (e.key === "ArrowUp") items[(i - 1 + items.length) % items.length].focus();
+    else return;
+    e.preventDefault();
+  };
+  wrap.addEventListener("focusout", (e) => { if (!wrap.contains(e.relatedTarget)) toggle(false); });
+
+  async function run(action) {
+    toggle(false);
+    const { from, to, empty } = editor.state.selection;
+    const whole = empty || action === "title";
+    const input = whole ? editor.getMarkdown() : editor.state.doc.textBetween(from, to, "\n");
+    const before = editor.state.doc;
+    wrap.classList.add("busy");
+    status.textContent = "Writing…";
+    editor.setEditable(false); // the result replaces this exact text
+    try {
+      const result = await onAI(action, input);
+      editor.setEditable(true);
+      if (!editor.state.doc.eq(before)) throw new Error("The note changed meanwhile, so nothing was replaced.");
+      const chain = editor.chain().focus();
+      if (action === "title") chain.insertContentAt(0, `# ${result.replace(/^#+\s*/, "")}`, { contentType: "markdown" });
+      else if (whole) chain.insertContentAt({ from: 0, to: editor.state.doc.content.size }, result, { contentType: "markdown" });
+      // A one-line answer stays inline; parsing it as Markdown would split the paragraph around it.
+      else if (!result.includes("\n")) chain.insertContentAt({ from, to }, { type: "text", text: result });
+      else chain.insertContentAt({ from, to }, result, { contentType: "markdown" });
+      chain.run();
+      status.textContent = "";
+    } catch (e) {
+      editor.setEditable(true);
+      status.textContent = e?.message || String(e);
+      setTimeout(() => { status.textContent = ""; }, 5000);
+    } finally {
+      wrap.classList.remove("busy");
+    }
+  }
+  return wrap;
+}
+
 const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>');
 
 /**
  * Mounts a Markdown-backed rich editor into `element`.
  * onChange(markdown) fires on every user edit (never for setMarkdown); onLinkNote(id) fires for note://<id> links.
  * fontSize is in px; titleLine styles the first block as the note's title (Apple Notes); onHeight(px) reports the
- * content height so a host can size the editor to fit.
+ * content height so a host can size the editor to fit. onAI(action, markdown) => Promise<string> adds a ✨ menu of
+ * Apple Intelligence edits (see AI_ACTIONS); the host runs the model, the editor applies the result as one undoable step.
  */
 export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
-  fontSize, titleLine = false, onHeight } = {}) {
+  fontSize, titleLine = false, onHeight, onAI } = {}) {
   const root = document.createElement("div");
   root.className = "mn-editor" + (titleLine ? " mn-title-line" : "");
   if (fontSize) root.style.setProperty("--mn-font-size", `${fontSize}px`);
@@ -158,6 +239,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   };
   editor.on("transaction", refreshToolbar);
   refreshToolbar();
+  if (onAI) root.append(aiMenu(editor, onAI));
   let observer;
   if (onHeight && typeof ResizeObserver !== "undefined") {
     observer = new ResizeObserver(() => onHeight(Math.ceil(root.getBoundingClientRect().height)));

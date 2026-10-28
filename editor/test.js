@@ -85,6 +85,45 @@ check("note:// link click calls onLinkNote", () => {
 });
 check("shortcuts list is exported", () => assert.ok(MNEditor.shortcuts.length >= 20));
 
+// ✨ menu: the host's reply replaces the whole note (or the selection) as one undoable step; titles go on top.
+async function checkAsync(name, fn) {
+  try { await fn(); console.log("ok  ", name); } catch (e) { failed++; console.log("FAIL", name, "\n    ", e.message); }
+}
+const ai = (ed, action) => [...ed.editor.options.element.closest(".mn-editor").querySelectorAll(".mn-ai-menu button")]
+  .find((b) => b.textContent === Object.fromEntries(MNEditor.AI_ACTIONS)[action]).click();
+const settle = () => new Promise((r) => setTimeout(r, 0));
+await checkAsync("✨ rewrites the whole note and Undo restores it", async () => {
+  const seen = [];
+  const ed = mount("teh note", { onAI: async (action, md) => { seen.push([action, md]); return "- [ ] the note"; } });
+  ai(ed, "checklist");
+  await settle();
+  assert.deepEqual(seen, [["checklist", "teh note"]]);
+  assert.equal(ed.getMarkdown().trim(), "- [ ] the note");
+  ed.editor.commands.undo();
+  assert.equal(ed.getMarkdown().trim(), "teh note");
+});
+await checkAsync("✨ on a selection only replaces the selection", async () => {
+  const ed = mount("keep this. fix taht.", { onAI: async () => "fix that." });
+  ed.editor.commands.setTextSelection({ from: 12, to: 21 });
+  ai(ed, "proofread");
+  await settle();
+  assert.equal(ed.getMarkdown().trim(), "keep this. fix that.");
+});
+await checkAsync("✨ Add Title puts a heading on top", async () => {
+  const ed = mount("body text", { onAI: async () => "My Title" });
+  ai(ed, "title");
+  await settle();
+  assert.equal(ed.getMarkdown().trim(), "# My Title\n\nbody text");
+});
+await checkAsync("✨ errors show in the status line and leave the note alone", async () => {
+  const ed = mount("x", { onAI: async () => { throw new Error("Turn on Apple Intelligence"); } });
+  ai(ed, "improve");
+  await settle();
+  assert.equal(ed.getMarkdown().trim(), "x");
+  assert.match(ed.editor.options.element.closest(".mn-editor").querySelector(".mn-ai-status").textContent, /Apple Intelligence/);
+  assert.equal(ed.editor.isEditable, true);
+});
+
 await window.happyDOM.close();
 console.log(failed ? `${failed} failed` : "all passed");
 process.exit(failed ? 1 : 0);
