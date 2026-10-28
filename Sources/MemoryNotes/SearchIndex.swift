@@ -55,14 +55,18 @@ actor SearchIndex {
 
     /// Embeds new or changed notes. Called by the app; the host never writes vectors.
     func update(_ notes: [Note]) async {
-        for note in notes where cache[note.id]?.updatedAt != note.updatedAt {
+        for note in notes where !note.locked && cache[note.id]?.updatedAt != note.updatedAt {
             guard let vector = await embed(Self.document(note)) else { break }
             cache[note.id] = (updatedAt: note.updatedAt, vector: vector)
             try? NoteStore.saveVector(note.id, updatedAt: note.updatedAt, vector: vector)
         }
     }
 
+    /// A note that was just locked: its vector (made from readable text) is gone from the database too.
+    func forget(_ id: String) { cache[id] = nil }
+
     func search(_ query: String, in notes: [Note], limit: Int = 20) async -> [Hit] {
+        let notes = notes.filter { !$0.locked }
         // "#ml" lists exactly the notes with that tag (or one nested under it), newest first, like Obsidian.
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         if trimmed.wholeMatch(of: #/#[^\s#]+/#) != nil {

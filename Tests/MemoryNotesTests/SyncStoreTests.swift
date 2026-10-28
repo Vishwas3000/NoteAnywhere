@@ -72,6 +72,22 @@ import Testing
         #expect(pushed.pinned == false && pushed.updated_at == 11)
     }
 
+    @Test func lockingLeavesNoReadableCopy() throws {
+        let id = UUID().uuidString
+        try NoteStore.save(Note(id: id, kind: .url, target: "bank.example", label: "", text: "pin 1234", createdAt: 1, updatedAt: 10))
+        try NoteStore.saveVector(id, updatedAt: 10, vector: [1, 0])
+        let sealed = try NoteLock.seal("pin 1234", password: "pw")
+        try NoteStore.setLocked(id, text: sealed, locked: true)
+        let note = try #require(NoteStore.loadAll().first { $0.id == id })
+        #expect(note.locked && note.text == sealed && note.title == "Locked Note" && note.tags.isEmpty)
+        #expect(NoteStore.loadHistory().filter { $0.note.id == id }.allSatisfy { !$0.note.text.contains("1234") })
+        #expect(NoteStore.vectors()[id] == nil)
+        #expect(!NoteStore.notes(under: "bank.example").contains { $0.id == id }, "the browser never sees it")
+        // A browser tab that loaded the note before it was locked can't write readable text over it.
+        try NoteStore.save(Note(id: id, kind: .url, target: "bank.example", label: "", text: "pin 1234", createdAt: 1, updatedAt: 99_999_999_999_999))
+        #expect(NoteStore.loadAll().first { $0.id == id }?.text == sealed)
+    }
+
     @Test func snapshotsNeedTheirNoteAndCursorsPersist() throws {
         let id = UUID().uuidString
         let snap = NoteStore.CloudSnapshot(note_id: id, day: "2026-10-01", body_md: "s", updated_at: 3)
