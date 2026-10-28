@@ -15,7 +15,7 @@ final class OverlayController {
     private lazy var panel: NSPanel = {
         // Non-activating: typing in the panel doesn't steal "frontmost" from the app the notes are about.
         let panel = OverlayPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 340),
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 420),
             styleMask: [.titled, .closable, .resizable, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered, defer: false)
         panel.makeFloating()
@@ -25,7 +25,7 @@ final class OverlayController {
         panel.isReleasedWhenClosed = false
         panel.contentView = NSHostingView(rootView: OverlayView())
         if let screen = NSScreen.main?.visibleFrame {
-            panel.setFrameTopLeftPoint(NSPoint(x: screen.maxX - 320, y: screen.maxY - 20))
+            panel.setFrameTopLeftPoint(NSPoint(x: screen.maxX - 340, y: screen.maxY - 20))
         }
         panel.setFrameAutosaveName("MemoryNotesOverlay")
         return panel
@@ -93,72 +93,181 @@ extension View {
 
 struct OverlayView: View {
     @ObservedObject private var model = NotesModel.shared
+    @Environment(\.openWindow) private var openWindow
+    @State private var searching = false
     @State private var query = ""
+    @State private var selection = 0
+    @State private var submits = 0
     @State private var pendingDelete: Note?
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
-        if let app = model.frontApp, let id = app.bundleIdentifier, let context = model.frontContext {
-            let name = app.localizedName ?? id
-            let place = context.split(separator: "/").dropFirst().joined(separator: " › ")
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    if let icon = app.icon { Image(nsImage: icon).resizable().frame(width: 18, height: 18) }
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(name).font(.headline).lineLimit(1)
-                        if !place.isEmpty {
-                            Text(place).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                        }
-                    }
-                    Spacer()
+        Group {
+            if let app = model.frontApp, let id = app.bundleIdentifier, let context = model.frontContext {
+                content(app, name: app.localizedName ?? id, context: context)
+            } else {
+                ContentUnavailableView("No App in Front", systemImage: "macwindow",
+                                       description: Text("Switch to an app to see its notes."))
+            }
+        }
+        // The hosting view sizes the panel to this; without it the ScrollView collapses to zero height.
+        .frame(minWidth: 260, idealWidth: 320, minHeight: 180, idealHeight: 420, alignment: .top)
+        .floatingBackground()
+        .tint(.yellow)
+        .confirmationDialog("Delete this note?", isPresented: Binding(
+            get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
+        ), presenting: pendingDelete) { note in
+            Button("Delete", role: .destructive) { model.delete(note.id) }
+        } message: { note in
+            Text("“\(note.title)” will be removed.")
+        }
+    }
+
+    private func content(_ app: NSRunningApplication, name: String, context: String) -> some View {
+        let place = context.split(separator: "/").dropFirst().joined(separator: " › ")
+        let notes = model.notes(inContext: context).reversed()  // newest first, like Apple Notes
+        let newNote = {
+            closeSearch()
+            model.add(kind: .app, target: context, label: name)
+        }
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                if let icon = app.icon {
+                    Image(nsImage: icon).resizable().frame(width: 22, height: 22).accessibilityHidden(true)
                 }
-                .padding(.leading, 20)  // clear of the close button in the transparent title bar
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(name).font(.headline).lineLimit(1)
+                    if !place.isEmpty {
+                        Text(place).font(.subheadline).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 4)
+                Group {
+                    Button { if searching { closeSearch() } else { searching = true } } label: {
+                        Label(searching ? "Close Search" : "Search All Notes", systemImage: "magnifyingglass")
+                    }
+                    .keyboardShortcut("f")
+                    .help(searching ? "Close Search" : "Search All Notes (⌘F)")
+                    Button { newNote() } label: { Label("New Note", systemImage: "plus") }
+                        .keyboardShortcut("n")
+                        .help("New Note (⌘N)")
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .imageScale(.large)
+                .foregroundStyle(.secondary)  // borderless icons would take the yellow tint, too faint on light glass
+            }
+            .padding(.leading, 22)  // clear of the close button in the transparent title bar
+
+            if searching {
                 TextField("Search all notes", text: $query, prompt: Text("\(Image(systemName: "magnifyingglass")) Search all notes"))
                     .textFieldStyle(.roundedBorder)
-                    .onExitCommand { query = "" }
-                if !query.trimmingCharacters(in: .whitespaces).isEmpty {
-                    SearchResultsView(query: query)
-                } else {
-                    ScrollView {
-                        VStack(spacing: 8) {
-                            ForEach(model.notes(inContext: context)) { note in
-                                HStack(alignment: .top, spacing: 4) {
-                                    NoteEditor(noteID: note.id, toolbar: false)
-                                        .frame(height: 110)
-                                        .padding(4)
-                                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                                        .accessibilityLabel("Note for \(note.place)")
-                                    Button {
-                                        if note.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                            model.delete(note.id)
-                                        } else {
-                                            pendingDelete = note
-                                        }
-                                    } label: { Image(systemName: "trash") }
-                                        .buttonStyle(.borderless)
-                                        .help("Delete note")
-                                        .accessibilityLabel("Delete note")
-                                }
-                            }
+                    .focused($searchFocused)
+                    .onAppear { searchFocused = true }
+                    .onExitCommand { if query.isEmpty { closeSearch() } else { query = "" } }
+                    .onKeyPress(.downArrow) { selection += 1; return .handled }
+                    .onKeyPress(.upArrow) { selection -= 1; return .handled }
+                    .onSubmit { submits += 1 }
+                    .accessibilityHint("Up and Down Arrow choose a note, Return edits it, Escape clears the search")
+                    .transition(.opacity)
+            }
+
+            if !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                SearchResultsView(query: query, selection: $selection, submits: submits)
+            } else if notes.isEmpty {
+                let here = place.isEmpty ? name : place
+                ContentUnavailableView {
+                    Label("No Notes Here Yet", systemImage: "note.text")
+                } description: {
+                    Text("Write one and it will be waiting when you come back.")
+                } actions: {
+                    Button { newNote() } label: { Text("New Note for \(here)").lineLimit(1).truncationMode(.middle) }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .environment(\.controlActiveState, .key)  // the overlay is rarely key; it would turn grey
+                }
+                .frame(maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    // Not Lazy: recreating a WKWebView editor on scroll would drop its undo history and measured height.
+                    VStack(spacing: 10) {
+                        ForEach(notes) { note in
+                            NoteCard(note: note, delete: { requestDelete(note) }, open: { open(note) })
                         }
                     }
-                    Button { model.add(kind: .app, target: context, label: name) } label: {
-                        Label("New Note for \(place.isEmpty ? name : place)", systemImage: "plus")
-                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Notes")
                 }
             }
-            .padding(10)
-            // The hosting view sizes the panel to this; without it the ScrollView collapses to zero height.
-            .frame(minWidth: 240, idealWidth: 300, minHeight: 160, idealHeight: 320, alignment: .top)
-            .floatingBackground()
-            .confirmationDialog("Delete this note?", isPresented: Binding(
-                get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
-            ), presenting: pendingDelete) { note in
-                Button("Delete", role: .destructive) { model.delete(note.id) }
-            } message: { _ in
-                Text("This can't be undone.")
-            }
-        } else {
-            Text("Switch to an app to see its notes.").padding().floatingBackground()
         }
+        .padding(12)
+        .animation(.easeOut(duration: 0.15), value: searching)
+    }
+
+    private func closeSearch() {
+        searching = false
+        query = ""
+    }
+
+    private func requestDelete(_ note: Note) {
+        if note.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            model.delete(note.id)
+        } else {
+            pendingDelete = note
+        }
+    }
+
+    private func open(_ note: Note) {
+        model.openRequest = note.id
+        openWindow(id: "notes")
+        NSApp.activate()
+    }
+}
+
+/// One note in the overlay: its editor on a soft card. Open and Delete show on hover or keyboard focus,
+/// and are always there for VoiceOver as actions.
+private struct NoteCard: View {
+    let note: Note
+    let delete: () -> Void
+    let open: () -> Void
+    @State private var hovering = false
+    @FocusState private var focusedAction: Int?
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 2) {
+                TimelineView(.everyMinute) { _ in Text("Edited \(note.editedAgo)") }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Group {
+                    Button(action: open) { Label("Open in MemoryNotes", systemImage: "arrow.up.forward.app") }
+                        .help("Open in MemoryNotes")
+                        .focused($focusedAction, equals: 0)
+                    Button(action: delete) { Label("Delete Note", systemImage: "trash") }
+                        .help("Delete Note")
+                        .focused($focusedAction, equals: 1)
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .opacity(hovering || focusedAction != nil ? 1 : 0)
+            }
+            NoteEditor(noteID: note.id, toolbar: false, fit: 44...320)
+        }
+        .padding(10)
+        .background(hovering ? .quaternary : .quinary, in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            if contrast == .increased { RoundedRectangle(cornerRadius: 10).strokeBorder(.secondary) }
+        }
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: hovering)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(note.title)
+        .accessibilityAction(named: "Open in MemoryNotes", open)
+        .accessibilityAction(named: "Delete Note", delete)
     }
 }
