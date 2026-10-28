@@ -2,7 +2,7 @@
 .mn-editor {
   --mn-fg: #1d1d1f; --mn-muted: #86868b; --mn-line: rgba(0, 0, 0, 0.1); --mn-bg: transparent;
   --mn-code-bg: rgba(0, 0, 0, 0.05); --mn-accent: #c78a00; --mn-check: #f5b800; --mn-hover: rgba(0, 0, 0, 0.06);
-  --mn-selection: rgba(255, 204, 0, 0.32); --mn-menu-bg: rgba(250, 250, 250, 0.92); --mn-font-size: 13px;
+  --mn-selection: rgba(255, 204, 0, 0.32); --mn-menu-bg: rgba(250, 250, 250, 0.92); --mn-link: #8a5d00; --mn-font-size: 13px;
   color: var(--mn-fg); background: var(--mn-bg);
   font: var(--mn-font-size)/1.5 -apple-system, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -11,12 +11,13 @@
   .mn-editor {
     --mn-fg: #ececec; --mn-muted: #98989d; --mn-line: rgba(255, 255, 255, 0.12); --mn-code-bg: rgba(255, 255, 255, 0.07);
     --mn-accent: #ffd60a; --mn-check: #ffd60a; --mn-hover: rgba(255, 255, 255, 0.08); --mn-selection: rgba(255, 214, 10, 0.3);
-    --mn-menu-bg: rgba(44, 44, 46, 0.92);
+    --mn-menu-bg: rgba(44, 44, 46, 0.92); --mn-link: #ffd60a;
   }
 }
 .mn-editor ::selection { background: var(--mn-selection); }
 
 /* Toolbar: quiet icon buttons in groups, active state in the accent color. */
+.mn-toolbar[hidden] { display: none; }  /* display: flex below would override [hidden] */
 .mn-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 1px; padding: 0 0 8px; }
 .mn-toolbar button { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 26px; padding: 0 6px;
   font: 600 13px -apple-system, system-ui, sans-serif; color: var(--mn-muted); background: none; border: none; border-radius: 6px; cursor: default; }
@@ -63,7 +64,7 @@
 .mn-content pre { background: var(--mn-code-bg); border-radius: 8px; padding: 0.7em 0.9em; overflow-x: auto; margin: 0 0 0.5em; }
 .mn-content pre code { background: none; padding: 0; }
 .mn-content hr { border: none; border-top: 1px solid var(--mn-line); margin: 1em 0; }
-.mn-content a { color: var(--mn-accent); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--mn-accent) 40%, transparent); cursor: pointer; }
+.mn-content a { color: var(--mn-link); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--mn-link) 40%, transparent); cursor: pointer; }
 .mn-content img { max-width: 100%; height: auto; border-radius: 8px; }
 .mn-content table { border-collapse: separate; border-spacing: 0; width: 100%; margin: 0 0 0.5em; table-layout: fixed;
   border: 1px solid var(--mn-line); border-radius: 8px; overflow: hidden; }
@@ -91,8 +92,7 @@
 .mn-ai-menu button { display: block; width: 100%; text-align: left; padding: 5px 10px; font: 13px -apple-system, system-ui, sans-serif;
   color: var(--mn-fg); background: none; border: none; border-radius: 6px; cursor: default; }
 /* One highlight: hovering moves focus (see aiMenu), so only :focus is styled. */
-.mn-ai-menu button:focus { background: var(--mn-accent); color: #fff; outline: none; }
-@media (prefers-color-scheme: dark) { .mn-ai-menu button:focus { color: #1d1d1f; } }
+.mn-ai-menu button:focus { background: var(--mn-check); color: #1d1d1f; outline: none; }  /* dark on yellow: legible in both modes */
 .mn-ai-footer { padding: 5px 10px 3px; font-size: 11px; color: var(--mn-muted); border-top: 1px solid var(--mn-line); margin-top: 4px; }
 .mn-ai-status:not(:empty) { margin-top: 4px; max-width: 240px; padding: 4px 8px; font-size: 11.5px; color: var(--mn-fg);
   background: var(--mn-code-bg); border-radius: 6px; }

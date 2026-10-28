@@ -83,6 +83,16 @@ check("note:// link click calls onLinkNote", () => {
   if (got === undefined) ed.editor.view.someProp("handleClick", (f) => f(ed.editor.view, 2, { target: ed.editor.view.dom.querySelector("a") }));
   assert.equal(got, "ABCD-1234");
 });
+check("Shift-Enter in a code block adds a line inside it", () => {
+  const ed = mount("```\na\n```");
+  press(ed, "a", "Enter", true);
+  ed.editor.commands.insertContent("b");
+  assert.equal(ed.getMarkdown().trim(), "```\na\nb\n```");
+});
+check("toolbar: false hides the toolbar", () => {
+  const ed = mount("x", { toolbar: false });
+  assert.equal(ed.editor.options.element.closest(".mn-editor").querySelector(".mn-toolbar").hidden, true);
+});
 check("shortcuts list is exported", () => assert.ok(MNEditor.shortcuts.length >= 20));
 
 // ✨ menu: the host's reply replaces the whole note (or the selection) as one undoable step; titles go on top.

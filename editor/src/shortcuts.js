@@ -12,7 +12,7 @@ export const shortcuts = [
   { group: "Blocks", keys: "⌘⌥0", action: "Normal text" },
   { group: "Blocks", keys: "⌘⇧B", action: "Quote" },
   { group: "Blocks", keys: "⌘⌥C", action: "Code block" },
-  { group: "Blocks", keys: "⇧Enter", action: "Line break inside a block" },
+  { group: "Blocks", keys: "⇧Enter", action: "Line break inside a block (a new line inside code blocks)" },
   { group: "Lists", keys: "⌘⇧8", action: "Bullet list" },
   { group: "Lists", keys: "⌘⇧7", action: "Numbered list" },
   { group: "Lists", keys: "⌘⇧9", action: "Checklist" },
