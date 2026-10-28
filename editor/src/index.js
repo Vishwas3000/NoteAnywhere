@@ -1,5 +1,5 @@
 import { Editor, Extension } from "@tiptap/core";
-import { Plugin } from "@tiptap/pm/state";
+import { NodeSelection, Plugin, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import StarterKit from "@tiptap/starter-kit";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
@@ -37,6 +37,135 @@ const TOOLBAR = [
   [icon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M12 3v18"/>'), "Insert table",
     (c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }), "table"],
 ];
+// Blocks you can drag or move, like Notion: a list item (checklist items too) or else a top-level block.
+const ITEMS = new Set(["listItem", "taskItem"]);
+function blockAround($pos) {
+  for (let d = $pos.depth; d > 0; d--) if (ITEMS.has($pos.node(d).type.name)) return d;
+  return $pos.depth > 0 ? 1 : 0;
+}
+
+/** ⌘⇧↑ / ⌘⇧↓: swap the block holding the cursor with its neighbour, keeping the cursor where it was in it. */
+function moveBlock(editor, dir) {
+  const { state, view } = editor;
+  const $from = state.selection.$from;
+  const depth = blockAround($from);
+  if (!depth) return false;
+  const parent = $from.node(depth - 1), index = $from.index(depth - 1);
+  if (index + dir < 0 || index + dir >= parent.childCount) return true; // at the edge: nothing to do, but don't leak the key
+  const node = $from.node(depth), start = $from.before(depth), offset = $from.pos - start;
+  const neighbour = parent.child(index + dir);
+  const to = dir < 0 ? start - neighbour.nodeSize : start + neighbour.nodeSize;
+  const tr = state.tr.delete(start, start + node.nodeSize).insert(to, node);
+  tr.setSelection(TextSelection.near(tr.doc.resolve(to + offset)));
+  view.dispatch(tr.scrollIntoView());
+  return true;
+}
+
+/** The ⋮⋮ handle left of the block under the pointer. Dragging it moves the block between blocks, like Notion. */
+function dragHandle() {
+  let handleView;
+  return Extension.create({
+    name: "mnDragHandle",
+    addProseMirrorPlugins: () => [new Plugin({
+      view: (view) => (handleView = dragHandleView(view)),
+      props: { handleDrop: (view, event) => handleView?.drop(event) ?? false },
+    })],
+  });
+}
+
+function dragHandleView(view) {
+  const handle = Object.assign(document.createElement("div"), { className: "mn-drag", draggable: true, textContent: "⋮⋮",
+    title: "Drag to move · ⌘⇧↑ ⌘⇧↓" });
+  handle.setAttribute("aria-hidden", "true"); // keyboard users have ⌘⇧↑/↓
+  const line = Object.assign(document.createElement("div"), { className: "mn-drop" });
+  let current = null, dragged = null;
+
+  // TipTap mounts the editor's DOM after creating the view, so the handle joins it once it's in place.
+  const attach = () => {
+    const body = view.dom.parentElement;
+    if (body && handle.parentElement !== body) body.append(handle);
+    return body;
+  };
+  // The block under the pointer at `depth` (or the list item / top-level block when depth is null).
+  const blockAt = (event, item) => {
+    const content = view.dom.getBoundingClientRect();
+    const found = view.posAtCoords({ left: Math.max(event.clientX, content.left + 30), top: event.clientY });
+    if (!found) return null;
+    const $pos = view.state.doc.resolve(found.pos);
+    const depth = item === false ? Math.min($pos.depth, 1) : blockAround($pos);
+    const pos = depth ? $pos.before(depth) : found.inside;
+    const dom = pos >= 0 && view.nodeDOM(pos);
+    return dom instanceof HTMLElement ? { pos, node: view.state.doc.nodeAt(pos), dom, box: dom.getBoundingClientRect() } : null;
+  };
+  // Where a dragged block lands: before or after the block under the pointer; list items only between list items.
+  const target = (event) => {
+    const block = blockAt(event, dragged.item ? null : false);
+    if (!block) return null;
+    const after = event.clientY > block.box.top + block.box.height / 2;
+    return { to: after ? block.pos + block.node.nodeSize : block.pos, y: after ? block.box.bottom : block.box.top, box: block.box };
+  };
+  const finish = () => {
+    view.dragging = null;
+    dragged = null;
+    line.remove();
+    handle.classList.remove("on");
+  };
+
+  view.dom.addEventListener("mousemove", (event) => {
+    const body = attach(), block = body && blockAt(event, null);
+    if (!block) return;
+    current = block.pos;
+    const frame = body.getBoundingClientRect();
+    const lineHeight = parseFloat(getComputedStyle(block.dom).lineHeight) || 20;
+    handle.style.top = `${block.box.top - frame.top + Math.max(0, (Math.min(lineHeight, block.box.height) - 22) / 2)}px`;
+    // Bullets and numbers sit outside the <li>, so a list item's handle goes left of its list instead.
+    const left = block.dom.tagName === "LI" ? block.dom.parentElement.getBoundingClientRect().left : block.box.left;
+    handle.style.left = `${Math.max(0, left - frame.left - 20)}px`;
+    handle.classList.add("on");
+  });
+  view.dom.addEventListener("mouseleave", (event) => { if (event.relatedTarget !== handle) handle.classList.remove("on"); });
+  handle.addEventListener("dragstart", (event) => {
+    if (current == null) return;
+    const selection = NodeSelection.create(view.state.doc, current);
+    view.dispatch(view.state.tr.setSelection(selection));
+    view.dragging = { slice: selection.content(), move: true };
+    dragged = { from: current, size: selection.node.nodeSize, slice: selection.content(), item: ITEMS.has(selection.node.type.name) };
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", selection.node.textContent);
+    event.dataTransfer.setDragImage(view.nodeDOM(current), 0, 0);
+  });
+  handle.addEventListener("dragend", finish);
+  view.dom.addEventListener("dragover", (event) => {
+    const spot = dragged && target(event), body = attach();
+    if (!spot || !body) return line.remove();
+    event.preventDefault();
+    const frame = body.getBoundingClientRect();
+    Object.assign(line.style, { top: `${spot.y - frame.top - 1}px`, left: `${spot.box.left - frame.left}px`, width: `${spot.box.width}px` });
+    body.append(line);
+  });
+  view.dom.addEventListener("dragleave", (event) => { if (!view.dom.contains(event.relatedTarget)) line.remove(); });
+  attach();
+
+  return {
+    update: attach,
+    destroy: () => { handle.remove(); line.remove(); },
+    drop(event) {
+      const spot = dragged && target(event);
+      if (!spot) return false;
+      const { from, size, slice } = dragged;
+      if (spot.to < from || spot.to > from + size) { // dropped onto itself: nothing moves
+        const tr = view.state.tr.delete(from, from + size);
+        const to = tr.mapping.map(spot.to);
+        tr.replaceRange(to, to, slice);
+        tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(to + 1, tr.doc.content.size))));
+        view.dispatch(tr.scrollIntoView());
+      }
+      finish();
+      return true;
+    },
+  };
+}
+
 // Obsidian-style #tags, same rule as Note.tags in Swift: needs a letter, may nest with "/".
 const TAG = /(^|[\s(\[{,;:!?])#([\p{L}\p{N}_\-/]*[\p{L}_\-][\p{L}\p{N}_\-/]*)/gu;
 
@@ -213,6 +342,8 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
       "Shift-Enter": () => editor.isActive("codeBlock") && editor.commands.newlineInCode(),
       "Mod-Shift-x": () => editor.commands.toggleStrike(),
       "Mod-k": openLink,
+      "Mod-Shift-ArrowUp": () => moveBlock(editor, -1),
+      "Mod-Shift-ArrowDown": () => moveBlock(editor, 1),
     }),
   });
 
@@ -220,7 +351,9 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     element: body,
     extensions: [
       tagHighlighter(onTag),
-      StarterKit.configure({ link: { openOnClick: false, protocols: ["note"], autolink: true } }),
+      dragHandle(),
+      StarterKit.configure({ link: { openOnClick: false, protocols: ["note"], autolink: true },
+        dropcursor: false }), // the drag handle draws its own line between blocks
       TaskList,
       TaskItem.configure({ nested: true }),
       TableKit.configure({ table: { resizable: false } }),

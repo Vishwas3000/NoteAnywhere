@@ -100,3 +100,14 @@
 .mn-editor:has(.mn-ai) .mn-toolbar { padding-right: 34px; }  /* room for the ✨ button */
 /* #tags, like Obsidian: a soft accent pill. */
 .mn-content .mn-tag { color: var(--mn-link); background: color-mix(in srgb, var(--mn-check) 18%, transparent); border-radius: 4px; padding: 0 2px; }
+/* Notion-style block handle in a narrow gutter left of the text. */
+.mn-body { position: relative; }
+.mn-content { padding-left: 20px; }
+.mn-drag { position: absolute; z-index: 1; width: 18px; height: 22px; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; letter-spacing: -3px; color: var(--mn-muted); border-radius: 5px; cursor: grab; user-select: none;
+  -webkit-user-select: none; opacity: 0; pointer-events: none; transition: opacity 0.12s; }
+.mn-drag.on { opacity: 0.7; pointer-events: auto; }
+.mn-drag:hover { opacity: 1; background: var(--mn-hover); color: var(--mn-fg); }
+.mn-drag:active { cursor: grabbing; }
+.mn-content .ProseMirror-selectednode { outline: 2px solid color-mix(in srgb, var(--mn-check) 60%, transparent); outline-offset: 2px; border-radius: 4px; }
+.mn-drop { position: absolute; z-index: 2; height: 2px; border-radius: 1px; background: var(--mn-check); pointer-events: none; }
