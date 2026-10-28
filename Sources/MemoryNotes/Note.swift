@@ -134,13 +134,13 @@ enum NoteStore {
             try run("""
                 INSERT INTO notes (id, kind, target, title, body_md, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE SET target = excluded.target, title = excluded.title,
-                    body_md = excluded.body_md, updated_at = excluded.updated_at
+                    body_md = excluded.body_md, updated_at = excluded.updated_at, dirty = 1
                 WHERE notes.deleted_at IS NULL AND notes.kind = excluded.kind
                 """, [note.id, note.kind.rawValue, note.target, note.label, note.text, note.createdAt, note.updatedAt])
             guard sqlite3_changes(try db()) > 0 else { return }
             try run("""
                 INSERT INTO snapshots (note_id, day, body_md, updated_at) VALUES (?, ?, ?, ?)
-                ON CONFLICT (note_id, day) DO UPDATE SET body_md = excluded.body_md, updated_at = excluded.updated_at
+                ON CONFLICT (note_id, day) DO UPDATE SET body_md = excluded.body_md, updated_at = excluded.updated_at, dirty = 1
                 """, [note.id, day(note.updatedAt), note.text, note.updatedAt])
         }
         notify_post(changed)
@@ -149,8 +149,99 @@ enum NoteStore {
     static func delete(_ id: String) throws {
         try validate(id)
         let now = Date().timeIntervalSince1970 * 1000
-        try transaction { try run("UPDATE notes SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL", [now, now, id]) }
+        try transaction { try run("UPDATE notes SET deleted_at = ?, updated_at = ?, dirty = 1 WHERE id = ? AND deleted_at IS NULL", [now, now, id]) }
         notify_post(changed)
+    }
+
+    // MARK: Cloud sync (rows as the server stores them; see CloudSync)
+
+    struct CloudNote: Codable, Equatable {
+        var id: String, kind: String, target: String, label: String, body_md: String
+        var created_at: Double, updated_at: Double, deleted_at: Double?
+        var seq: Int?
+    }
+
+    struct CloudSnapshot: Codable, Equatable {
+        var note_id: String, day: String, body_md: String, updated_at: Double
+        var seq: Int?
+    }
+
+    static func dirtyNotes(limit: Int = 200) -> [CloudNote] {
+        (try? query("""
+            SELECT id, kind, target, title, body_md, created_at, updated_at, deleted_at FROM notes WHERE dirty = 1 LIMIT ?
+            """, [limit]) { row in
+            CloudNote(id: text(row, 0), kind: text(row, 1), target: text(row, 2), label: text(row, 3), body_md: text(row, 4),
+                      created_at: sqlite3_column_double(row, 5), updated_at: sqlite3_column_double(row, 6),
+                      deleted_at: sqlite3_column_type(row, 7) == SQLITE_NULL ? nil : sqlite3_column_double(row, 7))
+        }) ?? []
+    }
+
+    static func dirtySnapshots(limit: Int = 500) -> [CloudSnapshot] {
+        (try? query("SELECT note_id, day, body_md, updated_at FROM snapshots WHERE dirty = 1 LIMIT ?", [limit]) { row in
+            CloudSnapshot(note_id: text(row, 0), day: text(row, 1), body_md: text(row, 2), updated_at: sqlite3_column_double(row, 3))
+        }) ?? []
+    }
+
+    /// After a push: clean only rows nobody edited meanwhile.
+    static func markPushed(notes: [CloudNote] = [], snapshots: [CloudSnapshot] = []) throws {
+        try transaction {
+            for n in notes { try run("UPDATE notes SET dirty = 0 WHERE id = ? AND updated_at = ?", [n.id, n.updated_at]) }
+            for s in snapshots {
+                try run("UPDATE snapshots SET dirty = 0 WHERE note_id = ? AND day = ? AND updated_at = ?", [s.note_id, s.day, s.updated_at])
+            }
+        }
+    }
+
+    /// Pulled rows: the newer edit wins and deletes stick, as on the server. Posts `changed` when anything changed.
+    static func applyRemote(notes: [CloudNote], snapshots: [CloudSnapshot]) throws {
+        var changes: Int32 = 0
+        try transaction {
+            let handle = try db()
+            let before = sqlite3_total_changes(handle)
+            for n in notes where (try? validate(n.id)) != nil && (n.kind == "app" || n.kind == "url") {
+                let deleted: Any = n.deleted_at ?? NSNull()
+                try run("""
+                    INSERT INTO notes (id, kind, target, title, body_md, created_at, updated_at, deleted_at, dirty)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                    ON CONFLICT (id) DO UPDATE SET target = excluded.target, title = excluded.title, body_md = excluded.body_md,
+                        updated_at = excluded.updated_at, deleted_at = coalesce(notes.deleted_at, excluded.deleted_at), dirty = 0
+                    WHERE excluded.updated_at > notes.updated_at
+                    """, [n.id, n.kind, n.target, n.label, n.body_md, n.created_at, n.updated_at, deleted])
+                if let at = n.deleted_at {  // deleted elsewhere, even if edited here later
+                    try run("UPDATE notes SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL", [at, n.id])
+                }
+            }
+            for s in snapshots {
+                try run("""
+                    INSERT INTO snapshots (note_id, day, body_md, updated_at, dirty)
+                    SELECT ?1, ?2, ?3, ?4, 0 WHERE EXISTS (SELECT 1 FROM notes WHERE id = ?1)
+                    ON CONFLICT (note_id, day) DO UPDATE SET body_md = excluded.body_md, updated_at = excluded.updated_at, dirty = 0
+                    WHERE excluded.updated_at > snapshots.updated_at
+                    """, [s.note_id, s.day, s.body_md, s.updated_at])
+            }
+            changes = sqlite3_total_changes(handle) - before
+        }
+        if changes > 0 { notify_post(changed) }
+    }
+
+    static func syncValue(_ key: String) -> String? {
+        (try? query("SELECT value FROM sync_state WHERE key = ?", [key]) { text($0, 0) })?.first
+    }
+
+    static func setSyncValue(_ key: String, _ value: String?) throws {
+        try transaction {
+            if let value { try run("INSERT OR REPLACE INTO sync_state (key, value) VALUES (?, ?)", [key, value]) }
+            else { try run("DELETE FROM sync_state WHERE key = ?", [key]) }
+        }
+    }
+
+    /// Signing in to a different account: everything here goes up to it, and its notes come down from the start.
+    static func resetSync() throws {
+        try transaction {
+            try run("UPDATE notes SET dirty = 1", [])
+            try run("UPDATE snapshots SET dirty = 1", [])
+            try run("DELETE FROM sync_state WHERE key LIKE 'cursor.%'", [])
+        }
     }
 
     // MARK: Embeddings and icons (derived caches: no change notification)
@@ -274,6 +365,16 @@ enum NoteStore {
                     PRAGMA user_version = 2;
                     """)
             }
+            if try userVersion(handle) < 3 {
+                // Cloud sync (D31): dirty rows changed here and not yet pushed; sync_state keeps pull cursors.
+                try exec(handle, """
+                    ALTER TABLE notes ADD COLUMN dirty INTEGER NOT NULL DEFAULT 1;
+                    ALTER TABLE snapshots ADD COLUMN dirty INTEGER NOT NULL DEFAULT 1;
+                    CREATE INDEX notes_dirty ON notes (dirty) WHERE dirty = 1;
+                    CREATE TABLE sync_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                    PRAGMA user_version = 3;
+                    """)
+            }
             try exec(handle, "COMMIT")
         } catch {
             try? exec(handle, "ROLLBACK")
@@ -377,7 +478,9 @@ enum NoteStore {
             switch arg {
             case let s as String: sqlite3_bind_text(stmt, index, s, -1, transient)
             case let d as Double: sqlite3_bind_double(stmt, index, d)
+            case let i as Int: sqlite3_bind_int64(stmt, index, Int64(i))
             case let data as Data: _ = data.withUnsafeBytes { sqlite3_bind_blob(stmt, index, $0.baseAddress, Int32($0.count), transient) }
+            case is NSNull: sqlite3_bind_null(stmt, index)
             default: sqlite3_finalize(stmt); throw SQLError(description: "unsupported bind \(type(of: arg))")
             }
         }

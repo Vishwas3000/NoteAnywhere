@@ -57,7 +57,7 @@
   {
     "group": "Blocks",
     "keys": "⇧Enter",
-    "action": "Line break inside a block"
+    "action": "Line break inside a block (a new line inside code blocks)"
   },
   {
     "group": "Lists",

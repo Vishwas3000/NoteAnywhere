@@ -17,6 +17,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         overlay.start()
         SearchPopup.shared.start()
+        _ = CloudSync.shared  // starts syncing if it was turned on
+    }
+
+    /// memorynotes://auth-callback from a sync sign-in email.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls { Task { await CloudSync.shared.handle(url) } }
     }
 }
 
@@ -29,6 +35,10 @@ struct MemoryNotesApp: App {
         }
         .defaultSize(width: 960, height: 640)
         .commands { NotesCommands() }
+
+        Settings {
+            SyncSettingsView().frame(width: 460).fixedSize(horizontal: false, vertical: true)
+        }
 
         Window("Keyboard Shortcuts", id: "shortcuts") {
             ShortcutsView()
@@ -93,6 +103,8 @@ private struct MenuContent: View {
             openWindow(id: "shortcuts")
             NSApp.activate()
         }
+        SettingsLink { Text("Sync Settings…") }
+            .simultaneousGesture(TapGesture().onEnded { NSApp.activate() })
         Divider()
         Button("Quit MemoryNotes") { NSApp.terminate(nil) }.keyboardShortcut("q")
     }

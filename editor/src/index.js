@@ -70,6 +70,8 @@ function aiMenu(editor, onAI) {
   const toggle = (open) => {
     menu.hidden = !open;
     button.setAttribute("aria-expanded", String(open));
+    // A host sizing the editor to its content (onHeight) must grow while the menu hangs below a short note.
+    wrap.parentElement.style.minHeight = open ? `${menu.offsetTop + menu.offsetHeight + 4}px` : "";
     if (open) items[0].focus();
   };
   button.onmousedown = (e) => e.preventDefault();
@@ -170,7 +172,9 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   // Shortcuts the kits don't ship with: ⌘⇧X strike (Apple Notes / Google Docs habit) and ⌘K link.
   const Extra = Extension.create({
     name: "mnShortcuts",
+    priority: 1000, // ahead of HardBreak, so Shift-Enter inside code stays in the block
     addKeyboardShortcuts: () => ({
+      "Shift-Enter": () => editor.isActive("codeBlock") && editor.commands.newlineInCode(),
       "Mod-Shift-x": () => editor.commands.toggleStrike(),
       "Mod-k": openLink,
     }),
