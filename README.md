@@ -58,7 +58,8 @@ supports Apple Intelligence.
 1. Download the DMG from [Releases](https://github.com/Vishwas3000/NoteAnywhere/releases/latest), drag NoteAnywhere
    to Applications and open it. It lives in the menu bar.
 2. Allow **Accessibility** when asked (System Settings ▸ Privacy & Security ▸ Accessibility). This lets NoteAnywhere
-   read window titles so notes can follow the channel or file you're in. Without it, notes are per app.
+   read window titles so notes can follow the channel or file you're in. Without it, notes are per app, and the
+   floating panel says so, with a button to the right Settings pane.
 3. For website notes, add the extension from the [Chrome Web Store]({{CHROME_WEB_STORE_URL}}) (works in Brave too).
 
 The first search downloads the search model once (about 87 MB). Until then, search matches exact words.
