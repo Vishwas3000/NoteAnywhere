@@ -1,4 +1,4 @@
-# MemoryNotes
+# NoteAnywhere
 
 Notes that follow what you're looking at. Write a note for an app (Xcode, Slack, Figma…) or a website/page,
 and it pops up in a floating overlay whenever that app is in front or that tab is open.
@@ -8,12 +8,19 @@ and it pops up in a floating overlay whenever that app is in front or that tab i
 
 ## Install
 
+- **Mac app** (macOS 15+): download the DMG from [Releases](https://github.com/Vishwas3000/NoteAnywhere/releases/latest),
+  drag NoteAnywhere to Applications and open it once. Opening it connects it to Chrome, Brave, Edge, Arc, Vivaldi and Chromium.
+- **Browser extension**: from the Chrome Web Store (works in any Chromium browser).
+
+### From source
+
 ```sh
 ./scripts/install.sh
 ```
 
-This builds `~/Applications/MemoryNotes.app`, launches it, and registers the browser bridge for Chrome and Brave.
-Then in `chrome://extensions` (or `brave://extensions`), turn on Developer mode → **Load unpacked** → pick `extension/`.
+This builds `~/Applications/NoteAnywhere.app` and launches it. Then in `chrome://extensions` (or `brave://extensions`),
+turn on Developer mode → **Load unpacked** → pick `extension/`. Releases are cut with `scripts/release.sh`; see
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ## Use
 
@@ -27,11 +34,11 @@ Then in `chrome://extensions` (or `brave://extensions`), turn on Developer mode 
 ## How it fits together
 
 ```
-Chrome/Brave tab ──content.js──▶ background.js ──Native Messaging──▶ MemoryNotes binary (host mode)
-                                                                         │
-                                       ~/Library/Application Support/MemoryNotes/notes/<id>.json
-                                                                         │
-MemoryNotes.app (watches the folder) ◀───────────────────────────────────┘
+Chrome/Brave tab ──content.js──▶ background.js ──Native Messaging──▶ NoteAnywhere binary (host mode)
+                                                                           │
+                                          ~/Library/Application Support/MemoryNotes/memorynotes.sqlite (WAL)
+                                                                           │
+NoteAnywhere.app (notified on every save) ◀────────────────────────────────┘
 ```
 
 Chrome starts the same app binary as a short-lived host process, so the extension works even when the app is closed.
@@ -42,3 +49,7 @@ Decisions and their reasons are in [docs/DECISIONS.md](docs/DECISIONS.md); the p
 ```sh
 swift test && swift build -c release && python3 scripts/test_host.py && (cd editor && npm test)
 ```
+
+## License
+
+[GPL-3.0](LICENSE).
