@@ -37,6 +37,8 @@ targets:
         group: Shared
       - path: ../Sources/MemoryNotes/GraphLayout.swift
         group: Shared
+      - path: ../Sources/MemoryNotes/NoteLock.swift
+        group: Shared
       - path: ../Sources/MemoryNotes/Accent.swift
         group: Shared
       - path: ../Sources/MemoryNotes/SyncCloud.swift

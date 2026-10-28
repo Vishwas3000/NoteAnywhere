@@ -15,13 +15,20 @@ struct NoteDetailView: View {
                 Text(note.edited.formatted(date: .long, time: .shortened))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                NoteEditor(noteID: noteID) { linked = $0 }
+                if note.locked || NoteLock.isEnvelope(note.text) {
+                    // The text is an encrypted envelope: editing it here would destroy the note.
+                    // shortcut: no unlock on the phone yet; add it with the Mac's unlock UI (NoteLock has the core).
+                    ContentUnavailableView("This Note Is Locked", systemImage: "lock.fill",
+                                           description: Text("Open it on your Mac to read or edit it."))
+                } else {
+                    NoteEditor(noteID: noteID) { linked = $0 }
+                }
             }
             .padding(.top, 4)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
-                    ShareLink(item: note.text)
+                    if !note.locked { ShareLink(item: note.text) }
                     Menu {
                         if let url = note.pageURL {
                             Link(destination: url) { Label("Open Page", systemImage: "safari") }

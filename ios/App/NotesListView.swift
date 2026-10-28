@@ -107,7 +107,7 @@ struct NotesListView: View {
                 Link(destination: url) { Label("Open Page", systemImage: "safari") }
                 Button { UIPasteboard.general.url = url } label: { Label("Copy Link", systemImage: "link") }
             }
-            ShareLink(item: note.text) { Label("Share", systemImage: "square.and.arrow.up") }
+            if !note.locked { ShareLink(item: note.text) { Label("Share", systemImage: "square.and.arrow.up") } }
             Divider()
             Button(role: .destructive) { delete(note) } label: { Label("Delete", systemImage: "trash") }
         }
@@ -133,7 +133,10 @@ struct NoteRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(note.title).font(.headline).lineLimit(1)
+            HStack(spacing: 4) {
+                if note.locked { Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary) }
+                Text(note.title).font(.headline).lineLimit(1)
+            }
             (Text(date) + Text("  ") + Text(note.preview.isEmpty ? "No additional text" : note.preview).foregroundStyle(.secondary))
                 .font(.subheadline)
                 .lineLimit(1)
