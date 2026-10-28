@@ -42,6 +42,14 @@ extension Note {
     }
 }
 
+/// Apple Intelligence's title and tags for one version of a note.
+struct Suggestion: Hashable {
+    let noteID: String
+    let updatedAt: Double
+    let title: String
+    let tags: [String]
+}
+
 /// A note as it was at the end of one local day (its last save that day).
 struct Snapshot: Identifiable, Hashable {
     let day: String  // "yyyy-MM-dd", local time
@@ -146,6 +154,26 @@ enum NoteStore {
         }
     }
 
+    /// Suggested title and tags, keyed by note id, with the note version they were made from.
+    static func suggestions() -> [String: Suggestion] {
+        let rows = (try? query("""
+            SELECT s.note_id, s.updated_at, s.title, s.tags_json FROM suggestions s JOIN notes n ON n.id = s.note_id
+            WHERE n.deleted_at IS NULL
+            """, []) { row in
+            Suggestion(noteID: text(row, 0), updatedAt: sqlite3_column_double(row, 1), title: text(row, 2),
+                       tags: (try? JSONDecoder().decode([String].self, from: Data(text(row, 3).utf8))) ?? [])
+        }) ?? []
+        return Dictionary(rows.map { ($0.noteID, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    static func saveSuggestion(_ s: Suggestion) throws {
+        let tags = String(data: try JSONEncoder().encode(s.tags), encoding: .utf8) ?? "[]"
+        try transaction {
+            try run("INSERT OR REPLACE INTO suggestions (note_id, updated_at, title, tags_json) VALUES (?, ?, ?, ?)",
+                    [s.noteID, s.updatedAt, s.title, tags])
+        }
+    }
+
     static func icon(_ key: String) -> Data? {
         (try? query("SELECT png FROM icons WHERE key = ?", [key]) { blob($0, 0) })?.first
     }
@@ -216,6 +244,14 @@ enum NoteStore {
                 try exec(handle, schemaV1)
                 imported = try importJSON(handle)
                 try exec(handle, "PRAGMA user_version = 1")
+            }
+            if try userVersion(handle) < 2 {
+                // Apple Intelligence's suggested title and tags per note version; kept apart from the user's own #tags.
+                try exec(handle, """
+                    CREATE TABLE suggestions (note_id TEXT PRIMARY KEY REFERENCES notes (id) ON DELETE CASCADE,
+                        updated_at REAL NOT NULL, title TEXT NOT NULL, tags_json TEXT NOT NULL);
+                    PRAGMA user_version = 2;
+                    """)
             }
             try exec(handle, "COMMIT")
         } catch {
