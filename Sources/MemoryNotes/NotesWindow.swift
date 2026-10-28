@@ -87,6 +87,7 @@ struct NotesWindow: View {
         }
         .tint(.notesAccent)
         .frame(minWidth: 760, minHeight: 480)
+        .navigationSubtitle(searching ? "^[\(hits.count) result](inflect: true)" : "^[\(visibleNotes.count) note](inflect: true)")
     }
 
     private var selectedNote: Note? { selection.flatMap { id in model.notes.first { $0.id == id } } }
@@ -136,7 +137,6 @@ struct NotesWindow: View {
             }
         }
         .searchable(text: $query, isPresented: $searchFocused, placement: .sidebar, prompt: "Search by meaning or keyword")
-        .navigationSubtitle(searching ? "^[\(hits.count) result](inflect: true)" : "^[\(visibleNotes.count) note](inflect: true)")
         .alert(folderPrompt?.renaming == nil ? "New Folder" : "Rename Folder", isPresented: Binding(
             get: { folderPrompt != nil }, set: { if !$0 { folderPrompt = nil } }
         ), presenting: folderPrompt) { prompt in
