@@ -44,7 +44,7 @@ enum WindowContext {
     /// Drops what changes without the place changing: unsaved dots, unread counts like "(3) Inbox" / "Inbox (3)".
     private static func clean(_ part: String) -> String {
         part.filter { !("\u{200E}\u{200F}\u{202A}\u{202B}\u{202C}\u{202D}\u{202E}\u{2066}\u{2067}\u{2068}\u{2069}".contains($0)) }  // bidi marks (WhatsApp)
-            .replacing(#/^[●•*]\s*/#, with: "")
+            .replacing(#/^[^\p{L}\p{N}(\[#@~]+/#, with: "")  // unsaved dots, spinners ("✳ Claude Code"), bullets
             .replacing(#/^\(\d+\)\s*/#, with: "")
             .replacing(#/\s*\(\d+\)$/#, with: "")
             .trimmingCharacters(in: .whitespaces)

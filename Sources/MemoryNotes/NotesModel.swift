@@ -3,6 +3,14 @@ import Combine
 import notify
 import SwiftUI
 
+/// Which app, and which place in it, is in front. Its own object, so views that don't show it (the main window)
+/// don't redraw every time a window title changes.
+final class FrontWindow: ObservableObject {
+    static let shared = FrontWindow()
+    @Published fileprivate(set) var app: NSRunningApplication?
+    @Published fileprivate(set) var context: String?
+}
+
 /// Shared state for the main window and the overlay: all notes, plus which app is in front.
 final class NotesModel: ObservableObject {
     static let shared = NotesModel()
@@ -17,10 +25,10 @@ final class NotesModel: ObservableObject {
     /// A day ("yyyy-MM-dd") to show in the calendar, e.g. after ⌘-clicking a date in a note.
     @Published var calendarRequest: String?
     /// The last frontmost app that isn't MemoryNotes itself.
-    @Published private(set) var frontApp: NSRunningApplication?
+    var frontApp: NSRunningApplication? { FrontWindow.shared.app }
     /// Where in that app you are, as an app-note target: "bundle.id/Workspace/Channel" (just "bundle.id" without
     /// the Accessibility permission or a useful window title).
-    @Published private(set) var frontContext: String?
+    var frontContext: String? { FrontWindow.shared.context }
 
     private let titles = WindowTitleWatcher()
 
@@ -39,7 +47,7 @@ final class NotesModel: ObservableObject {
         titles.onChange = { [weak self] title, conversation in
             guard let self, let app = self.frontApp, let id = app.bundleIdentifier else { return }
             let context = WindowContext.target(bundleID: id, appName: app.localizedName ?? id, title: title, conversation: conversation)
-            if context != self.frontContext { self.frontContext = context }
+            if context != self.frontContext { FrontWindow.shared.context = context }
         }
         WindowTitleWatcher.requestPermission()
         setFront(Self.otherApp(NSWorkspace.shared.frontmostApplication))
@@ -53,7 +61,7 @@ final class NotesModel: ObservableObject {
     }
 
     private func setFront(_ app: NSRunningApplication?) {
-        frontApp = app
+        FrontWindow.shared.app = app
         titles.watch(app)  // reports the window title right away, which sets frontContext
     }
 

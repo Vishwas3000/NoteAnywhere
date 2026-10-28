@@ -19,6 +19,9 @@ import Testing
     ("a/b.txt", "TextEdit", ["a∕b.txt"]),
     // Window titled just like the app, or nothing.
     ("Slack", "Slack", []),  // no "Slack › Slack"
+    // Animated titles (a terminal spinner) stay one place.
+    ("✳ Claude Code", "Terminal", ["Claude Code"]),
+    ("⠋ Claude Code", "Terminal", ["Claude Code"]),
     ("", "Slack", []),
 ])
 func windowTitlePath(title: String, app: String, expected: [String]) {

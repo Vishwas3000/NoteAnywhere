@@ -32,7 +32,7 @@ final class OverlayController {
     }()
 
     func start() {
-        subscription = model.$frontContext.removeDuplicates().sink { [weak self] context in self?.contextChanged(context) }
+        subscription = FrontWindow.shared.$context.removeDuplicates().sink { [weak self] context in self?.contextChanged(context) }
         HotKeys.register(kVK_ANSI_M, optionKey | shiftKey, name: "⌥⇧M") { [weak self] in self?.toggle() }
     }
 
@@ -93,6 +93,7 @@ extension View {
 
 struct OverlayView: View {
     @ObservedObject private var model = NotesModel.shared
+    @ObservedObject private var front = FrontWindow.shared  // redraw when the app or place in front changes
     @Environment(\.openWindow) private var openWindow
     @State private var searching = false
     @State private var query = ""
