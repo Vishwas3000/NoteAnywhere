@@ -6,11 +6,13 @@ const MISSING = "Mac app not installed — run scripts/install.sh";
 let tabId, page = {};
 let notes = [], visible = false, dismissed = false, collapsed = false, forced = false, error = "";
 let query = "", results = [], searchSeq = 0, searchTimer;
-let editors = [], toolbarOn = false;
+let editors = [], stamps = [], toolbarOn = false, expanded = false, hostH;
 
 const $ = (s) => document.querySelector(s);
 const [panel, count, body, list, empty, errBox] = [".panel", ".count", ".body", ".notes", ".empty", ".error"].map($);
 const [searchBox, resultList, noResults, footer, help] = [".search", ".results", ".no-results", "footer", ".help"].map($);
+const [favicon, hostName, pageTitle] = [".site img", ".host", ".page-title"].map($);
+const store = chrome.storage?.local; // needs the "storage" permission; without it the size choice just isn't remembered
 
 function send(msg) {
   return new Promise((resolve) => {
@@ -21,12 +23,47 @@ function send(msg) {
   });
 }
 
-// Tell content.js whether to show the frame and how tall the panel wants to be.
+// Mirrors Note.plain in Sources/MemoryNotes/Note.swift: one Markdown line as plain text.
+const plain = (line) => line
+  .replace(/^\s*(#{1,6}\s+|>\s*|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)*/, "")
+  .replace(/^\s*(-{3,}|\*{3,}|_{3,}|\|?[\s:|-]+\|[\s:|-]*)\s*$/, "")
+  .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+  .replace(/\*\*|__|~~|`/g, "")
+  .replace(/\*(\S|\S[^*]*\S)\*/g, "$1")
+  .replace(/\s*\|\s*/g, "  ")
+  .trim();
+function plainLines(text) {
+  let fence = false;
+  return text.split("\n").flatMap((line) => {
+    if (line.startsWith("```")) { fence = !fence; return []; }
+    const p = fence ? line.trim() : plain(line);
+    return p ? [p] : [];
+  });
+}
+
+function edited(ms) {
+  const d = new Date(ms), mins = (Date.now() - ms) / 60e3;
+  if (mins < 1) return "Edited just now";
+  if (mins < 60) return `Edited ${Math.floor(mins)} min ago`;
+  if (d.toDateString() === new Date().toDateString()) return `Edited ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+  if (d.toDateString() === new Date(Date.now() - 864e5).toDateString()) return "Edited yesterday";
+  const year = d.getFullYear() === new Date().getFullYear() ? undefined : "numeric";
+  return `Edited ${d.toLocaleDateString([], { month: "short", day: "numeric", year })}`;
+}
+
+// Tell content.js whether to show the frame and how big the panel wants to be. It replies with the page's viewport height.
 function report() {
   if (tabId === undefined) return; // not wired up yet; the first load reports
   const shown = query ? resultList : help.hidden ? list : help;
-  const height = panel.offsetHeight - shown.clientHeight + shown.scrollHeight + 16;
-  chrome.tabs.sendMessage(tabId, { type: "mn:frame", visible, height }, { frameId: 0 }).catch(() => {});
+  const height = expanded && !collapsed && hostH ? hostH : panel.offsetHeight - shown.clientHeight + shown.scrollHeight;
+  chrome.tabs.sendMessage(tabId, { type: "mn:frame", visible, height, width: panel.offsetWidth }, { frameId: 0 })
+    .then((h) => {
+      if (!h || h === hostH) return;
+      hostH = h;
+      document.documentElement.style.setProperty("--host-h", `${h}px`);
+      report();
+    })
+    .catch(() => {});
 }
 new ResizeObserver(report).observe(panel);
 
@@ -55,6 +92,12 @@ $(".help-toggle").onclick = () => {
   $(".help-toggle").setAttribute("aria-expanded", String(!help.hidden));
   render();
 };
+$(".expand").onclick = () => {
+  expanded = !expanded;
+  store?.set({ expanded });
+  render();
+};
+favicon.onload = () => { favicon.hidden = false; }; // until then (or if the site has none) a globe shows
 
 // The shortcut list comes from the editor bundle, so it can't drift from what the editor does.
 let lastGroup;
@@ -76,10 +119,16 @@ for (const { group, keys, action } of MNEditor.shortcuts) {
 // State only. The note editors are rebuilt by renderNotes(), and only when the note set changes,
 // so typing, searching or collapsing never resets the cursor.
 function render() {
-  count.textContent = ` ${notes.length}`;
+  count.textContent = notes.length ? `${notes.length}` : "";
+  count.title = `${notes.length} note${notes.length === 1 ? "" : "s"} on this page`;
   body.hidden = collapsed;
-  $(".collapse").textContent = collapsed ? "+" : "−";
-  $(".collapse").setAttribute("aria-label", collapsed ? "Expand" : "Collapse");
+  $(".collapse").setAttribute("aria-expanded", String(!collapsed));
+  $(".collapse").setAttribute("aria-label", collapsed ? "Show notes" : "Collapse notes");
+  $(".collapse").title = collapsed ? "Show notes" : "Collapse";
+  panel.classList.toggle("expanded", expanded);
+  $(".expand").setAttribute("aria-pressed", String(expanded));
+  $(".expand").setAttribute("aria-label", expanded ? "Shrink panel" : "Expand panel");
+  $(".expand").title = expanded ? "Shrink panel" : "Expand panel";
   errBox.textContent = error;
   errBox.hidden = !error;
   const searching = query !== "";
@@ -95,8 +144,17 @@ function render() {
 function renderNotes() {
   for (const ed of editors) ed.destroy();
   editors = [];
+  stamps = [];
   list.replaceChildren(...notes.map(noteRow));
   render();
+}
+
+function showPage() {
+  hostName.textContent = page.host || "Notes";
+  pageTitle.textContent = page.title || page.page || "";
+  pageTitle.title = page.title || "";
+  const src = page.host ? `https://${page.host}/favicon.ico` : "";
+  if (favicon.getAttribute("src") !== src) { favicon.hidden = true; favicon.src = src; }
 }
 
 async function search() {
@@ -109,19 +167,29 @@ async function search() {
 }
 
 function resultRow(note) {
+  const [title = "New Note", ...rest] = plainLines(note.text);
   const row = document.createElement("button");
+  row.className = "card";
+  const head = document.createElement("div");
+  head.className = "r-title";
+  head.textContent = title;
+  const snippet = document.createElement("div");
+  snippet.className = "snippet";
+  snippet.textContent = rest.slice(0, 4).join(" ");
   const meta = document.createElement("div");
   meta.className = "meta";
   meta.textContent = note.kind === "app" ? `App · ${note.label || note.target}` : `Site · ${note.target}`;
-  const snippet = document.createElement("div");
-  snippet.className = "snippet";
-  snippet.textContent = note.text || "Empty note";
-  row.append(meta, snippet);
+  row.append(head, snippet, meta);
   if (note.kind === "app") {
     row.setAttribute("aria-expanded", "false");
-    row.onclick = () => { row.setAttribute("aria-expanded", String(snippet.classList.toggle("full"))); report(); };
+    row.onclick = () => {
+      const full = snippet.classList.toggle("full");
+      snippet.textContent = full ? rest.join("\n") : rest.slice(0, 4).join(" ");
+      row.setAttribute("aria-expanded", String(full));
+      report();
+    };
   } else {
-    row.setAttribute("aria-label", `Open ${note.target}: ${note.text.split("\n")[0]}`);
+    row.setAttribute("aria-label", `Open ${note.target}: ${title}`);
     row.onclick = () => window.open(`https://${note.target}`, "_blank", "noopener");
   }
   return row;
@@ -131,6 +199,7 @@ function resultRow(note) {
 function whereLabel(note) {
   if (note.target === page.page) return null;
   const a = document.createElement("a");
+  a.className = "where-link";
   a.href = `https://${note.target}`;
   a.target = "_blank";
   a.rel = "noopener";
@@ -139,40 +208,52 @@ function whereLabel(note) {
   return a;
 }
 
+const TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"/></svg>';
+
 function noteRow(note) {
-  const row = document.createElement("div");
+  const row = document.createElement("article");
+  row.className = "card";
+  const link = whereLabel(note);
+  if (link) row.append(link);
+
+  const box = document.createElement("div");
+  box.className = "editor";
   const meta = document.createElement("div");
   meta.className = "meta";
-  const where = document.createElement("span");
-  const link = whereLabel(note);
-  if (link) where.append(link);
+  const stamp = document.createElement("span");
+  stamp.textContent = edited(note.updatedAt);
   const del = document.createElement("button");
-  del.textContent = "Delete";
+  del.className = "icon del";
+  del.innerHTML = TRASH; // our own constant markup
+  del.title = "Delete";
   del.setAttribute("aria-label", `Delete note${link ? ` for ${note.target}` : ""}`);
   // confirm() is blocked in cross-origin frames, so a note with text needs a second click.
   let armed;
   del.onclick = () => {
     if (!note.text.trim() || armed) return remove(note);
-    del.textContent = "Really delete?";
-    armed = setTimeout(() => { armed = undefined; del.textContent = "Delete"; }, 3000);
+    del.textContent = "Delete?";
+    del.classList.add("armed");
+    armed = setTimeout(() => { armed = undefined; del.innerHTML = TRASH; del.classList.remove("armed"); }, 3000);
   };
-  meta.append(where, del);
+  meta.append(stamp, del);
 
-  const box = document.createElement("div");
-  box.className = "note-editor";
   let timer;
   editors.push(MNEditor.mount(box, {
     markdown: note.text,
     placeholder: "Write a note…",
     toolbar: toolbarOn,
+    // Apple Notes' first-line title, unless that line is a long paragraph that would become a wall of bold text.
+    titleLine: (plainLines(note.text)[0] ?? "").length <= 60,
     onChange: (md) => {
       note.text = md;
       note.updatedAt = Date.now();
+      stamp.textContent = edited(note.updatedAt);
       clearTimeout(timer);
       timer = setTimeout(() => save(note), 400);
     },
   }));
-  row.append(meta, box);
+  stamps.push(stamp);
+  row.append(box, meta);
   return row;
 }
 
@@ -204,17 +285,27 @@ async function remove(note) {
 
 // nav: a new page, so auto-show/hide afresh. Otherwise a refresh: never clobber an in-progress edit.
 async function load(nav) {
-  if (!nav && editors.some((ed) => ed.isFocused())) return;
+  const typing = () => !nav && editors.some((ed) => ed.isFocused());
+  if (typing()) return;
   const r = await send({ op: "list", url: page.url });
+  if (typing()) return; // focus may have moved into an editor while the Mac app answered
   error = r.ok ? "" : r.error;
-  const before = JSON.stringify(notes);
-  if (r.ok) notes = r.notes;
-  else if (nav) notes = [];
+  const fresh = r.ok ? r.notes : nav ? [] : notes;
   // forced: opened by toggle on this page, so a slower first load mustn't hide it again.
-  if (nav) { dismissed = false; visible = forced || notes.length > 0; }
-  else if (notes.length && !dismissed) visible = true;
-  // Rebuilding unchanged editors would drop the cursor (and focus) the user just placed.
-  JSON.stringify(notes) === before ? render() : renderNotes();
+  if (nav) { dismissed = false; visible = forced || fresh.length > 0; }
+  else if (fresh.length && !dismissed) visible = true;
+  // Same notes: update changed ones in place, so cursors, scroll and the other cards stay put.
+  if (!nav && fresh.length === notes.length && fresh.every((n, i) => n.id === notes[i].id)) {
+    fresh.forEach((n, i) => {
+      if (n.text !== notes[i].text) editors[i].setMarkdown(n.text);
+      if (n.updatedAt !== notes[i].updatedAt) stamps[i].textContent = edited(n.updatedAt);
+      Object.assign(notes[i], n); // the row's handlers hold this object
+    });
+    render();
+  } else {
+    notes = fresh;
+    renderNotes();
+  }
 }
 
 chrome.runtime.onMessage.addListener((msg, sender) => {
@@ -227,7 +318,10 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
   } else if (msg.type === "mn:context") {
     if (msg.nav) forced = false;
     page = msg.page;
+    showPage();
     load(msg.nav);
+  } else if (msg.type === "mn:resize") {
+    report();
   }
 });
 
@@ -235,5 +329,7 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
   tabId = await chrome.runtime.sendMessage({ type: "mn:whoami" });
   page = await chrome.tabs.sendMessage(tabId, { type: "mn:ready" }, { frameId: 0 });
   forced = page.open;
+  expanded = !!(await store?.get("expanded").catch(() => null))?.expanded;
+  showPage();
   load(true);
 })();
