@@ -14,7 +14,8 @@ final class ShareFromSafariTests: XCTestCase {
         // Safari 26 keeps Share in the toolbar's More menu; older layouts show it directly.
         let share = safari.buttons["Share"]
         if !share.waitForExistence(timeout: 10) { safari.buttons["More"].firstMatch.tap() }
-        XCTAssertTrue(share.waitForExistence(timeout: 10))
+        if !share.waitForExistence(timeout: 10) { print("MENU", safari.debugDescription) }
+        XCTAssertTrue(share.exists)
         share.tap()
         let target = safari.cells["MemoryNotes"].firstMatch
         if !target.waitForExistence(timeout: 10) { safari.cells["More"].firstMatch.tap() }  // pick it from the full list
@@ -55,7 +56,9 @@ final class ShareFromSafariTests: XCTestCase {
         let allow = settings.switches["Allow Extension"].firstMatch
         XCTAssertTrue(allow.waitForExistence(timeout: 5))
         if allow.value as? String == "0" { allow.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap() }  // the toggle, not the label
-        try open(settings.staticTexts["All Websites"].firstMatch.waitForExistence(timeout: 5) ? "All Websites" : "Other Websites", in: settings)
+        let sites = settings.staticTexts["All Websites"].firstMatch.waitForExistence(timeout: 5) ? "All Websites" : "Other Websites"
+        guard !settings.cells.containing(.staticText, identifier: sites).staticTexts["Allow"].exists else { return }  // a re-run
+        try open(sites, in: settings)
         try open("Allow", in: settings)
     }
 
