@@ -9,6 +9,8 @@ struct NoteEditor: View {
     var fontSize = 13
     var titleLine = false  // first line styled as the title, like Apple Notes
     var fit: ClosedRange<CGFloat>?  // grow with the content within this range instead of filling the space
+    var onTag: ((String) -> Void)?  // after ⌘-clicking a #tag, which also asks the main window to search for it
+    var focusIfEmpty = true  // a new note takes the cursor; off while something else (an address field) should have it
     @ObservedObject private var model = NotesModel.shared
     @State private var contentHeight: CGFloat = 0
 
@@ -17,7 +19,8 @@ struct NoteEditor: View {
     var body: some View {
         if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
             EditorWebView(dir: dir, markdown: model.binding(noteID, \.text),
-                          options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine]) { contentHeight = $0 }
+                          options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine], onTag: onTag,
+                          focusIfEmpty: focusIfEmpty) { contentHeight = $0 }
                 .id(noteID)  // a fresh editor per note keeps undo history per note
                 .frame(height: fit.map { min(max(contentHeight, $0.lowerBound), $0.upperBound) })
         } else {
@@ -30,6 +33,8 @@ private struct EditorWebView: NSViewRepresentable {
     let dir: URL
     @Binding var markdown: String
     let options: [String: Any]
+    let onTag: ((String) -> Void)?
+    let focusIfEmpty: Bool
     let onHeight: (CGFloat) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -82,6 +87,10 @@ private struct EditorWebView: NSViewRepresentable {
                 ready = true
                 shown = parent.markdown
                 call("load", parent.markdown, parent.options)
+                if parent.markdown.isEmpty && parent.focusIfEmpty {  // a new note: start typing right away
+                    web?.window?.makeFirstResponder(web)
+                    call("focus")
+                }
             case "change":
                 guard let markdown = body["markdown"] as? String else { return }
                 shown = markdown
@@ -99,6 +108,10 @@ private struct EditorWebView: NSViewRepresentable {
                 }
             case "height":
                 if let value = body["value"] as? Double { parent.onHeight(value) }
+            case "tag":
+                guard let tag = body["tag"] as? String else { return }
+                NotesModel.shared.searchRequest = "#" + tag
+                parent.onTag?(tag)
             case "openNote":
                 if let id = body["id"] as? String { NotesModel.shared.openRequest = id }
             default:

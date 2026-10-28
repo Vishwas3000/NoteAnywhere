@@ -35,3 +35,17 @@ func plainLine(markdown: String, expected: String) {
 func pageTargets(url: String, expected: String) {
     #expect(Note.pageTarget(URL(string: url)!) == expected)
 }
+
+@Test func obsidianTags() {
+    let note = Note(kind: .url, target: "x", label: "", text: """
+        # Heading is not a tag
+        Plan for #ML and #ml again, #project/notes, (#paren) and #2024.
+        `#code` and [link](https://x.com/#anchor) and a#mid
+        ```
+        #fenced
+        ```
+        - [ ] ship #release-1
+        """)
+    #expect(note.tags == ["ml", "project/notes", "paren", "release-1"])
+    #expect(note.hasTag("project") && note.hasTag("project/notes") && !note.hasTag("proj"))
+}

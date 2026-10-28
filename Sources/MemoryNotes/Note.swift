@@ -20,6 +20,27 @@ extension Note {
     /// What follows the title, flattened to one line.
     var preview: String { plainLines.dropFirst().prefix(4).joined(separator: " ") }
     var edited: Date { Date(timeIntervalSince1970: updatedAt / 1000) }
+    /// A note can stand alone: no app or website, stored as a website note without an address.
+    var hasSource: Bool { !target.isEmpty }
+
+    /// Obsidian-style #tags, lowercased and in order of first use: "#ML", "#project/notes". A tag needs a letter
+    /// ("#2024" isn't one) and doesn't count inside code or a link's address; "# Heading" has a space, so it's no tag.
+    var tags: [String] {
+        var inFence = false, seen = Set<String>(), found: [String] = []
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            if line.hasPrefix("```") { inFence.toggle(); continue }
+            if inFence { continue }
+            let prose = line.replacing(#/`[^`]*`|\]\([^)]*\)|<[^>]*>/#, with: " ")  // code spans, link targets, autolinks
+            for match in prose.matches(of: #/(?:^|[\s(\[{,;:!?])#([\w\-/]*[^\W\d][\w\-/]*)/#) {
+                let tag = String(match.1).lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                if !tag.isEmpty, seen.insert(tag).inserted { found.append(tag) }
+            }
+        }
+        return found
+    }
+
+    /// True for "#project" on a note tagged #project or #project/notes, like Obsidian's tag search.
+    func hasTag(_ tag: String) -> Bool { tags.contains { $0 == tag || $0.hasPrefix(tag + "/") } }
 
     private var plainLines: [String] {
         var inFence = false

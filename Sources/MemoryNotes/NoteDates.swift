@@ -3,7 +3,7 @@ import Foundation
 extension Note {
     /// "Slack · Alex Rivera (DM)" or "chatgpt.com": the app with its narrowest place, or the site's host.
     var shortSource: String {
-        if kind == .url { return target.isEmpty ? "New Website Note" : String(target.prefix { $0 != "/" }) }
+        if kind == .url { return String(target.prefix { $0 != "/" }) }
         let parts = target.split(separator: "/")
         return parts.count > 1 ? "\(label) · \(parts.last!)" : label
     }

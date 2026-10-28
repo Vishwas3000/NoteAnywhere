@@ -93,6 +93,15 @@ check("toolbar: false hides the toolbar", () => {
   const ed = mount("x", { toolbar: false });
   assert.equal(ed.editor.options.element.closest(".mn-editor").querySelector(".mn-toolbar").hidden, true);
 });
+check("#tags are highlighted, not in code, and ⌘-click reports them", () => {
+  let got;
+  const ed = mount("plan #ML and #project/notes, `#code`, #2024", { onTag: (t) => (got = t) });
+  const tags = [...ed.editor.view.dom.querySelectorAll(".mn-tag")].map((t) => t.dataset.tag);
+  assert.deepEqual(tags, ["ml", "project/notes"]);
+  const el = ed.editor.view.dom.querySelector(".mn-tag");
+  ed.editor.view.someProp("handleClick", (f) => f(ed.editor.view, 0, { metaKey: true, target: el }));
+  assert.equal(got, "ml");
+});
 check("shortcuts list is exported", () => assert.ok(MNEditor.shortcuts.length >= 20));
 
 // ✨ menu: the host's reply replaces the whole note (or the selection) as one undoable step; titles go on top.

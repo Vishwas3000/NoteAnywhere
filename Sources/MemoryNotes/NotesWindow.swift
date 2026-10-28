@@ -5,6 +5,7 @@ enum WindowMode: String, CaseIterable { case notes = "Notes", calendar = "Calend
 
 /// What the menu commands can do in the focused notes window.
 struct WindowActions {
+    var newNote: () -> Void
     var newWebsiteNote: () -> Void
     var findNotes: () -> Void
     var show: (WindowMode) -> Void
@@ -58,6 +59,7 @@ struct NotesWindow: View {
             }
         }
         .focusedSceneValue(\.windowActions, WindowActions(
+            newNote: newNote,
             newWebsiteNote: newWebsiteNote,
             findNotes: { mode = .notes; searchFocused = true },
             show: { mode = $0 },
@@ -87,6 +89,22 @@ struct NotesWindow: View {
                 ForEach(NoteDates.sections(model.notes)) { section in
                     Section { ForEach(section.notes) { row($0) } } header: { sectionHeader(section.title) }
                 }
+                let tags = tagCounts
+                if !tags.isEmpty {
+                    Section {
+                        ForEach(tags, id: \.tag) { item in
+                            Button { query = "#" + item.tag } label: {
+                                LabeledContent {
+                                    Text("\(item.count)").monospacedDigit()
+                                } label: {
+                                    Label("#" + item.tag, systemImage: "number").foregroundStyle(Color.notesAccent)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint("Shows the notes with this tag")
+                        }
+                    } header: { sectionHeader("Tags") }
+                }
             }
         }
         .overlay {
@@ -94,7 +112,7 @@ struct NotesWindow: View {
                 ContentUnavailableView.search(text: query)
             } else if !searching, model.notes.isEmpty {
                 ContentUnavailableView("No Notes", systemImage: "note.text",
-                                       description: Text("Press ⌘N for a website note, or use + to add one for an app."))
+                                       description: Text("Press ⌘N to write a note. Use + to tie one to a website or an app."))
             }
         }
         .searchable(text: $query, isPresented: $searchFocused, placement: .sidebar, prompt: "Search by meaning or keyword")
@@ -111,8 +129,20 @@ struct NotesWindow: View {
             selection = id
             model.openRequest = nil
         }
+        .onChange(of: model.searchRequest, initial: true) { _, request in
+            guard let request else { return }
+            mode = .notes
+            query = request
+            model.searchRequest = nil
+        }
         .onChange(of: selection) { _, id in if id != nil { mode = .notes } }
         .navigationSplitViewColumnWidth(min: 240, ideal: 290)
+    }
+
+    /// Every #tag in use with its number of notes, most used first, like Obsidian's tag pane.
+    private var tagCounts: [(tag: String, count: Int)] {
+        let counts = model.notes.flatMap(\.tags).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+        return counts.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.map { (tag: $0.key, count: $0.value) }
     }
 
     /// Bold, sentence-case headers like Notes, instead of the sidebar's small grey ones.
@@ -143,7 +173,7 @@ struct NotesWindow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
-                NoteEditor(noteID: note.id, fontSize: 15, titleLine: true)
+                NoteEditor(noteID: note.id, fontSize: 15, titleLine: true, focusIfEmpty: !editingAddress)
             }
             .frame(maxWidth: 720)
             .padding(.horizontal, 40)
@@ -157,10 +187,10 @@ struct NotesWindow: View {
         }
     }
 
-    /// The address field while a website note has no page yet (or after "Edit Address…"), otherwise the source chip.
+    /// The source chip; for a note without one, a quiet "Add Website" button; the address field while editing it.
     @ViewBuilder
     private func header(_ note: Note) -> some View {
-        if note.kind == .url && (note.target.isEmpty || editingAddress) {
+        if note.kind == .url && editingAddress {
             TextField("Page address, e.g. github.com/vercel/next.js", text: targetBinding(note.id))
                 .textFieldStyle(.roundedBorder)
                 .focused($targetFocused)
@@ -177,6 +207,7 @@ struct NotesWindow: View {
                     pageActions(url)
                     Divider()
                     Button("Edit Address…") { editingAddress = true }
+                    Button("Remove Website") { model.binding(note.id, \.target).wrappedValue = "" }
                 } label: {
                     Label("Page Actions", systemImage: "ellipsis.circle")
                 }
@@ -186,8 +217,13 @@ struct NotesWindow: View {
                 .fixedSize()
                 .help("Open Page, Copy Link, Edit Address")
             }
-        } else {
+        } else if note.hasSource {
             chip(note)
+        } else {
+            Button { editingAddress = true } label: { Label("Add Website", systemImage: "link.badge.plus") }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("Tie this note to a web page, so it shows up there in the browser")
         }
     }
 
@@ -221,7 +257,8 @@ struct NotesWindow: View {
 
     private var newNoteMenu: some View {
         Menu {
-            Button("New Website Note", action: newWebsiteNote)
+            Button("New Note", action: newNote)
+            Button("New Note for Website", action: newWebsiteNote)
             Menu("New Note for App") {
                 ForEach(runningApps(), id: \.processIdentifier) { app in
                     Button {
@@ -234,15 +271,21 @@ struct NotesWindow: View {
         } label: {
             Label("New Note", systemImage: "square.and.pencil")
         } primaryAction: {
-            newWebsiteNote()
+            newNote()
         }
         .help("New Note")
     }
 
-    private func newWebsiteNote() {
+    /// A note on its own; the editor takes the focus (see EditorView) so you can type right away.
+    private func newNote() {
         mode = .notes
         query = ""
+        editingAddress = false
         selection = model.add(kind: .url, target: "", label: "").id
+    }
+
+    private func newWebsiteNote() {
+        newNote()
         editingAddress = true  // keeps the field up once the first typed character makes the target non-empty
     }
 
@@ -283,9 +326,11 @@ struct NoteRow: View {
             (Text(date) + Text("  ") + Text(note.preview.isEmpty ? "No additional text" : note.preview).foregroundStyle(.secondary))
                 .font(.subheadline)
                 .lineLimit(1)
-            HStack(spacing: 4) {
-                NoteIcon(note: note, size: 12)
-                Text(note.shortSource).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
+            if note.hasSource {
+                HStack(spacing: 4) {
+                    NoteIcon(note: note, size: 12)
+                    Text(note.shortSource).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
+                }
             }
         }
         .padding(.vertical, 6)

@@ -25,6 +25,7 @@
         markdown, ...options, placeholder: "Write a note…",
         onChange: (md) => post({ type: "change", markdown: md }),
         onLinkNote: (id) => post({ type: "openNote", id }),
+        onTag: (tag) => post({ type: "tag", tag }),
         onHeight: (px) => post({ type: "height", value: px }),
         onAI: (action, text) => new Promise((resolve, reject) => {
           const id = ++aiCount;

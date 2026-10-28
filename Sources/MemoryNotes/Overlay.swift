@@ -235,6 +235,7 @@ private struct NoteCard: View {
     @State private var hovering = false
     @FocusState private var focusedAction: Int?
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -256,7 +257,10 @@ private struct NoteCard: View {
                 .foregroundStyle(.secondary)
                 .opacity(hovering || focusedAction != nil ? 1 : 0)
             }
-            NoteEditor(noteID: note.id, toolbar: false, fit: 44...320)
+            NoteEditor(noteID: note.id, toolbar: false, fit: 44...320) { _ in
+                openWindow(id: "notes")
+                NSApp.activate()
+            }
         }
         .padding(10)
         .background(hovering ? .quaternary : .quinary, in: RoundedRectangle(cornerRadius: 10))

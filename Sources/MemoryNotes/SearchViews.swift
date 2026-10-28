@@ -106,7 +106,7 @@ struct SearchResultsView: View {
 
 extension Note {
     /// "App · Xcode" / "Site · github.com"
-    var source: String { kind == .app ? "App · \(place)" : "Site · \(place)" }
+    var source: String { kind == .app ? "App · \(place)" : hasSource ? "Site · \(place)" : "Note" }
     /// "5 minutes ago", "yesterday"
     var editedAgo: String { edited.formatted(.relative(presentation: .named, unitsStyle: .wide)) }
 }

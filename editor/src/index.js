@@ -1,4 +1,6 @@
 import { Editor, Extension } from "@tiptap/core";
+import { Plugin } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import StarterKit from "@tiptap/starter-kit";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { TableKit } from "@tiptap/extension-table";
@@ -35,6 +37,40 @@ const TOOLBAR = [
   [icon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M12 3v18"/>'), "Insert table",
     (c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }), "table"],
 ];
+// Obsidian-style #tags, same rule as Note.tags in Swift: needs a letter, may nest with "/".
+const TAG = /(^|[\s(\[{,;:!?])#([\p{L}\p{N}_\-/]*[\p{L}_\-][\p{L}\p{N}_\-/]*)/gu;
+
+/** Highlights #tags as you type (outside code and links); ⌘-click one to see every note with it (onTag). */
+function tagHighlighter(onTag) {
+  return Extension.create({
+    name: "mnTags",
+    addProseMirrorPlugins: () => [new Plugin({
+      props: {
+        decorations(state) {
+          const found = [];
+          state.doc.descendants((node, pos, parent) => {
+            if (parent?.type.name === "codeBlock" || !node.isText || node.marks.some((m) => m.type.name === "code" || m.type.name === "link")) return;
+            for (const m of node.text.matchAll(TAG)) {
+              const from = pos + m.index + m[1].length;
+              found.push(Decoration.inline(from, from + 1 + m[2].length, {
+                class: "mn-tag", "data-tag": m[2].toLowerCase().replace(/^\/+|\/+$/g, ""),
+                title: onTag ? "⌘-click to see every note with this tag" : "",
+              }));
+            }
+          });
+          return DecorationSet.create(state.doc, found);
+        },
+        handleClick(view, pos, event) {
+          const tag = event.metaKey && event.target.closest?.(".mn-tag")?.dataset.tag;
+          if (!tag || !onTag) return false;
+          onTag(tag);
+          return true;
+        },
+      },
+    })],
+  });
+}
+
 export const AI_ACTIONS = [
   ["proofread", "Fix Spelling & Grammar"],
   ["improve", "Make Clearer"],
@@ -128,7 +164,7 @@ const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.0
  * Apple Intelligence edits (see AI_ACTIONS); the host runs the model, the editor applies the result as one undoable step.
  */
 export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
-  fontSize, titleLine = false, onHeight, onAI } = {}) {
+  fontSize, titleLine = false, onHeight, onAI, onTag } = {}) {
   const root = document.createElement("div");
   root.className = "mn-editor" + (titleLine ? " mn-title-line" : "");
   if (fontSize) root.style.setProperty("--mn-font-size", `${fontSize}px`);
@@ -183,6 +219,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   const editor = new Editor({
     element: body,
     extensions: [
+      tagHighlighter(onTag),
       StarterKit.configure({ link: { openOnClick: false, protocols: ["note"], autolink: true } }),
       TaskList,
       TaskItem.configure({ nested: true }),

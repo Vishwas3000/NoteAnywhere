@@ -1,18 +1,19 @@
 import Accelerate
 import CoreGraphics
 
-/// The knowledge graph: a node per note, a hub per app or site, and three kinds of edges.
-/// Notes come first in `nodes`, hubs after them, so hiding the hubs is a prefix of the same indices.
+/// The knowledge graph: a node per note, a hub per app or site and per #tag, and four kinds of edges.
+/// Notes come first in `nodes`, hubs after them; hubs that are switched off aren't built at all.
 struct Graph {
     struct Node: Identifiable {
-        let id: String  // the note id, or "app:bundle.id" / "url:host" for a hub
+        let id: String  // the note id, or "app:bundle.id" / "url:host" / "tag:name" for a hub
         let title: String
-        let note: Note  // a hub's first note, which gives it its icon
+        let note: Note  // a hub's first note, which gives a source hub its icon
         var isHub: Bool { id != note.id }
+        var isTag: Bool { id.hasPrefix("tag:") }
     }
 
     struct Edge: Hashable {
-        enum Kind: CaseIterable { case link, source, similar }
+        enum Kind: CaseIterable { case link, source, tag, similar }
         let a: Int, b: Int
         let kind: Kind
     }
@@ -26,7 +27,7 @@ struct Graph {
     private(set) var edges: [Edge] = []
     private(set) var noteCount = 0
 
-    init(notes: [Note], vectors: [String: [Float]]) {
+    init(notes: [Note], vectors: [String: [Float]], sources: Bool = true, tags: Bool = true) {
         nodes = notes.map { Node(id: $0.id, title: $0.title, note: $0) }
         noteCount = notes.count
         let index = Dictionary(notes.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -40,7 +41,7 @@ struct Graph {
         }
 
         var hubs: [String: Int] = [:]
-        for (i, note) in notes.enumerated() {
+        for (i, note) in notes.enumerated() where sources {
             let key = String(note.target.prefix { $0 != "/" })  // bundle id or host, like IconStore
             guard !key.isEmpty else { continue }
             let id = "\(note.kind.rawValue):\(key)"
@@ -49,6 +50,21 @@ struct Graph {
                 nodes.append(Node(id: id, title: note.kind == .app && !note.label.isEmpty ? note.label : key, note: note))
             }
             edges.append(Edge(a: i, b: hubs[id]!, kind: .source))
+        }
+
+        // Like Obsidian: a hub per tag, and a nested tag hangs off its parent (#project/notes → #project).
+        func tagHub(_ tag: String, _ note: Note) -> Int {
+            if let hub = hubs["tag:" + tag] { return hub }
+            let hub = nodes.count
+            hubs["tag:" + tag] = hub
+            nodes.append(Node(id: "tag:" + tag, title: "#" + tag, note: note))
+            if let slash = tag.lastIndex(of: "/") {
+                edges.append(Edge(a: hub, b: tagHub(String(tag[..<slash]), note), kind: .tag))
+            }
+            return hub
+        }
+        for (i, note) in notes.enumerated() where tags {
+            for tag in note.tags { edges.append(Edge(a: i, b: tagHub(tag, note), kind: .tag)) }
         }
 
         // Strongest pairs first; a pair is kept only while both notes have room, so no note gets more than k.
@@ -83,6 +99,7 @@ struct GraphLayout {
         switch kind {
         case .link: (60, 1)
         case .source: (50, 1)
+        case .tag: (55, 0.8)
         case .similar: (70, 0.15)
         }
     }
