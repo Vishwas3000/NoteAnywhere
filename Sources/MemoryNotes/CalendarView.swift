@@ -25,10 +25,15 @@ struct CalendarView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title).font(.largeTitle.bold()).lineLimit(1).padding([.horizontal, .top]).padding(.bottom, 8)
             Divider()
-            switch mode {
-            case .month: month(days)
-            case .week: week(days)
-            case .day: day(days)
+            if days.isEmpty {
+                ContentUnavailableView("No Edits Yet", systemImage: "calendar",
+                                       description: Text("Notes appear here on the days you edit them."))
+            } else {
+                switch mode {
+                case .month: month(days)
+                case .week: week(days)
+                case .day: day(days)
+                }
             }
         }
         .toolbar {
@@ -90,41 +95,38 @@ struct CalendarView: View {
 
     private func monthCell(_ d: Date, _ items: [Snapshot]) -> some View {
         let inMonth = cal.isDate(d, equalTo: date, toGranularity: .month)
-        let today = cal.isDateInToday(d)
         return Button { open(d) } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(d.formatted(.dateTime.day()))
-                    .font(.callout.weight(today ? .bold : .regular))
-                    .foregroundStyle(today ? Color.white : .primary)
-                    .padding(.horizontal, 5)
-                    .background(today ? Color.accentColor : .clear, in: Capsule())
+            VStack(alignment: .leading, spacing: 3) {
+                dayNumber(d)
                 ForEach(items.prefix(3)) { s in
-                    Label { Text(firstLine(s.note)) } icon: { NoteIcon(note: s.note, size: 11) }
-                        .font(.caption2).lineLimit(1)
+                    Label { Text(s.note.title) } icon: { NoteIcon(note: s.note, size: 12) }
+                        .font(.caption).lineLimit(1)
                 }
                 if items.count > 3 {
-                    Text("+\(items.count - 3) more").font(.caption2).foregroundStyle(.secondary)
+                    Text("\(items.count - 3) more").font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .padding(4)
+            .padding(6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .opacity(inMonth ? 1 : 0.4)
+            .opacity(inMonth ? 1 : 0.35)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .overlay(Rectangle().stroke(.quaternary, lineWidth: 0.5))
+        .overlay(Rectangle().stroke(.separator, lineWidth: 0.5))
         .accessibilityLabel("\(d.formatted(date: .complete, time: .omitted)), \(items.count) notes edited")
     }
 
     private func week(_ days: [String: [Snapshot]]) -> some View {
         let start = weekStart(date)
+        let dates = (0..<7).map { cal.date(byAdding: .day, value: $0, to: start)! }
         return HStack(alignment: .top, spacing: 0) {
-            ForEach(0..<7, id: \.self) { i in
-                let d = cal.date(byAdding: .day, value: i, to: start)!
-                VStack(alignment: .leading, spacing: 6) {
+            ForEach(dates, id: \.self) { d in
+                VStack(alignment: .leading, spacing: 8) {
                     Button { open(d) } label: {
-                        Text(d.formatted(.dateTime.weekday(.abbreviated).day())).font(.headline)
-                            .foregroundStyle(cal.isDateInToday(d) ? Color.accentColor : .primary)
+                        HStack(spacing: 4) {
+                            Text(d.formatted(.dateTime.weekday(.abbreviated))).font(.callout).foregroundStyle(.secondary)
+                            dayNumber(d)
+                        }
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open \(d.formatted(date: .complete, time: .omitted))")
@@ -136,22 +138,45 @@ struct CalendarView: View {
                         }
                     }
                 }
-                .padding(6)
+                .padding(8)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .overlay(alignment: .trailing) { Divider() }
+            }
+        }
+        .overlay {
+            if dates.allSatisfy({ days[key($0)] == nil }) {
+                ContentUnavailableView("Nothing Edited This Week", systemImage: "calendar",
+                                       description: Text("Notes you edit this week appear here."))
             }
         }
     }
 
     private func card(_ s: Snapshot) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Label { Text(sourceName(s.note)) } icon: { NoteIcon(note: s.note, size: 12) }
-                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            Text(firstLine(s.note)).font(.callout).lineLimit(2)
+        VStack(alignment: .leading, spacing: 3) {
+            Text(s.note.title).font(.callout.weight(.semibold)).lineLimit(2)
+            if !s.note.preview.isEmpty {
+                Text(s.note.preview).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            }
+            HStack(spacing: 4) {
+                NoteIcon(note: s.note, size: 12)
+                Text(s.note.shortSource).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+            }
         }
-        .padding(6)
+        .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+        .background(.quinary, in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The day of the month; today's sits in an accent circle, with dark text so it reads on the yellow in both modes.
+    private func dayNumber(_ d: Date) -> some View {
+        let today = cal.isDateInToday(d)
+        return Text(d.formatted(.dateTime.day()))
+            .font(.callout.weight(today ? .semibold : .regular))
+            .monospacedDigit()
+            .foregroundStyle(today ? Color.black : Color.primary)
+            .frame(minWidth: 22, minHeight: 22)
+            .background { if today { Circle().fill(.tint) } }
     }
 
     @ViewBuilder
@@ -162,17 +187,13 @@ struct CalendarView: View {
                                    description: Text("Notes you edit on this day appear here."))
         } else {
             List(items) { s in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(Date(timeIntervalSince1970: s.note.updatedAt / 1000).formatted(date: .omitted, time: .shortened))
-                            .monospacedDigit()
-                        NoteIcon(note: s.note, size: 14)
-                        Text(sourceName(s.note)).foregroundStyle(.secondary)
-                    }
-                    .font(.caption)
-                    Text(s.note.text.isEmpty ? "Empty note" : s.note.text).textSelection(.enabled)
+                Button { model.openRequest = s.note.id } label: {
+                    NoteRow(note: s.note, date: s.note.edited.formatted(date: .omitted, time: .shortened))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
-                .padding(.vertical, 4)
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens the note")
             }
         }
     }
@@ -196,7 +217,7 @@ struct CalendarView: View {
         var seen = Set<String>()
         return model.snapshots.reversed().compactMap { s -> (key: String, title: String, note: Note)? in
             guard seen.insert(sourceKey(s.note)).inserted else { return nil }
-            return (sourceKey(s.note), (s.note.kind == .app ? "App · " : "Site · ") + sourceName(s.note), s.note)
+            return (sourceKey(s.note), (s.note.kind == .app ? "App · " : "Site · ") + s.note.place, s.note)
         }
         .sorted { $0.title < $1.title }
     }
@@ -223,8 +244,4 @@ struct CalendarView: View {
     private func weekStart(_ d: Date) -> Date { cal.dateInterval(of: .weekOfYear, for: d)!.start }
     private func key(_ d: Date) -> String { Self.dayKey.string(from: d) }
     private func sourceKey(_ n: Note) -> String { n.kind.rawValue + ":" + n.target }
-    private func sourceName(_ n: Note) -> String { n.place }
-    private func firstLine(_ n: Note) -> String {
-        n.text.split(separator: "\n").first.map(String.init) ?? (n.kind == .app ? n.label : n.target)
-    }
 }
