@@ -338,4 +338,16 @@ Made by the subagent that wrote the extension:
 
 ## D40 — No real people or workspaces in the repo (2026-10-28)
 - Comments, tests and decisions used a colleague's name, a work Slack workspace and a WhatsApp group from screenshots;
-  replaced with demo names before going public. They remain in git history until the user decides on a rewrite.
+  replaced with demo names before going public. **History rewritten** (user approved): every commit on main scrubbed
+  with `git filter-branch` and force-pushed (2026-10-28); a local `backup/pre-rewrite-2026-10-28` branch was kept.
+
+## D41 — iPhone app (2026-10-28, subagent; user chose the scope)
+- XcodeGen project in `ios/` (generated `.xcodeproj` not committed); shared Swift files compiled by path, so the Mac
+  code needs no `public`. App Group `group.com.memorynotes` is the store for the app, the Share extension and the
+  Safari Web Extension. Tabs (Notes / Calendar / Graph / Settings), sidebar on iPad; "+" makes a no-source note.
+- The Safari extension reuses `extension/`; Safari kills pages whose extension frame calls `tabs.*`, so the iOS build
+  routes those calls through the background page (build fails loudly if the call sites change).
+- Locked notes show a placeholder on iPhone for now; MiniLM downloads on the first search.
+- **Rejected:** a shared Swift module (`public` everywhere); forking the extension JS.
+- **Status:** Decided. Builds and runs in the iOS 26.2 simulator with 4 UI tests (incl. both extensions); not yet on a
+  device (needs `DEVELOPMENT_TEAM: GH5YVSN865` and App IDs with the App Group).
