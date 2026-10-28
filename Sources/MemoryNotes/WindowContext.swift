@@ -7,7 +7,7 @@ enum WindowContext {
     static func path(title: String?, appName: String) -> [String] {
         guard let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else { return [] }
         var parts = title.split(separator: #/\s[-—–|]\s/#).map { clean(String($0)) }
-        let app = appName.lowercased()
+        let app = clean(appName).lowercased()  // macOS names WhatsApp "\u{200E}WhatsApp"
         // The app's own name ("Slack", "Brave" for "Brave Browser", "Visual Studio Code" for "Code") marks which end
         // of the title is the broad one.
         let isApp = { (part: String) in
