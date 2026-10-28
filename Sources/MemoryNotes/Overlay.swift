@@ -257,7 +257,7 @@ private struct NoteCard: View {
                 .foregroundStyle(.secondary)
                 .opacity(hovering || focusedAction != nil ? 1 : 0)
             }
-            NoteEditor(noteID: note.id, toolbar: false, fit: 44...320) { _ in
+            NoteEditor(noteID: note.id, toolbar: false, fit: 44...320) {
                 openWindow(id: "notes")
                 NSApp.activate()
             }

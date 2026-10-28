@@ -266,3 +266,24 @@ Made by the subagent that wrote the extension:
 - Stored as a website note with an empty target, which already existed, so no local or Supabase migration; the
   browser still can't save notes without a page, and empty targets never match a page or form a graph hub.
 - **Status:** Decided (Claude, as asked).
+
+## D34 — Notion-style block drag and drop (2026-10-28)
+- **Why:** user wants to rearrange like Notion.
+- A ⋮⋮ handle appears left of the block under the pointer (list/checklist item, else the top-level block: paragraph,
+  heading, quote, code, table). Dragging drops it before/after the block under the pointer, never inside it; list
+  items move between list items. A yellow line shows the spot. ⌘⇧↑/↓ moves the current block (keyboard + VoiceOver path).
+- Own ~100-line ProseMirror plugin in the shared editor (app, overlays, browser, iPhone).
+- **Rejected:** `@tiptap/extension-drag-handle` (pulls in collaboration/Yjs peers); ProseMirror's default drop point
+  (dropped blocks inside list items).
+- **Status:** Decided (Claude). Real-WebKit drag checked (paragraph above a list; list item reorder); happy-dom tests for ⌘⇧↑/↓.
+
+## D35 — Dates on lines and tasks, shown on the calendar (2026-10-28)
+- **Why:** user wants to tag a date in a note so a task shows on that day.
+- Written in the text like tags: `@2026-10-30` (Obsidian Tasks' `📅 2026-10-30` also read). Typing `@today`, `@tomorrow`,
+  `@yesterday` or a weekday (`@fri`, next one, today included) + space turns into the real date; 📅 in the toolbar
+  picks any day. Dates show as chips; ⌘-click opens that day in the calendar.
+- Calendar: each dated line appears on its day ("Planned", above edits); checklist lines are tasks with a box that
+  ticks the task in the note itself. Invalid dates (2026-02-30) and code are ignored.
+- Parsed from text (`Note.dates`), so no schema change; it syncs and works in the browser and on iPhone as is.
+- **Rejected:** a due-date column (needs migrations + sync); natural-language parsing of free text (surprising edits).
+- **Status:** Decided (Claude). Parser + editor covered by tests; chips checked in WebKit; calendar not yet seen with dated notes.

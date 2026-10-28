@@ -39,6 +39,28 @@ extension Note {
         return found
     }
 
+    /// Lines with a date: "@2026-10-30" (what the editor writes) or Obsidian Tasks' "📅 2026-10-30". A checklist
+    /// line is a task, shown done when checked. The calendar puts each on its day.
+    var dates: [DatedLine] {
+        var inFence = false, found: [DatedLine] = []
+        for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            if line.hasPrefix("```") { inFence.toggle(); continue }
+            if inFence { continue }
+            let prose = line.replacing(#/`[^`]*`/#, with: " ")
+            let days = prose.matches(of: #/(?:^|[\s(\[])(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?![\w-])/#).map { String($0.1) }
+                .filter { DatedLine.isDay($0) }
+            guard !days.isEmpty else { continue }
+            let task = line.firstMatch(of: #/^\s*[-*+]\s+\[([ xX])\]\s/#)
+            let words = Note.plain(Substring(prose.replacing(#/(?:@|📅\s?)\d{4}-\d{2}-\d{2}/#, with: "")))
+                .replacing(#/\s{2,}/#, with: " ")
+            for day in Set(days).sorted() {
+                found.append(DatedLine(noteID: id, line: index, day: day, text: words.isEmpty ? title : words,
+                                       isTask: task != nil, done: task.map { $0.1 != " " } ?? false))
+            }
+        }
+        return found
+    }
+
     /// True for "#project" on a note tagged #project or #project/notes, like Obsidian's tag search.
     func hasTag(_ tag: String) -> Bool { tags.contains { $0 == tag || $0.hasPrefix(tag + "/") } }
 
@@ -74,6 +96,28 @@ extension Note {
         if path.hasSuffix("/") { path.removeLast() }
         return host.lowercased().replacing(#/^www\./#, with: "") + (parts.port.map { ":\($0)" } ?? "") + path
     }
+}
+
+/// One dated line of a note: a task due that day, or anything else written for it.
+struct DatedLine: Hashable, Identifiable {
+    let noteID: String
+    let line: Int  // index in the note's text, so the calendar can tick the task
+    let day: String  // "yyyy-MM-dd"
+    let text: String
+    let isTask: Bool
+    let done: Bool
+    var id: String { "\(noteID)/\(line)/\(day)" }
+
+    private static let parser: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        f.isLenient = false
+        return f
+    }()
+
+    /// "2026-02-30" looks like a date but isn't one.
+    static func isDay(_ day: String) -> Bool { parser.date(from: day).map { parser.string(from: $0) == day } ?? false }
 }
 
 /// Apple Intelligence's title and tags for one version of a note.

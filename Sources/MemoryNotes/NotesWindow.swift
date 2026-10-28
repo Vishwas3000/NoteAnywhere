@@ -135,6 +135,7 @@ struct NotesWindow: View {
             query = request
             model.searchRequest = nil
         }
+        .onChange(of: model.calendarRequest) { _, day in if day != nil { mode = .calendar } }  // CalendarView takes it from there
         .onChange(of: selection) { _, id in if id != nil { mode = .notes } }
         .navigationSplitViewColumnWidth(min: 240, ideal: 290)
     }
