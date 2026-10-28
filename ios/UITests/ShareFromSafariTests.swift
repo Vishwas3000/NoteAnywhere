@@ -1,6 +1,6 @@
 import XCTest
 
-/// End to end in the simulator: share a page from Safari to MemoryNotes, find the note in the app, then turn the
+/// End to end in the simulator: share a page from Safari to NoteAnywhere, find the note in the app, then turn the
 /// Safari extension on and see the same note in the page's overlay (read through the extension's native handler).
 final class ShareFromSafariTests: XCTestCase {
     func testShareAPageThenSeeItInTheOverlay() throws {
@@ -17,7 +17,7 @@ final class ShareFromSafariTests: XCTestCase {
         if !share.waitForExistence(timeout: 10) { print("MENU", safari.debugDescription) }
         XCTAssertTrue(share.exists)
         share.tap()
-        let target = safari.cells["MemoryNotes"].firstMatch
+        let target = safari.cells["NoteAnywhere"].firstMatch
         if !target.waitForExistence(timeout: 10) { safari.cells["More"].firstMatch.tap() }  // pick it from the full list
         XCTAssertTrue(target.waitForExistence(timeout: 10))
         target.tap()
@@ -46,13 +46,13 @@ final class ShareFromSafariTests: XCTestCase {
         add(shot)
     }
 
-    /// Settings › Apps › Safari › Extensions › MemoryNotes: allow it, on all websites.
+    /// Settings › Apps › Safari › Extensions › NoteAnywhere: allow it, on all websites.
     private func enableExtension() throws {
         let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
         settings.terminate()
         settings.launch()
         for _ in 0..<6 where settings.buttons["BackButton"].exists { settings.buttons["BackButton"].tap() }  // it reopens where it was
-        for name in ["Apps", "Safari", "Extensions", "MemoryNotes"] { try open(name, in: settings) }
+        for name in ["Apps", "Safari", "Extensions", "NoteAnywhere"] { try open(name, in: settings) }
         let allow = settings.switches["Allow Extension"].firstMatch
         XCTAssertTrue(allow.waitForExistence(timeout: 5))
         if allow.value as? String == "0" { allow.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap() }  // the toggle, not the label

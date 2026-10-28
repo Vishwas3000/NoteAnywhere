@@ -21,7 +21,7 @@ enum SampleNotes {
             ("B0000000-0000-4000-8000-000000000004", .url, "", "", [
                 (0.2, "# Groceries\n- [ ] Oat milk\n- [ ] Coffee beans\n- [x] Bananas\n- [ ] Basil"),
             ]),
-            ("B0000000-0000-4000-8000-000000000005", .app, "com.figma.Desktop/MemoryNotes iOS", "Figma", [
+            ("B0000000-0000-4000-8000-000000000005", .app, "com.figma.Desktop/NoteAnywhere iOS", "Figma", [
                 (1.1, "# Design review\nTab bar: Notes, Calendar, Graph, Settings. Source chip above the editor; yellow accent only for state. #ios #design"),
             ]),
             (glass, .url, "developer.apple.com/design/human-interface-guidelines/materials", "Materials | Apple Developer Documentation", [
@@ -51,6 +51,20 @@ enum SampleNotes {
                 try? NoteStore.save(Note(id: id, kind: kind, target: target, label: label, text: text,
                                          createdAt: created, updatedAt: now - ago * day))
             }
+        }
+        // Pins, colours and a folder, as the Mac sets them.
+        let work = Folder(name: "Work")
+        try? NoteStore.saveFolder(work)
+        for note in NoteStore.loadAll() {
+            var meta = note
+            switch note.id {
+            case "B0000000-0000-4000-8000-000000000004": meta.pinned = true
+            case "B0000000-0000-4000-8000-000000000001": meta.color = .blue; meta.folderID = work.id
+            case "B0000000-0000-4000-8000-000000000008": meta.folderID = work.id
+            case glass: meta.color = .yellow
+            default: continue
+            }
+            try? NoteStore.saveMeta(meta)
         }
     }
 }

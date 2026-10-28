@@ -9,6 +9,7 @@ struct NotesListView: View {
     @State private var searchedQuery = ""  // the query `hits` belong to, so "no results" never flashes mid-debounce
     @State private var pendingDelete: Note?
     @State private var draft: String?  // a note made with +, dropped again if left empty
+    @State private var folder: String?  // nil: All Notes
 
     private var searching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
 
@@ -21,13 +22,18 @@ struct NotesListView: View {
                         Section { ForEach(hits, id: \.note.id) { row(model.note($0.note.id) ?? $0.note) } } header: { header("Results") }
                     }
                 } else {
-                    ForEach(NoteDates.sections(model.notes)) { section in
+                    let shown = model.notes.filter { folder == nil || $0.folderID == folder }
+                    let pinned = shown.filter(\.pinned).sorted { $0.updatedAt > $1.updatedAt }
+                    if !pinned.isEmpty {
+                        Section { ForEach(pinned) { row($0) } } header: { header("Pinned") }
+                    }
+                    ForEach(NoteDates.sections(shown.filter { !$0.pinned })) { section in
                         Section { ForEach(section.notes) { row($0) } } header: { header(section.title) }
                     }
                 }
             }
             .overlay { emptyState }
-            .navigationTitle("Notes")
+            .navigationTitle(model.folders.first { $0.id == folder }?.name ?? "Notes")
             .searchable(text: $query, prompt: "Search by meaning or keyword")
             .task(id: query) {
                 try? await Task.sleep(for: .milliseconds(300))  // debounce typing
@@ -45,6 +51,18 @@ struct NotesListView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { newNote() } label: { Label("New Note", systemImage: "plus") }
+                }
+                if !model.folders.isEmpty {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Menu {
+                            Picker("Folder", selection: $folder) {
+                                Label("All Notes", systemImage: "tray.full").tag(String?.none)
+                                ForEach(model.folders) { Label($0.name, systemImage: "folder").tag(Optional($0.id)) }
+                            }
+                        } label: {
+                            Label("Folders", systemImage: folder == nil ? "folder" : "folder.fill")
+                        }
+                    }
                 }
             }
             .navigationDestination(for: String.self) { NoteDetailView(noteID: $0) }
@@ -86,7 +104,7 @@ struct NotesListView: View {
             }
         } else if model.notes.isEmpty {
             ContentUnavailableView("No Notes", systemImage: "note.text",
-                                   description: Text("Tap + to write one, or share a page or some text to MemoryNotes."))
+                                   description: Text("Tap + to write one, or share a page or some text to NoteAnywhere."))
         }
     }
 
@@ -102,15 +120,13 @@ struct NotesListView: View {
         .swipeActions {
             Button { delete(note) } label: { Label("Delete", systemImage: "trash") }.tint(.red)
         }
-        .contextMenu {
-            if let url = note.pageURL {
-                Link(destination: url) { Label("Open Page", systemImage: "safari") }
-                Button { UIPasteboard.general.url = url } label: { Label("Copy Link", systemImage: "link") }
+        .swipeActions(edge: .leading) {
+            Button { model.update(note.id) { $0.pinned.toggle() } } label: {
+                Label(note.pinned ? "Unpin" : "Pin", systemImage: note.pinned ? "pin.slash.fill" : "pin.fill")
             }
-            if !note.locked { ShareLink(item: note.text) { Label("Share", systemImage: "square.and.arrow.up") } }
-            Divider()
-            Button(role: .destructive) { delete(note) } label: { Label("Delete", systemImage: "trash") }
+            .tint(.notesAccent)
         }
+        .contextMenu { NoteMenu(note: note) { delete(note) } }
     }
 
     /// Empty notes go at once; anything with text asks first.
@@ -133,7 +149,10 @@ struct NoteRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
+                if let color = note.color {
+                    Circle().fill(color.swatch).frame(width: 9, height: 9).accessibilityLabel("\(color.title) label")
+                }
                 if note.locked { Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary) }
                 Text(note.title).font(.headline).lineLimit(1)
             }

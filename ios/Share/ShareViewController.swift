@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// "MemoryNotes" in the share sheet: a shared page becomes a website note for that page (same target as the
+/// "NoteAnywhere" in the share sheet: a shared page becomes a website note for that page (same target as the
 /// browser extension makes), shared text becomes the note's body. Saved straight into the App Group database;
 /// the app picks it up (and syncs it) the next time it's active.
 final class ShareViewController: UIViewController {

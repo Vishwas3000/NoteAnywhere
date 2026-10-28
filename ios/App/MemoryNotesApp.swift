@@ -30,6 +30,7 @@ enum AppTab: String { case notes, calendar, graph, settings }
 struct RootView: View {
     @AppStorage("tab") private var tab = AppTab.notes
     @ObservedObject private var model = NotesModel.shared
+    @State private var folderName = ""
 
     var body: some View {
         TabView(selection: $tab) {
@@ -42,5 +43,19 @@ struct RootView: View {
         .tint(.notesAccent)
         .onChange(of: model.searchRequest) { if model.searchRequest != nil { tab = .notes } }
         .onChange(of: model.calendarRequest) { if model.calendarRequest != nil { tab = .calendar } }  // CalendarView takes it from there
+        .alert("New Folder", isPresented: Binding(get: { model.newFolderFor != nil }, set: { if !$0 { model.newFolderFor = nil } })) {
+            TextField("Name", text: $folderName)
+            Button("Cancel", role: .cancel) { folderName = "" }
+            Button("Create") {
+                let name = folderName.trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty, let id = model.newFolderFor {
+                    let folder = model.addFolder(name)
+                    model.update(id) { $0.folderID = folder.id }
+                }
+                folderName = ""
+            }
+        } message: {
+            Text("The note moves into it.")
+        }
     }
 }

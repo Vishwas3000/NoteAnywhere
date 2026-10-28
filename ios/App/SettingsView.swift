@@ -19,7 +19,7 @@ struct SettingsView: View {
                         }
                     }
                 } footer: {
-                    Text("Keep notes in step with MemoryNotes on your Mac.")
+                    Text("Keep notes in step with NoteAnywhere on your Mac.")
                 }
 
                 Section {
@@ -37,7 +37,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Safari")
                 } footer: {
-                    Text("To see page notes on websites, turn on MemoryNotes in Settings › Apps › Safari › Extensions, then allow it on the sites you want.")
+                    Text("To see page notes on websites, turn on NoteAnywhere in Settings › Apps › Safari › Extensions, then allow it on the sites you want.")
                 }
 
                 Section {

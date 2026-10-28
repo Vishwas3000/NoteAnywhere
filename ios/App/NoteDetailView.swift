@@ -30,12 +30,7 @@ struct NoteDetailView: View {
                 ToolbarItemGroup(placement: .primaryAction) {
                     if !note.locked { ShareLink(item: note.text) }
                     Menu {
-                        if let url = note.pageURL {
-                            Link(destination: url) { Label("Open Page", systemImage: "safari") }
-                            Button { UIPasteboard.general.url = url } label: { Label("Copy Link", systemImage: "link") }
-                            Divider()
-                        }
-                        Button(role: .destructive) { confirmDelete = true } label: { Label("Delete Note", systemImage: "trash") }
+                        NoteMenu(note: note) { confirmDelete = true }
                     } label: {
                         Label("More", systemImage: "ellipsis")
                     }

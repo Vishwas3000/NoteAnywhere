@@ -5,7 +5,7 @@ import SafariServices
 final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
     func beginRequest(with context: NSExtensionContext) {
         let message = (context.inputItems.first as? NSExtensionItem)?.userInfo?[SFExtensionMessageKey]
-        var reply: Any = ["ok": false, "error": "MemoryNotes couldn't read the request"]
+        var reply: Any = ["ok": false, "error": "NoteAnywhere couldn't read the request"]
         if (message as? [String: Any])?["op"] as? String == "watch" {
             // watch streams events on a native port, which Safari on iOS doesn't route to this handler.
             reply = ["ok": false, "error": "watch isn't available in Safari"]
