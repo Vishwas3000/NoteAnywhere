@@ -80,6 +80,10 @@ final class CloudSync: ObservableObject {
     /// Where sign-in links land; allowed in supabase/config.toml and registered as the apps' URL scheme.
     static let callback = "memorynotes://auth-callback"
 
+    /// Google sign-in through Supabase: it redirects back to `callback` with the session, like the email link.
+    static let googleURL = URL(string: "auth/v1/authorize?provider=google&redirect_to="
+                                   + callback.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!, relativeTo: projectURL)!
+
     func sendLink(to email: String) async {
         let email = email.trimmingCharacters(in: .whitespaces).lowercased()
         await perform {

@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 /// Sync settings, shared by the Mac (Settings window) and iPhone (Settings tab).
@@ -8,6 +9,7 @@ struct SyncSettingsView: View {
     @State private var passphrase = ""
     @State private var confirm = ""
     @FocusState private var codeFocused: Bool
+    @Environment(\.webAuthenticationSession) private var webAuthentication
 
     var body: some View {
         Form {
@@ -83,6 +85,14 @@ struct SyncSettingsView: View {
                     .onAppear { codeFocused = true }
                 } else {
                     Section {
+                        Button { Task { await signInWithGoogle() } } label: {
+                            Label("Continue with Google", systemImage: "person.crop.circle.badge.checkmark")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .controlSize(.large)
+                        .disabled(sync.busy)
+                    }
+                    Section {
                         TextField("Email", text: $email)
                             .textContentType(.emailAddress)
                             .autocorrectionDisabled()
@@ -104,6 +114,18 @@ struct SyncSettingsView: View {
         }
         .formStyle(.grouped)
         .tint(.notesAccent)
+    }
+
+    /// Google's page opens in a secure sheet (shared with Safari's sign-ins); its redirect carries the session.
+    private func signInWithGoogle() async {
+        do {
+            let url = try await webAuthentication.authenticate(using: CloudSync.googleURL, callbackURLScheme: "memorynotes")
+            await sync.handle(url)
+        } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+            // closed the sheet: nothing to report
+        } catch {
+            sync.error = error.localizedDescription
+        }
     }
 
     private func sendLink() {

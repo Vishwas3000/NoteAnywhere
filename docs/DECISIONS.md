@@ -351,3 +351,11 @@ Made by the subagent that wrote the extension:
 - **Rejected:** a shared Swift module (`public` everywhere); forking the extension JS.
 - **Status:** Decided. Builds and runs in the iOS 26.2 simulator with 4 UI tests (incl. both extensions); not yet on a
   device (needs `DEVELOPMENT_TEAM: GH5YVSN865` and App IDs with the App Group).
+
+## D42 — Google sign-in for sync (2026-10-28)
+- **Why:** user asked for Google OAuth.
+- Supabase's Google provider; the app opens `/auth/v1/authorize?provider=google&redirect_to=memorynotes://auth-callback`
+  in SwiftUI's `webAuthenticationSession` (a secure sheet) and reuses the email link's callback handling. Email link stays.
+- Client id/secret live in the Supabase dashboard (and env vars for `config push`), never in the repo.
+- End-to-end encryption is unchanged: Google only proves who you are; the sync passphrase still unlocks the notes.
+- **Status:** Decided (user asked). Needs a Google OAuth client and the provider enabled by the user.
