@@ -11,6 +11,16 @@ mkdir -p "$APP/Contents/MacOS"
 cp .build/release/MemoryNotes "$APP/Contents/MacOS/"
 cp Info.plist "$APP/Contents/"
 
+# App icon, drawn by scripts/make_icon.swift.
+ICONSET=$(mktemp -d)/AppIcon.iconset
+mkdir -p "$ICONSET" "$APP/Contents/Resources"
+swift scripts/make_icon.swift "$ICONSET/icon_512x512@2x.png"
+for px in 16 32 128 256 512; do
+  sips -z $px $px "$ICONSET/icon_512x512@2x.png" --out "$ICONSET/icon_${px}x${px}.png" >/dev/null
+  sips -z $((px * 2)) $((px * 2)) "$ICONSET/icon_512x512@2x.png" --out "$ICONSET/icon_${px}x${px}@2x.png" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+
 # The shared editor (also used by the browser extension) is built from editor/ and loaded by the app's web views.
 (cd editor && npm ci --no-audit --no-fund --silent && npm run build --silent)
 mkdir -p "$APP/Contents/Resources/editor"
