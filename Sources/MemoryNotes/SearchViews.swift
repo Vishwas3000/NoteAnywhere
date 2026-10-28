@@ -9,6 +9,7 @@ struct SearchResultsView: View {
     @Binding var selection: Int
     var submits = 0
     @ObservedObject private var model = NotesModel.shared
+    @Environment(\.colorSchemeContrast) private var contrast
     @State private var hits: [SearchIndex.Hit] = []
     @State private var searched: String?  // the query `hits` belongs to; no empty state while still debouncing
     @State private var expanded: String?
@@ -26,9 +27,10 @@ struct SearchResultsView: View {
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 6) {
+                        LazyVStack(alignment: .leading, spacing: 2) {
                             ForEach(Array(hits.enumerated()), id: \.element.note.id) { index, hit in
-                                row(hit, selected: index == selection).id(hit.note.id)
+                                // The live note, so the title follows edits made in the expanded editor.
+                                row(model.notes.first { $0.id == hit.note.id } ?? hit.note, index: index).id(hit.note.id)
                             }
                         }
                     }
@@ -58,36 +60,55 @@ struct SearchResultsView: View {
         expanded = expanded == id ? nil : id
     }
 
-    private func row(_ hit: SearchIndex.Hit, selected: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Button { toggle(hit.note.id) } label: {
-                VStack(alignment: .leading, spacing: 2) {
-                    Label { Text(hit.note.source) } icon: { NoteIcon(note: hit.note, size: 14) }
-                        .font(.caption).foregroundStyle(.secondary)
-                    Text(hit.note.text.isEmpty ? "Empty note" : hit.note.text).lineLimit(2)
+    /// Apple Notes style: bold title, then the preview, then where the note lives and when it was edited.
+    private func row(_ note: Note, index: Int) -> some View {
+        let selected = index == selection
+        let isOpen = expanded == note.id
+        return VStack(alignment: .leading, spacing: 6) {
+            Button {
+                selection = index
+                toggle(note.id)
+            } label: {
+                HStack(alignment: .top, spacing: 10) {
+                    NoteIcon(note: note, size: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(note.title).font(.headline).lineLimit(1)
+                        Text(note.preview.isEmpty ? "No additional text" : note.preview)
+                            .foregroundStyle(note.preview.isEmpty ? .tertiary : .secondary)
+                            .lineLimit(1)
+                        Text("\(note.source) · \(note.editedAgo)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
-            .accessibilityHint("Press Return to edit")
-            if expanded == hit.note.id {
-                NoteEditor(noteID: hit.note.id, toolbar: false)
-                    .frame(height: 140)
-                    .padding(4)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+            .accessibilityAddTraits(selected ? .isSelected : [])
+            .accessibilityHint(isOpen ? "Closes the editor" : "Opens the note for editing")
+            if isOpen {
+                NoteEditor(noteID: note.id, toolbar: false, fit: 44...240)
+                    .padding(6)
+                    .background(.quinary, in: RoundedRectangle(cornerRadius: 8))
             }
         }
         .padding(8)
-        .background(selected ? AnyShapeStyle(Color.accentColor.opacity(0.22)) : AnyShapeStyle(.quinary),
-                    in: RoundedRectangle(cornerRadius: 8))
+        .background(selected ? AnyShapeStyle(.tint.opacity(0.35)) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            if selected && contrast == .increased { RoundedRectangle(cornerRadius: 10).strokeBorder(.primary) }
+        }
     }
 }
 
 extension Note {
     /// "App · Xcode" / "Site · github.com"
     var source: String { kind == .app ? "App · \(place)" : "Site · \(place)" }
+    /// "5 minutes ago", "yesterday"
+    var editedAgo: String { edited.formatted(.relative(presentation: .named, unitsStyle: .wide)) }
 }
 
 /// Spotlight-style search panel toggled by a global hotkey (⌥⇧Space).
@@ -96,10 +117,11 @@ final class SearchPopup: NSObject, NSWindowDelegate {
 
     private lazy var panel: NSPanel = {
         let panel = KeyPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 440),
             styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered, defer: false)
         panel.makeFloating()
+        panel.title = "Search Notes"  // hidden, but VoiceOver announces it
         panel.standardWindowButton(.closeButton)?.isHidden = true  // Escape closes it; no greyed-out traffic lights
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -139,29 +161,58 @@ private struct SearchPopupView: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.secondary)
-                TextField("Search all notes…", text: $query)
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass").font(.title).foregroundStyle(.secondary).accessibilityHidden(true)
+                TextField("Search all notes", text: $query, prompt: Text("Search notes"))
                     .textFieldStyle(.plain)
-                    .font(.title2)
+                    .font(.title)
                     .focused($focused)
                     .onExitCommand(perform: close)
                     .onKeyPress(.downArrow) { selection += 1; return .handled }
                     .onKeyPress(.upArrow) { selection -= 1; return .handled }
                     .onSubmit { submits += 1 }
+                    .accessibilityHint("Up and Down Arrow choose a note, Return edits it, Escape closes")
             }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
             Divider()
-            if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                Text("Type to search by meaning or keyword. ↑↓ to choose, Return to edit.").foregroundStyle(.secondary)
-                Spacer()
-            } else {
-                SearchResultsView(query: query, selection: $selection, submits: submits)
+            Group {
+                if query.trimmingCharacters(in: .whitespaces).isEmpty {
+                    ContentUnavailableView("Search Your Notes", systemImage: "note.text",
+                                           description: Text("Find any note by meaning or keyword, from every app and website."))
+                } else {
+                    SearchResultsView(query: query, selection: $selection, submits: submits).padding(8)
+                }
             }
+            .frame(maxHeight: .infinity)
+            Divider()
+            HStack(spacing: 16) {
+                keyHint("↑↓", "Select")
+                keyHint("↩", "Edit")
+                keyHint("esc", "Close")
+                Spacer()
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .accessibilityHidden(true)  // the search field's hint tells VoiceOver the same
         }
-        .padding(16)
-        .frame(minWidth: 420, minHeight: 300)
+        .frame(width: 600, height: 440)
         .floatingBackground()
+        .tint(.yellow)
         .onAppear { focused = true }
+    }
+
+    private func keyHint(_ key: String, _ action: String) -> some View {
+        HStack(spacing: 5) {
+            Text(key)
+                .fontWeight(.medium)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+            Text(action)
+        }
     }
 }
