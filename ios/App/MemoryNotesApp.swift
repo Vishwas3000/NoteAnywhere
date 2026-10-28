@@ -41,5 +41,6 @@ struct RootView: View {
         .tabViewStyle(.sidebarAdaptable)
         .tint(.notesAccent)
         .onChange(of: model.searchRequest) { if model.searchRequest != nil { tab = .notes } }
+        .onChange(of: model.calendarRequest) { if model.calendarRequest != nil { tab = .calendar } }  // CalendarView takes it from there
     }
 }

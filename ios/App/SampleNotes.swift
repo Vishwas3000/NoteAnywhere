@@ -6,11 +6,13 @@ enum SampleNotes {
     static func seed() {
         guard NoteStore.loadAll().isEmpty else { return }
         let next = "B0000000-0000-4000-8000-000000000002", glass = "B0000000-0000-4000-8000-000000000003"
+        let now = Date().timeIntervalSince1970 * 1000, day = 86_400_000.0
+        let tomorrow = NoteStore.day(now + day), friday = NoteStore.day(now + 2 * day), later = NoteStore.day(now + 10 * day)
         // id, kind, target, label, then each saved version as (days ago, Markdown); every version leaves a calendar entry.
         let samples: [(String, Note.Kind, String, String, [(Double, String)])] = [
             ("B0000000-0000-4000-8000-000000000001", .app, "com.tinyspeck.slackmacgap/Acme/Alex Rivera (DM)", "Slack", [
                 (1.2, "# 1:1 with Alex\n- [ ] Share the sync design"),
-                (0.05, "# 1:1 with Alex\n- [x] Share the sync design\n- [ ] Ask about the Supabase budget\n- [ ] Demo the iPhone app #work"),
+                (0.05, "# 1:1 with Alex\n- [x] Share the sync design\n- [ ] Ask about the Supabase budget @\(tomorrow)\n- [ ] Demo the iPhone app @\(friday) #work"),
             ]),
             (next, .url, "github.com/vercel/next.js", "GitHub - vercel/next.js: The React Framework", [
                 (3, "# Next.js caching\n`use cache` replaces unstable_cache."),
@@ -34,16 +36,15 @@ enum SampleNotes {
             ]),
             ("B0000000-0000-4000-8000-000000000008", .app, "com.apple.dt.Xcode/memoryNotes", "Xcode", [
                 (14, "# Release checklist\n- [ ] Bump the build number\n- [ ] Archive and upload\n- [ ] Write the release notes"),
-                (12, "# Release checklist\n- [x] Bump the build number\n- [ ] Archive and upload\n- [ ] Write the release notes #work"),
+                (12, "# Release checklist\n- [x] Bump the build number\n- [ ] Archive and upload @\(friday)\n- [ ] Write the release notes #work"),
             ]),
             ("B0000000-0000-4000-8000-000000000009", .url, "en.wikipedia.org/wiki/Fourier_transform", "Fourier transform - Wikipedia", [
                 (20, "# Fourier transform\nAny signal is a sum of sines. The FFT does it in n log n."),
             ]),
             ("B0000000-0000-4000-8000-00000000000A", .url, "", "", [
-                (40, "# Trip to Goa\nFlights on the 14th. Book the scooter in Anjuna."),
+                (40, "# Trip to Goa\nFlights @\(later). Book the scooter in Anjuna."),
             ]),
         ]
-        let now = Date().timeIntervalSince1970 * 1000, day = 86_400_000.0
         for (id, kind, target, label, versions) in samples {
             let created = now - versions[0].0 * day
             for (ago, text) in versions {

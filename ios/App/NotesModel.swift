@@ -12,6 +12,8 @@ final class NotesModel: ObservableObject {
     @Published private(set) var snapshots = NoteStore.loadHistory()
     /// A search for the Notes tab to run, e.g. "#ml" after a #tag is opened in the editor.
     @Published var searchRequest: String?
+    /// A day ("yyyy-MM-dd") for the Calendar tab to show, after a date is opened in the editor.
+    @Published var calendarRequest: String?
 
     private var notifyToken: Int32 = 0
     private var indexing: AnyCancellable?
@@ -54,6 +56,16 @@ final class NotesModel: ObservableObject {
         notes.removeAll { $0.id == id }
         snapshots.removeAll { $0.note.id == id }
         do { try NoteStore.delete(id) } catch { NSLog("MemoryNotes: delete failed: \(error)") }
+    }
+
+    /// Ticks or unticks a dated task from the calendar, by flipping its checkbox in the note's Markdown.
+    func toggleTask(_ item: DatedLine) {
+        let text = binding(item.noteID, \.text)
+        var lines = text.wrappedValue.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        guard lines.indices.contains(item.line),
+              let box = lines[item.line].firstMatch(of: #/^\s*[-*+]\s+\[([ xX])\]/#) else { return }
+        lines[item.line].replaceSubrange(box.1.startIndex..<box.1.endIndex, with: box.1 == " " ? "x" : " ")
+        text.wrappedValue = lines.joined(separator: "\n")
     }
 
     func binding(_ id: String, _ field: WritableKeyPath<Note, String>) -> Binding<String> {

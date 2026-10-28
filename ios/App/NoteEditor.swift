@@ -121,6 +121,8 @@ private struct EditorWebView: UIViewRepresentable {
                         call("aiDone", id, NSNull(), error.localizedDescription)
                     }
                 }
+            case "date":  // ⌘-click, so only with a hardware keyboard on the phone
+                if let day = body["day"] as? String { NotesModel.shared.calendarRequest = day }
             case "tag":
                 if let tag = body["tag"] as? String { NotesModel.shared.searchRequest = "#" + tag }
             case "openNote":

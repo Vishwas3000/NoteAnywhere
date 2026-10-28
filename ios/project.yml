@@ -126,3 +126,22 @@ targets:
           m["background"] = {"scripts": [m["background"]["service_worker"]]}  # Safari on iOS: non-persistent background page
           json.dump(m, open(sys.argv[2], "w"), indent=2)
           PY
+
+  MemoryNotesUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: MemoryNotes
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.memorynotes.ios.uitests
+        TEST_TARGET_NAME: MemoryNotes
+
+schemes:
+  MemoryNotes:
+    build:
+      targets:
+        MemoryNotes: all
+    test:
+      targets: [MemoryNotesUITests]
