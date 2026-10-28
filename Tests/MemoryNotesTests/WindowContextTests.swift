@@ -18,7 +18,7 @@ import Testing
     // A "/" inside a name must not create a level.
     ("a/b.txt", "TextEdit", ["a∕b.txt"]),
     // Window titled just like the app, or nothing.
-    ("Slack", "Slack", ["Slack"]),
+    ("Slack", "Slack", []),  // no "Slack › Slack"
     ("", "Slack", []),
 ])
 func windowTitlePath(title: String, app: String, expected: [String]) {
@@ -37,4 +37,16 @@ func windowTitlePath(title: String, app: String, expected: [String]) {
     let slack = Note(kind: .url, target: "app.slack.com/client/T01/D02", label: "Alex Rivera (DM) - Acme - Slack")
     #expect(slack.place == "app.slack.com › Acme › Alex Rivera (DM)")
     #expect(Note(kind: .url, target: "github.com/a/b", label: "").place == "github.com/a/b")
+}
+
+@Test func conversationFromInsideTheWindow() {
+    // WhatsApp's title is only "\u{200E}WhatsApp"; the chat comes from its header element.
+    #expect(WindowContext.path(title: "\u{200E}WhatsApp", appName: "WhatsApp") == [])
+    let target = WindowContext.target(bundleID: "net.whatsapp.WhatsApp", appName: "WhatsApp", title: "\u{200E}WhatsApp",
+                                      conversation: "\u{200E}Project / Team")
+    #expect(target == "net.whatsapp.WhatsApp/Project ∕ Team")
+    #expect(Note(kind: .app, target: target, label: "WhatsApp").place == "WhatsApp › Project ∕ Team")
+    // A title that already names the place wins over the header.
+    #expect(WindowContext.target(bundleID: "x", appName: "Slack", title: "general - Acme - Slack", conversation: "other")
+            == "x/Acme/general")
 }

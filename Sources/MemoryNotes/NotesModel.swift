@@ -32,9 +32,9 @@ final class NotesModel: ObservableObject {
             Task { await SearchIndex.shared.update(notes) }
         }
 
-        titles.onChange = { [weak self] title in
+        titles.onChange = { [weak self] title, conversation in
             guard let self, let app = self.frontApp, let id = app.bundleIdentifier else { return }
-            let context = WindowContext.target(bundleID: id, appName: app.localizedName ?? id, title: title)
+            let context = WindowContext.target(bundleID: id, appName: app.localizedName ?? id, title: title, conversation: conversation)
             if context != self.frontContext { self.frontContext = context }
         }
         WindowTitleWatcher.requestPermission()
