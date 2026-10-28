@@ -294,7 +294,20 @@ enum NoteStore {
     struct CloudNote: Codable, Equatable {
         var id: String, kind: String, target: String, label: String, body_md: String
         var created_at: Double, updated_at: Double, deleted_at: Double?
+        var pinned: Bool?, folder_id: String?, color: String?, locked: Bool?
         var seq: Int?
+    }
+
+    struct CloudFolder: Codable, Equatable {
+        var id: String, name: String, updated_at: Double, deleted_at: Double?
+        var seq: Int?
+    }
+
+    static func dirtyFolders() -> [CloudFolder] {
+        (try? query("SELECT id, name, updated_at, deleted_at FROM folders WHERE dirty = 1", []) { row in
+            CloudFolder(id: text(row, 0), name: text(row, 1), updated_at: sqlite3_column_double(row, 2),
+                        deleted_at: sqlite3_column_type(row, 3) == SQLITE_NULL ? nil : sqlite3_column_double(row, 3))
+        }) ?? []
     }
 
     struct CloudSnapshot: Codable, Equatable {
@@ -304,11 +317,16 @@ enum NoteStore {
 
     static func dirtyNotes(limit: Int = 200) -> [CloudNote] {
         (try? query("""
-            SELECT id, kind, target, title, body_md, created_at, updated_at, deleted_at FROM notes WHERE dirty = 1 LIMIT ?
+            SELECT id, kind, target, title, body_md, created_at, updated_at, deleted_at, pinned, folder_id, color, locked
+            FROM notes WHERE dirty = 1 LIMIT ?
             """, [limit]) { row in
             CloudNote(id: text(row, 0), kind: text(row, 1), target: text(row, 2), label: text(row, 3), body_md: text(row, 4),
                       created_at: sqlite3_column_double(row, 5), updated_at: sqlite3_column_double(row, 6),
-                      deleted_at: sqlite3_column_type(row, 7) == SQLITE_NULL ? nil : sqlite3_column_double(row, 7))
+                      deleted_at: sqlite3_column_type(row, 7) == SQLITE_NULL ? nil : sqlite3_column_double(row, 7),
+                      pinned: sqlite3_column_int(row, 8) != 0,
+                      folder_id: sqlite3_column_type(row, 9) == SQLITE_NULL ? nil : text(row, 9),
+                      color: sqlite3_column_type(row, 10) == SQLITE_NULL ? nil : text(row, 10),
+                      locked: sqlite3_column_int(row, 11) != 0)
         }) ?? []
     }
 
@@ -319,8 +337,9 @@ enum NoteStore {
     }
 
     /// After a push: clean only rows nobody edited meanwhile.
-    static func markPushed(notes: [CloudNote] = [], snapshots: [CloudSnapshot] = []) throws {
+    static func markPushed(notes: [CloudNote] = [], snapshots: [CloudSnapshot] = [], folders: [CloudFolder] = []) throws {
         try transaction {
+            for f in folders { try run("UPDATE folders SET dirty = 0 WHERE id = ? AND updated_at = ?", [f.id, f.updated_at]) }
             for n in notes { try run("UPDATE notes SET dirty = 0 WHERE id = ? AND updated_at = ?", [n.id, n.updated_at]) }
             for s in snapshots {
                 try run("UPDATE snapshots SET dirty = 0 WHERE note_id = ? AND day = ? AND updated_at = ?", [s.note_id, s.day, s.updated_at])
@@ -329,20 +348,32 @@ enum NoteStore {
     }
 
     /// Pulled rows: the newer edit wins and deletes stick, as on the server. Posts `changed` when anything changed.
-    static func applyRemote(notes: [CloudNote], snapshots: [CloudSnapshot]) throws {
+    static func applyRemote(notes: [CloudNote], snapshots: [CloudSnapshot], folders: [CloudFolder] = []) throws {
         var changes: Int32 = 0
         try transaction {
             let handle = try db()
             let before = sqlite3_total_changes(handle)
+            for f in folders where (try? validate(f.id)) != nil {  // before notes, which may point at them
+                try run("""
+                    INSERT INTO folders (id, name, updated_at, deleted_at, dirty) VALUES (?, ?, ?, ?, 0)
+                    ON CONFLICT (id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at,
+                        deleted_at = coalesce(folders.deleted_at, excluded.deleted_at), dirty = 0
+                    WHERE excluded.updated_at > folders.updated_at
+                    """, [f.id, f.name, f.updated_at, f.deleted_at ?? NSNull()])
+            }
             for n in notes where (try? validate(n.id)) != nil && (n.kind == "app" || n.kind == "url") {
                 let deleted: Any = n.deleted_at ?? NSNull()
                 try run("""
-                    INSERT INTO notes (id, kind, target, title, body_md, created_at, updated_at, deleted_at, dirty)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                    INSERT INTO notes (id, kind, target, title, body_md, created_at, updated_at, deleted_at,
+                        pinned, folder_id, color, locked, dirty)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT id FROM folders WHERE id = ?), ?, ?, 0)
                     ON CONFLICT (id) DO UPDATE SET target = excluded.target, title = excluded.title, body_md = excluded.body_md,
-                        updated_at = excluded.updated_at, deleted_at = coalesce(notes.deleted_at, excluded.deleted_at), dirty = 0
+                        updated_at = excluded.updated_at, deleted_at = coalesce(notes.deleted_at, excluded.deleted_at),
+                        pinned = excluded.pinned, folder_id = excluded.folder_id, color = excluded.color,
+                        locked = excluded.locked, dirty = 0
                     WHERE excluded.updated_at > notes.updated_at
-                    """, [n.id, n.kind, n.target, n.label, n.body_md, n.created_at, n.updated_at, deleted])
+                    """, [n.id, n.kind, n.target, n.label, n.body_md, n.created_at, n.updated_at, deleted,
+                          (n.pinned ?? false) ? 1 : 0, n.folder_id ?? NSNull(), n.color ?? NSNull(), (n.locked ?? false) ? 1 : 0])
                 if let at = n.deleted_at {  // deleted elsewhere, even if edited here later
                     try run("UPDATE notes SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL", [at, n.id])
                 }
@@ -375,6 +406,7 @@ enum NoteStore {
     static func resetSync() throws {
         try transaction {
             try run("UPDATE notes SET dirty = 1", [])
+            try run("UPDATE folders SET dirty = 1", [])
             try run("UPDATE snapshots SET dirty = 1", [])
             try run("DELETE FROM sync_state WHERE key LIKE 'cursor.%'", [])
         }
