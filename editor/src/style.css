@@ -37,7 +37,7 @@
 .mn-content h2 { font-size: 1.25em; font-weight: 650; line-height: 1.3; margin: 0.7em 0 0.25em; }
 .mn-content h3 { font-size: 1.08em; font-weight: 600; margin: 0.6em 0 0.2em; }
 /* Apple Notes makes the first line the note's title. */
-.mn-title-line .mn-content > :first-child { font-size: 1.75em; font-weight: 700; letter-spacing: -0.015em; line-height: 1.2; margin-bottom: 0.4em; }
+.mn-title-line .mn-content > :is(p, h1, h2, h3):first-child { font-size: 1.75em; font-weight: 700; letter-spacing: -0.015em; line-height: 1.2; margin-bottom: 0.4em; }
 
 .mn-content ul, .mn-content ol { margin: 0 0 0.35em; padding-left: 1.5em; }
 .mn-content li { margin: 0.1em 0; }
