@@ -10,6 +10,8 @@ final class NotesModel: ObservableObject {
     @Published private(set) var notes = NoteStore.loadAll()
     /// One entry per note per day it was edited; feeds the calendar.
     @Published private(set) var snapshots = NoteStore.loadHistory()
+    /// A search for the Notes tab to run, e.g. "#ml" after a #tag is opened in the editor.
+    @Published var searchRequest: String?
 
     private var notifyToken: Int32 = 0
     private var indexing: AnyCancellable?

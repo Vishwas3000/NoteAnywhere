@@ -131,7 +131,7 @@ struct CalendarView: View {
                             dayNumber(d)
                         }
                         .font(.headline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.primary)
                     }
                     .buttonStyle(.plain)
                     .textCase(nil)
@@ -191,8 +191,8 @@ struct CalendarView: View {
     private var sources: [(key: String, title: String)] {
         var seen = Set<String>()
         return model.snapshots.reversed().compactMap { s -> (key: String, title: String)? in
-            guard !s.note.target.isEmpty, seen.insert(sourceKey(s.note)).inserted else { return nil }
-            return (sourceKey(s.note), (s.note.kind == .app ? "App · " : "Site · ") + s.note.place)
+            guard seen.insert(sourceKey(s.note)).inserted else { return nil }
+            return (sourceKey(s.note), !s.note.hasSource ? "Notes Without a Source" : (s.note.kind == .app ? "App · " : "Site · ") + s.note.place)
         }
         .sorted { $0.title < $1.title }
     }

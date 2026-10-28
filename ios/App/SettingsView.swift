@@ -4,15 +4,14 @@ struct SettingsView: View {
     @ObservedObject private var model = NotesModel.shared
     @ObservedObject private var sync = CloudSync.shared
     @Environment(\.openURL) private var openURL
+    @State private var path: [String] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Form {
                 Section {
                     // SyncSettingsView is a Form of its own (shared with the Mac), so it gets its own page.
-                    NavigationLink {
-                        SyncSettingsView().navigationTitle("Sync")
-                    } label: {
+                    NavigationLink(value: "sync") {
                         LabeledContent {
                             Text(syncStatus)
                         } label: {
@@ -47,6 +46,10 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .navigationDestination(for: String.self) { _ in SyncSettingsView().navigationTitle("Sync") }
+            #if DEBUG
+            .task { if UserDefaults.standard.bool(forKey: "openSync") { path = ["sync"] } }  // screenshots
+            #endif
         }
     }
 

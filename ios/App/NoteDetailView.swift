@@ -11,7 +11,7 @@ struct NoteDetailView: View {
     var body: some View {
         if let note = model.note(noteID) {
             VStack(spacing: 6) {
-                if !note.target.isEmpty { chip(note).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal) }
+                if note.hasSource { chip(note).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal) }
                 Text(note.edited.formatted(date: .long, time: .shortened))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -56,10 +56,10 @@ struct NoteDetailView: View {
             if note.pageURL != nil { Image(systemName: "arrow.up.right").font(.caption2.weight(.semibold)).accessibilityHidden(true) }
         }
         .font(.footnote)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.secondary)  // not the link tint
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
-        .background(.quaternary.opacity(0.6), in: Capsule())
+        .background(Color(.tertiarySystemFill), in: Capsule())
 
         if let url = note.pageURL {
             Link(destination: url) { label }

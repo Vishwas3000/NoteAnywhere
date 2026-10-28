@@ -29,11 +29,19 @@ private struct EditorWebView: UIViewRepresentable {
     let options: [String: Any]
     let openNote: (String) -> Void
 
-    /// iPhone-only styling on top of the shared page: side margins, no text inflation on rotation, and no ✨ menu
-    /// before iOS 26 (Apple Intelligence's on-device model needs it).
+    /// iPhone-only styling on top of the shared page: side margins, no text inflation on rotation, one scrolling row
+    /// of finger-sized toolbar buttons, a ✨ button that's always visible (there's no hover), and no ✨ menu before
+    /// iOS 26 (Apple Intelligence's on-device model needs it).
     private static var css: String {
-        var css = "body { padding: 0 20px 48px; -webkit-text-size-adjust: 100%; }"
-        if #unavailable(iOS 26) { css += " .mn-ai { display: none; } .mn-editor .mn-toolbar { padding-right: 0; }" }
+        var css = """
+            body { padding: 0 20px 48px; -webkit-text-size-adjust: 100%; }
+            .mn-toolbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+                -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+            .mn-toolbar button { min-width: 36px; height: 36px; flex: none; }
+            .mn-editor:has(.mn-ai) .mn-toolbar { padding-right: 0; margin-right: 44px; }
+            .mn-ai > button { width: 36px; height: 36px; opacity: 1; }
+            """
+        if #unavailable(iOS 26) { css += " .mn-ai { display: none; } .mn-editor:has(.mn-ai) .mn-toolbar { margin-right: 0; }" }
         return css
     }
 
@@ -94,6 +102,7 @@ private struct EditorWebView: UIViewRepresentable {
                 ready = true
                 shown = parent.markdown
                 call("load", parent.markdown, parent.options)
+                if parent.markdown.isEmpty { call("focus") }  // a new note: the cursor is ready (the keyboard waits for a tap)
                 // The shared ✨ menu says "on this Mac".
                 let footer = "Apple Intelligence · on this \(UIDevice.current.model)"
                 web?.evaluateJavaScript("document.querySelectorAll('.mn-ai-footer').forEach(e => e.textContent = \(EditorWebView.quoted(footer)))")
@@ -112,6 +121,8 @@ private struct EditorWebView: UIViewRepresentable {
                         call("aiDone", id, NSNull(), error.localizedDescription)
                     }
                 }
+            case "tag":
+                if let tag = body["tag"] as? String { NotesModel.shared.searchRequest = "#" + tag }
             case "openNote":
                 if let id = body["id"] as? String { parent.openNote(id) }
             default:

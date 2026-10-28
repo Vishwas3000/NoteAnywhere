@@ -59,7 +59,7 @@ struct NoteIcon: View {
                 Image(uiImage: image).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: size * 0.2))
             } else {
-                Image(systemName: note.kind == .app ? "macwindow" : note.target.isEmpty ? "note.text" : "globe")
+                Image(systemName: note.kind == .app ? "macwindow" : note.hasSource ? "globe" : "note.text")
                     .resizable().aspectRatio(contentMode: .fit).foregroundStyle(.secondary)
             }
         }
@@ -69,5 +69,5 @@ struct NoteIcon: View {
 }
 
 extension Note {
-    var pageURL: URL? { kind == .url && !target.isEmpty ? URL(string: "https://\(target)") : nil }
+    var pageURL: URL? { kind == .url && hasSource ? URL(string: "https://\(target)") : nil }
 }

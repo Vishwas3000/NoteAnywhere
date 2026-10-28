@@ -36,6 +36,12 @@ struct NotesListView: View {
                 searchedQuery = query
             }
             .refreshable { model.reload() }
+            .onChange(of: model.searchRequest, initial: true) {
+                guard let request = model.searchRequest else { return }
+                path = []
+                query = request
+                model.searchRequest = nil
+            }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { newNote() } label: { Label("New Note", systemImage: "plus") }
@@ -54,7 +60,11 @@ struct NotesListView: View {
                 Text("“\(note.title)” will be removed.")
             }
             #if DEBUG
-            .task { if let id = UserDefaults.standard.string(forKey: "openNote"), path.isEmpty { path = [id] } }  // screenshots
+            .task {  // screenshots: -openNote <id>, -search <query>
+                let defaults = UserDefaults.standard
+                if let id = defaults.string(forKey: "openNote"), !id.isEmpty, path.isEmpty { path = [id] }
+                if let search = defaults.string(forKey: "search"), !search.isEmpty { model.searchRequest = search }
+            }
             #endif
         }
     }
@@ -82,7 +92,7 @@ struct NotesListView: View {
 
     /// Bold, sentence-case headers like Notes, instead of the list's small grey ones.
     private func header(_ title: String) -> some View {
-        Text(title).font(.title3.bold()).foregroundStyle(.primary).textCase(nil)
+        Text(title).font(.title3.bold()).foregroundStyle(Color.primary).textCase(nil)
     }
 
     private func row(_ note: Note) -> some View {
@@ -127,7 +137,7 @@ struct NoteRow: View {
             (Text(date) + Text("  ") + Text(note.preview.isEmpty ? "No additional text" : note.preview).foregroundStyle(.secondary))
                 .font(.subheadline)
                 .lineLimit(1)
-            if !note.target.isEmpty {
+            if note.hasSource {
                 HStack(spacing: 5) {
                     NoteIcon(note: note, size: 14)
                     Text(note.shortSource).font(.caption).foregroundStyle(.secondary).lineLimit(1)

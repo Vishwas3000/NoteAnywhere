@@ -8,6 +8,7 @@ struct GraphView: View {
     @AppStorage("graphShowsLinks") private var showLinks = true
     @AppStorage("graphShowsSources") private var showSources = true
     @AppStorage("graphShowsSimilar") private var showSimilar = true
+    @AppStorage("graphShowsTags") private var showTags = true
     @State private var graph: Graph?
     // What the toggles show, kept in step: positions, node ids by index (to keep positions across rebuilds),
     // the shown edges and each node's number of them.
@@ -41,7 +42,8 @@ struct GraphView: View {
                             if autoFit { fit() }
                         }
                         .task(id: model.notes) { await rebuild() }
-                        .onChange(of: [showLinks, showSources, showSimilar]) { relayout() }
+                        .onChange(of: [showSources, showTags]) { Task { await rebuild() } }  // hubs that are off aren't built
+                        .onChange(of: [showLinks, showSimilar]) { relayout() }
                 }
             }
             .navigationTitle("Graph")
@@ -57,6 +59,7 @@ struct GraphView: View {
                     Menu {
                         Toggle(isOn: $showLinks) { Label("Links", systemImage: "link") }
                         Toggle(isOn: $showSources) { Label("Sources", systemImage: "globe") }
+                        Toggle(isOn: $showTags) { Label("Tags", systemImage: "number") }
                         Toggle(isOn: $showSimilar) { Label("Similar Meaning", systemImage: "sparkles") }
                     } label: {
                         Label("Connections", systemImage: "line.3.horizontal.decrease.circle")
@@ -72,7 +75,7 @@ struct GraphView: View {
     private var canvas: some View {
         TimelineView(.animation(paused: layout.isSettled)) { timeline in
             Canvas { ctx, size in draw(&ctx, size) } symbols: {
-                ForEach(graph?.nodes.filter(\.isHub) ?? []) { NoteIcon(note: $0.note, size: 40).tag($0.id) }
+                ForEach(graph?.nodes.filter { $0.isHub && !$0.isTag } ?? []) { NoteIcon(note: $0.note, size: 40).tag($0.id) }
             }
             .onChange(of: timeline.date) { tick() }
         }
@@ -138,7 +141,10 @@ struct GraphView: View {
             if dim[i] { hub.opacity = 0.25 }
             hub.fill(Path(ellipseIn: rect), with: .color(surface))
             hub.stroke(Path(ellipseIn: rect), with: .color(i == center ? accent : .primary.opacity(0.25 * boost)), lineWidth: i == center ? 2 : 1)
-            if let icon = hub.resolveSymbol(id: nodes[i].id) {
+            if nodes[i].isTag {
+                hub.draw(Text("#").font(.system(size: rect.height * 0.5, weight: .bold, design: .rounded)).foregroundStyle(accent),
+                         at: CGPoint(x: rect.midX, y: rect.midY))
+            } else if let icon = hub.resolveSymbol(id: nodes[i].id) {
                 hub.draw(icon, in: rect.insetBy(dx: rect.width * 0.2, dy: rect.height * 0.2))
             }
         }
@@ -183,6 +189,7 @@ struct GraphView: View {
         switch kind {
         case .link: StrokeStyle(lineWidth: 1.4)
         case .source: StrokeStyle(lineWidth: 0.8)
+        case .tag: StrokeStyle(lineWidth: 1.2, lineCap: .round, dash: [0.5, 3.5])
         case .similar: StrokeStyle(lineWidth: 1, dash: [3, 3])
         }
     }
@@ -191,6 +198,7 @@ struct GraphView: View {
         switch kind {
         case .link: 0.45
         case .source: 0.18
+        case .tag: 0.4
         case .similar: 0.22
         }
     }
@@ -270,9 +278,9 @@ struct GraphView: View {
     // MARK: Building
 
     private func rebuild() async {
-        let notes = model.notes
+        let notes = model.notes, sources = showSources, tags = showTags
         let built = await Task.detached(priority: .userInitiated) {
-            Graph(notes: notes, vectors: NoteStore.vectors().mapValues(\.vector))
+            Graph(notes: notes, vectors: NoteStore.vectors().mapValues(\.vector), sources: sources, tags: tags)
         }.value
         guard !Task.isCancelled else { return }
         graph = built
@@ -286,10 +294,11 @@ struct GraphView: View {
             switch $0.kind {
             case .link: showLinks
             case .source: showSources
+            case .tag: showTags
             case .similar: showSimilar
             }
         }
-        let ids = graph.nodes.prefix(showSources ? graph.nodes.count : graph.noteCount).map(\.id)
+        let ids = graph.nodes.map(\.id)
         let old = Dictionary(zip(placed, layout.positions), uniquingKeysWith: { a, _ in a })
         var start: [Int: CGPoint] = [:]
         for (i, id) in ids.enumerated() { start[i] = old[id] }
@@ -311,9 +320,9 @@ struct GraphView: View {
     private var noConnections: some View {
         VStack(spacing: 4) {
             Text("No Connections").font(.headline)
-            Text(showLinks && showSources && showSimilar
-                 ? "Link notes with [text](note://id), or keep writing: notes with a similar meaning join up once indexed."
-                 : "Turn on Links, Sources or Similar Meaning to see how your notes connect.")
+            Text(showLinks && showSources && showTags && showSimilar
+                 ? "Type #tags in your notes, link notes with [text](note://id), or keep writing: similar notes join up once indexed."
+                 : "Turn on Links, Sources, Tags or Similar Meaning to see how your notes connect.")
                 .font(.callout).foregroundStyle(.secondary)
         }
         .multilineTextAlignment(.center)

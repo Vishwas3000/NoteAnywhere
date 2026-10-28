@@ -29,6 +29,7 @@ enum AppTab: String { case notes, calendar, graph, settings }
 /// Tabs on iPhone; `.sidebarAdaptable` turns them into a sidebar on iPad.
 struct RootView: View {
     @AppStorage("tab") private var tab = AppTab.notes
+    @ObservedObject private var model = NotesModel.shared
 
     var body: some View {
         TabView(selection: $tab) {
@@ -39,5 +40,6 @@ struct RootView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .tint(.notesAccent)
+        .onChange(of: model.searchRequest) { if model.searchRequest != nil { tab = .notes } }
     }
 }
