@@ -1,7 +1,7 @@
 // The overlay UI. It runs in an extension frame, so the page never sees its keystrokes, focus or styles.
 // Page context comes from content.js via extension messaging (the page can't forge it, unlike postMessage).
 const HOST = "com.memorynotes.host";
-const MISSING = "Mac app not installed — run scripts/install.sh";
+const MISSING = "Install NoteAnywhere for Mac and open it once: vishwas3000.github.io/NoteAnywhere";
 
 let tabId, page = {};
 let notes = [], visible = false, dismissed = false, collapsed = false, forced = false, error = "";

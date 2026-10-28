@@ -12,7 +12,7 @@ struct SyncSettingsView: View {
             Section {
                 Picker("Sync", selection: $sync.mode) {
                     Text("Off").tag(CloudSync.Mode.off)
-                    Text("MemoryNotes Cloud").tag(CloudSync.Mode.cloud)
+                    Text("NoteAnywhere Cloud").tag(CloudSync.Mode.cloud)
                     Text("iCloud (coming soon)").tag(CloudSync.Mode.icloud).selectionDisabled()
                 }
             } footer: {

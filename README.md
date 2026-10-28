@@ -134,10 +134,13 @@ You need Xcode 26 (or its command-line tools) and Node.js 20.19+ or 22.12+.
 ./scripts/install.sh
 ```
 
-This builds the app into `~/Applications`, launches it, and registers the browser bridge (native messaging host) for
-Chrome and Brave. It signs with your first Apple Development certificate if you have one, so the Accessibility
-permission survives rebuilds; otherwise it signs ad hoc and macOS asks again after each install. Set
-`MEMORYNOTES_SIGN_ID` to pick a certificate.
+This builds `~/Applications/NoteAnywhere.app` and launches it; on launch the app registers its browser bridge (native
+messaging host) with every installed Chromium browser. It signs with an Apple Development certificate if you have one
+(remembered in an untracked `.signing-identity`), so the Accessibility permission survives rebuilds; otherwise it signs
+ad hoc and macOS asks again after each install. Set `MEMORYNOTES_SIGN_ID` to pick a certificate.
+
+Releases (a notarized DMG and the Chrome Web Store zip) are cut with `scripts/release.sh`; see
+[docs/RELEASING.md](docs/RELEASING.md).
 
 Then in `chrome://extensions` (or `brave://extensions`), turn on Developer mode, click **Load unpacked** and pick
 `extension/`. The manifest's `key` keeps the unpacked extension's id stable, so the bridge recognises it.
