@@ -258,3 +258,11 @@ Made by the subagent that wrote the extension:
   overlays, browser) lists exactly the tagged notes. Sidebar has a Tags section with counts.
 - **Rejected:** the unused `tags` table (would need syncing; parsing is cheap); plain click on a tag (it would steal clicks meant for editing).
 - **Status:** Decided (Claude, Obsidian semantics as asked).
+
+## D33 — The app/website is optional (2026-10-28)
+- **Why:** user: "the app name/website is not optional, make it optional".
+- ⌘N makes a plain note (no source) and the editor takes the cursor; ⇧⌘N / + menu still make website or app notes.
+  A note without a source can get one later ("Add Website") and lose it ("Remove Website"). Rows hide the source line.
+- Stored as a website note with an empty target, which already existed, so no local or Supabase migration; the
+  browser still can't save notes without a page, and empty targets never match a page or form a graph hub.
+- **Status:** Decided (Claude, as asked).

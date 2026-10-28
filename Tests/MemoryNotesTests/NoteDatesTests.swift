@@ -41,5 +41,6 @@ private let now = day(2026, 10, 28, 14)  // a Wednesday
         == "Slack · Alex Rivera (DM)")
     #expect(Note(kind: .app, target: "com.apple.dt.Xcode", label: "Xcode").shortSource == "Xcode")
     #expect(Note(kind: .url, target: "chatgpt.com/c/123", label: "Whisper STT Explained").shortSource == "chatgpt.com")
-    #expect(Note(kind: .url, target: "", label: "").shortSource == "New Website Note")
+    let alone = Note(kind: .url, target: "", label: "")  // a note without a source shows no source line
+    #expect(alone.shortSource == "" && !alone.hasSource)
 }

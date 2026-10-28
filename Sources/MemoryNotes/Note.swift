@@ -20,6 +20,8 @@ extension Note {
     /// What follows the title, flattened to one line.
     var preview: String { plainLines.dropFirst().prefix(4).joined(separator: " ") }
     var edited: Date { Date(timeIntervalSince1970: updatedAt / 1000) }
+    /// A note can stand alone: no app or website, stored as a website note without an address.
+    var hasSource: Bool { !target.isEmpty }
 
     /// Obsidian-style #tags, lowercased and in order of first use: "#ML", "#project/notes". A tag needs a letter
     /// ("#2024" isn't one) and doesn't count inside code or a link's address; "# Heading" has a space, so it's no tag.

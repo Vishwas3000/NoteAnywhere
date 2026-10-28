@@ -217,7 +217,7 @@ struct CalendarView: View {
         var seen = Set<String>()
         return model.snapshots.reversed().compactMap { s -> (key: String, title: String, note: Note)? in
             guard seen.insert(sourceKey(s.note)).inserted else { return nil }
-            return (sourceKey(s.note), (s.note.kind == .app ? "App · " : "Site · ") + s.note.place, s.note)
+            return (sourceKey(s.note), s.note.hasSource ? s.note.source : "Notes Without a Source", s.note)
         }
         .sorted { $0.title < $1.title }
     }

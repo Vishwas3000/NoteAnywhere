@@ -57,8 +57,11 @@ private struct NotesCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Website Note") { actions?.newWebsiteNote() }
+            Button("New Note") { actions?.newNote() }
                 .keyboardShortcut("n")
+                .disabled(actions == nil)
+            Button("New Note for Website") { actions?.newWebsiteNote() }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
                 .disabled(actions == nil)
         }
         CommandGroup(after: .textEditing) {
