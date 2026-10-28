@@ -116,7 +116,8 @@ final class SearchPopup: NSObject, NSWindowDelegate {
 
     func toggle() {
         if panel.isVisible { return hide() }
-        panel.center()
+        panel.moveToMouseScreen()
+        panel.center()  // centers on the panel's current screen
         panel.makeKeyAndOrderFront(nil)
     }
 

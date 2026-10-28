@@ -189,3 +189,9 @@ Made by the subagent that wrote the extension:
   for the app/context in front, so "New Note for …" is one shortcut away even where no notes exist yet.
 - **Rejected:** ⌥⇧N, the browser extension's key; a global hotkey would swallow it in Chrome/Brave.
 - **Status:** Decided (user asked; key chosen by Claude, easy to change).
+
+## D25 — Panels open on the mouse pointer's screen (2026-10-28)
+- **Why:** multiple displays. User chose the mouse pointer's screen over the front window's screen (needs no AX
+  window geometry) and over a fixed position.
+- Overlay keeps its offset from the top-right corner when it moves screens, clamped to fit; ⌥⇧Space popup centers there.
+- **Status:** Decided (user). Geometry covered by `swift test`.

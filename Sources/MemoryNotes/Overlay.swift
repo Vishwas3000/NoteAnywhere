@@ -47,6 +47,7 @@ final class OverlayController {
 
     private func show(_ app: NSRunningApplication?) {
         panel.title = app?.localizedName ?? "MemoryNotes"
+        panel.moveToMouseScreen()
         panel.orderFrontRegardless()
     }
 }
@@ -60,6 +61,21 @@ extension NSPanel {
         backgroundColor = .clear
         isOpaque = false
         for button in [NSWindow.ButtonType.miniaturizeButton, .zoomButton] { standardWindowButton(button)?.isHidden = true }
+    }
+
+    /// With several displays, brings the panel to the one under the mouse pointer.
+    func moveToMouseScreen() {
+        let mouse = NSEvent.mouseLocation
+        guard let target = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }),
+              let current = screen ?? NSScreen.main, target != current else { return }
+        setFrameOrigin(Self.origin(of: frame, from: current.visibleFrame, to: target.visibleFrame))
+    }
+
+    /// Same offset from the top-right corner on the new screen, kept fully on it.
+    static func origin(of frame: NSRect, from: NSRect, to: NSRect) -> NSPoint {
+        let x = to.maxX - (from.maxX - frame.maxX) - frame.width
+        let y = to.maxY - (from.maxY - frame.maxY) - frame.height
+        return NSPoint(x: min(max(x, to.minX), to.maxX - frame.width), y: min(max(y, to.minY), to.maxY - frame.height))
     }
 }
 
