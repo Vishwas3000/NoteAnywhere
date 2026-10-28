@@ -13,20 +13,23 @@ struct NoteEditor: View {
     var showMainWindow: (() -> Void)?
     var focusIfEmpty = true  // a new note takes the cursor; off while something else (an address field) should have it
     @ObservedObject private var model = NotesModel.shared
+    @ObservedObject private var lock = LockSession.shared
     @State private var contentHeight: CGFloat = 0
 
     static let editorDir = Bundle.main.resourceURL?.appendingPathComponent("editor")
 
     var body: some View {
-        if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
-            EditorWebView(dir: dir, markdown: model.binding(noteID, \.text),
+        if model.notes.first(where: { $0.id == noteID })?.locked == true, !lock.isUnlocked {
+            LockedNoteView(compact: fit != nil)
+        } else if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
+            EditorWebView(dir: dir, markdown: model.textBinding(noteID),
                           options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine], showMainWindow: showMainWindow,
                           focusIfEmpty: focusIfEmpty,
                           passesScroll: fit.map { contentHeight <= $0.upperBound } ?? false) { contentHeight = $0 }
                 .id(noteID)  // a fresh editor per note keeps undo history per note
                 .frame(height: fit.map { min(max(contentHeight, $0.lowerBound), $0.upperBound) })
         } else {
-            TextEditor(text: model.binding(noteID, \.text)).font(.body)
+            TextEditor(text: model.textBinding(noteID)).font(.body)
         }
     }
 }

@@ -152,6 +152,43 @@ final class NotesModel: ObservableObject {
         do { try NoteStore.delete(id) } catch { NSLog("MemoryNotes: delete failed: \(error)") }
     }
 
+    // MARK: Locked notes
+
+    /// The editor's text: decrypted while locked notes are unlocked, re-sealed (same salt, so it's quick) on every edit.
+    @MainActor
+    func textBinding(_ id: String) -> Binding<String> {
+        let raw = binding(id, \.text)
+        return Binding(get: {
+            guard let note = self.notes.first(where: { $0.id == id }), note.locked else { return raw.wrappedValue }
+            return LockSession.shared.password.flatMap { try? NoteLock.open(note.text, password: $0) } ?? ""
+        }, set: { value in
+            guard let note = self.notes.first(where: { $0.id == id }), note.locked else { return raw.wrappedValue = value }
+            guard let password = LockSession.shared.password,
+                  let sealed = try? NoteLock.seal(value, password: password, reusing: note.text) else { return }
+            raw.wrappedValue = sealed
+        })
+    }
+
+    /// Needs LockSession to be unlocked (or a password just set).
+    @MainActor
+    func lock(_ id: String) {
+        guard let password = LockSession.shared.password, let i = notes.firstIndex(where: { $0.id == id }), !notes[i].locked,
+              let sealed = try? NoteLock.seal(notes[i].text, password: password) else { return }
+        notes[i].text = sealed
+        notes[i].locked = true
+        do { try NoteStore.setLocked(id, text: sealed, locked: true) } catch { NSLog("MemoryNotes: lock failed: \(error)") }
+        Task { await SearchIndex.shared.forget(id) }
+    }
+
+    @MainActor
+    func removeLock(_ id: String) {
+        guard let password = LockSession.shared.password, let i = notes.firstIndex(where: { $0.id == id }), notes[i].locked,
+              let plain = try? NoteLock.open(notes[i].text, password: password) else { return }
+        notes[i].text = plain
+        notes[i].locked = false
+        do { try NoteStore.setLocked(id, text: plain, locked: false) } catch { NSLog("MemoryNotes: unlock failed: \(error)") }
+    }
+
     /// Ticks or unticks a dated checklist line from the calendar.
     func toggleTask(_ item: DatedLine) {
         let text = binding(item.noteID, \.text)

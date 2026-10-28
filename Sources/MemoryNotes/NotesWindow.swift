@@ -32,6 +32,14 @@ struct NotesWindow: View {
     @State private var folderFilter: String?  // nil: All Notes
     @State private var folderPrompt: FolderPrompt?
     @State private var folderName = ""
+    @State private var lockPrompt: LockPrompt?
+    @ObservedObject private var lockSession = LockSession.shared
+
+    /// Locking a note may first need a notes password (first time) or unlocking (later).
+    private enum LockPrompt: Identifiable {
+        case setPassword(String), unlock(String)
+        var id: String { switch self { case .setPassword(let id), .unlock(let id): id } }
+    }
     @Environment(\.openWindow) private var openWindow
 
     /// "New Folder…" (optionally moving a note into it) or "Rename…".
@@ -137,6 +145,26 @@ struct NotesWindow: View {
             }
         }
         .searchable(text: $query, isPresented: $searchFocused, placement: .sidebar, prompt: "Search by meaning or keyword")
+        .sheet(item: $lockPrompt) { prompt in
+            switch prompt {
+            case .setPassword(let id):
+                NotesPasswordSheet { set in
+                    lockPrompt = nil
+                    if set { model.lock(id) }
+                }
+            case .unlock:
+                VStack {
+                    LockedNoteView()
+                    Button("Cancel") { lockPrompt = nil }.padding(.bottom)
+                }
+                .frame(width: 380, height: 300)
+                .onChange(of: lockSession.isUnlocked) { _, open in
+                    guard open, case .unlock(let id) = prompt, let note = model.notes.first(where: { $0.id == id }) else { return }
+                    lockPrompt = nil
+                    if note.locked { model.removeLock(id) } else { model.lock(id) }
+                }
+            }
+        }
         .alert(folderPrompt?.renaming == nil ? "New Folder" : "Rename Folder", isPresented: Binding(
             get: { folderPrompt != nil }, set: { if !$0 { folderPrompt = nil } }
         ), presenting: folderPrompt) { prompt in
@@ -193,6 +221,13 @@ struct NotesWindow: View {
         Divider()
         Button { model.update(note.id) { $0.pinned.toggle() } } label: {
             Label(note.pinned ? "Unpin Note" : "Pin Note", systemImage: note.pinned ? "pin.slash" : "pin")
+        }
+        if note.locked {
+            Button { if lockSession.isUnlocked { model.removeLock(note.id) } else { lockPrompt = .unlock(note.id) } } label: {
+                Label("Remove Lock", systemImage: "lock.open")
+            }
+        } else {
+            Button { lockNote(note.id) } label: { Label("Lock Note", systemImage: "lock") }
         }
         Divider()
         Button(action: newNote) { Label("New Note", systemImage: "square.and.pencil") }
@@ -281,6 +316,12 @@ struct NotesWindow: View {
         .buttonStyle(.plain)
         .accessibilityAddTraits(current ? .isSelected : [])
         .accessibilityHint(folder == nil ? "Shows every note" : "Shows the notes in this folder")
+    }
+
+    private func lockNote(_ id: String) {
+        if !lockSession.hasPassword { lockPrompt = .setPassword(id) }
+        else if lockSession.isUnlocked { model.lock(id) }
+        else { lockPrompt = .unlock(id) }
     }
 
     private func promptFolder(moving noteID: String?) {

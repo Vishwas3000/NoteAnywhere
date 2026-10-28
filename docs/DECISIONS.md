@@ -323,7 +323,7 @@ Made by the subagent that wrote the extension:
 - **Lock** (user chose real encryption over hiding): one notes password; text becomes an AES-GCM envelope keyed by
   PBKDF2-SHA256(password, per-note salt, 310k). Touch ID unlocks via LocalAuthentication + a Keychain copy on this
   device. Locked notes hide title/preview/tags/dates and are skipped by search and the browser.
-- **Status:** Decided (user). Menu, folders, pins, colours shipped; lock UI in progress.
+- **Status:** Decided (user). Shipped: menu, folders, pins, colours, Lock Note / Remove Lock, unlock screen (Touch ID or password), Lock All Notes. Covered by tests (crypto, scrubbing history and vectors, browser exclusion).
 
 ## D39 — Supabase sync is end-to-end encrypted (2026-10-28)
 - **Why:** user: "make sure when data is stored on Supabase it is encrypted; if the user chooses iCloud, follow the regular route".

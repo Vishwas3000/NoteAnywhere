@@ -70,6 +70,8 @@ private struct NotesCommands: Commands {
             Button("New Note for Website") { actions?.newWebsiteNote() }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
                 .disabled(actions == nil)
+            Divider()
+            Button("Lock All Notes") { LockSession.shared.lockNow() }  // locked notes close again, like Apple Notes' Lock Now
         }
         CommandGroup(after: .textEditing) {
             Button("Find Notes") { actions?.findNotes() }

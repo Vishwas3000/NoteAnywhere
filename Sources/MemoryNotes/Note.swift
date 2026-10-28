@@ -216,7 +216,7 @@ enum NoteStore {
         // "0" sorts right after "/", so [page/, page0) is exactly the targets under this page, on the (kind, target) index.
         return (try? query("""
             SELECT id, kind, target, title, body_md, created_at, updated_at, pinned, folder_id, color, locked FROM notes
-            WHERE deleted_at IS NULL AND kind = 'url' AND (target = ?1 OR (target >= ?2 AND target < ?3))
+            WHERE deleted_at IS NULL AND locked = 0 AND kind = 'url' AND (target = ?1 OR (target >= ?2 AND target < ?3))
             ORDER BY created_at
             """, [page, page + "/", page + "0"], note)) ?? []
     }
@@ -240,6 +240,7 @@ enum NoteStore {
                 ON CONFLICT (id) DO UPDATE SET target = excluded.target, title = excluded.title,
                     body_md = excluded.body_md, updated_at = excluded.updated_at, dirty = 1
                 WHERE notes.deleted_at IS NULL AND notes.kind = excluded.kind
+                    AND (notes.locked = 0 OR excluded.body_md LIKE 'mnlock:v1:%')  -- a stale tab can't unlock it
                 """, [note.id, note.kind.rawValue, note.target, note.label, note.text, note.createdAt, note.updatedAt])
             guard sqlite3_changes(try db()) > 0 else { return }
             try run("""
@@ -254,6 +255,22 @@ enum NoteStore {
         try validate(id)
         let now = Date().timeIntervalSince1970 * 1000
         try transaction { try run("UPDATE notes SET deleted_at = ?, updated_at = ?, dirty = 1 WHERE id = ? AND deleted_at IS NULL", [now, now, id]) }
+        notify_post(changed)
+    }
+
+    // MARK: Locked notes
+
+    /// Locks or unlocks a note. Locking also replaces its history with the envelope and drops its search vector,
+    /// so no readable copy is left in the database (or, through sync, in the cloud).
+    static func setLocked(_ id: String, text: String, locked: Bool) throws {
+        try validate(id)
+        let now = Date().timeIntervalSince1970 * 1000
+        try transaction {
+            try run("UPDATE notes SET body_md = ?, locked = ?, updated_at = ?, dirty = 1 WHERE id = ? AND deleted_at IS NULL",
+                    [text, locked ? 1 : 0, now, id])
+            try run("UPDATE snapshots SET body_md = ?, updated_at = ?, dirty = 1 WHERE note_id = ?", [text, now, id])
+            try run("DELETE FROM embeddings WHERE note_id = ?", [id])
+        }
         notify_post(changed)
     }
 
