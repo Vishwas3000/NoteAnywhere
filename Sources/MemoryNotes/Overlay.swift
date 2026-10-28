@@ -113,7 +113,7 @@ struct OverlayView: View {
         // The hosting view sizes the panel to this; without it the ScrollView collapses to zero height.
         .frame(minWidth: 260, idealWidth: 320, minHeight: 180, idealHeight: 420, alignment: .top)
         .floatingBackground()
-        .tint(.yellow)
+        .tint(.notesAccent)
         .confirmationDialog("Delete this note?", isPresented: Binding(
             get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
         ), presenting: pendingDelete) { note in

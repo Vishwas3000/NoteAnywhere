@@ -113,7 +113,7 @@ struct NotesWindow: View {
             hits = await model.search(query)
             searchedQuery = query
         }
-        .onChange(of: model.openRequest) { _, id in
+        .onChange(of: model.openRequest, initial: true) { _, id in  // initial: a request made while the window was closed
             guard let id else { return }
             query = ""
             mode = .notes

@@ -201,7 +201,7 @@ private struct SearchPopupView: View {
         }
         .frame(width: 600, height: 440)
         .floatingBackground()
-        .tint(.yellow)
+        .tint(.notesAccent)
         .onAppear { focused = true }
     }
 
