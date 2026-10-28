@@ -2,7 +2,7 @@
 .mn-editor {
   --mn-fg: #1d1d1f; --mn-muted: #86868b; --mn-line: rgba(0, 0, 0, 0.1); --mn-bg: transparent;
   --mn-code-bg: rgba(0, 0, 0, 0.05); --mn-accent: #c78a00; --mn-check: #f5b800; --mn-hover: rgba(0, 0, 0, 0.06);
-  --mn-selection: rgba(255, 204, 0, 0.32); --mn-font-size: 13px;
+  --mn-selection: rgba(255, 204, 0, 0.32); --mn-menu-bg: rgba(250, 250, 250, 0.92); --mn-font-size: 13px;
   color: var(--mn-fg); background: var(--mn-bg);
   font: var(--mn-font-size)/1.5 -apple-system, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -11,6 +11,7 @@
   .mn-editor {
     --mn-fg: #ececec; --mn-muted: #98989d; --mn-line: rgba(255, 255, 255, 0.12); --mn-code-bg: rgba(255, 255, 255, 0.07);
     --mn-accent: #ffd60a; --mn-check: #ffd60a; --mn-hover: rgba(255, 255, 255, 0.08); --mn-selection: rgba(255, 214, 10, 0.3);
+    --mn-menu-bg: rgba(44, 44, 46, 0.92);
   }
 }
 .mn-editor ::selection { background: var(--mn-selection); }
@@ -85,13 +86,15 @@
 .mn-ai.busy > button svg { animation: mn-pulse 1s ease-in-out infinite; }
 @keyframes mn-pulse { 50% { opacity: 0.35; transform: scale(0.85); } }
 .mn-ai-menu { margin-top: 4px; min-width: 200px; padding: 4px; border-radius: 10px; border: 1px solid var(--mn-line);
-  background: color-mix(in srgb, Canvas 88%, transparent); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  background: var(--mn-menu-bg); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
 .mn-ai-menu button { display: block; width: 100%; text-align: left; padding: 5px 10px; font: 13px -apple-system, system-ui, sans-serif;
   color: var(--mn-fg); background: none; border: none; border-radius: 6px; cursor: default; }
-.mn-ai-menu button:hover, .mn-ai-menu button:focus-visible { background: var(--mn-accent); color: #fff; outline: none; }
-@media (prefers-color-scheme: dark) { .mn-ai-menu button:hover, .mn-ai-menu button:focus-visible { color: #1d1d1f; } }
+/* One highlight: hovering moves focus (see aiMenu), so only :focus is styled. */
+.mn-ai-menu button:focus { background: var(--mn-accent); color: #fff; outline: none; }
+@media (prefers-color-scheme: dark) { .mn-ai-menu button:focus { color: #1d1d1f; } }
 .mn-ai-footer { padding: 5px 10px 3px; font-size: 11px; color: var(--mn-muted); border-top: 1px solid var(--mn-line); margin-top: 4px; }
 .mn-ai-status:not(:empty) { margin-top: 4px; max-width: 240px; padding: 4px 8px; font-size: 11.5px; color: var(--mn-fg);
   background: var(--mn-code-bg); border-radius: 6px; }
 .mn-ai-menu[hidden] { display: none; }
+.mn-editor:has(.mn-ai) .mn-toolbar { padding-right: 34px; }  /* room for the ✨ button */

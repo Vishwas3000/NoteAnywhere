@@ -25,7 +25,7 @@ enum Assistant {
     /// Why the model can't run, or nil when it can.
     static var unavailableReason: String? {
         #if canImport(FoundationModels)
-        guard #available(macOS 26, *) else { return "Apple Intelligence needs macOS 26 or later." }
+        guard #available(macOS 26, iOS 26, *) else { return "Apple Intelligence needs macOS 26 or later." }
         switch SystemLanguageModel.default.availability {
         case .available: return nil
         case .unavailable(.appleIntelligenceNotEnabled): return "Turn on Apple Intelligence in System Settings to use this."
@@ -45,7 +45,7 @@ enum Assistant {
             throw Failure(errorDescription: "Write something first.")
         }
         #if canImport(FoundationModels)
-        guard #available(macOS 26, *) else { throw Failure(errorDescription: unavailableReason) }
+        guard #available(macOS 26, iOS 26, *) else { throw Failure(errorDescription: unavailableReason) }
         let session = LanguageModelSession(instructions: """
             You edit personal notes written in Markdown. \(action.instruction)
             Keep Markdown formatting (headings, lists, checkboxes, links, code) unless asked to change it.

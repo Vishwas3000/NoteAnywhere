@@ -60,6 +60,7 @@ function aiMenu(editor, onAI) {
     item.setAttribute("role", "menuitem");
     item.onmousedown = (e) => e.preventDefault(); // keep the editor's selection
     item.onclick = () => run(action);
+    item.onmouseenter = () => item.focus(); // hover and keyboard share one highlight
     return item;
   });
   const footer = Object.assign(document.createElement("div"), { className: "mn-ai-footer", textContent: "Apple Intelligence · on this Mac" });

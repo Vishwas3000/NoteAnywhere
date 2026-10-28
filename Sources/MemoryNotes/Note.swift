@@ -67,8 +67,16 @@ enum NoteStore {
     static let changed = "com.memorynotes.changed"
     static let embeddingModel = "sentence-transformers/all-MiniLM-L6-v2"
 
+    static let appGroup = "group.com.memorynotes"
     static let root: URL = {
+        #if os(iOS)
+        // Shared with the Share and Safari extensions.
+        let shared = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
+        #else
+        let shared: URL? = nil
+        #endif
         let root = ProcessInfo.processInfo.environment["MEMORYNOTES_DIR"].map { URL(fileURLWithPath: $0) }
+            ?? shared?.appendingPathComponent("MemoryNotes")
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("MemoryNotes")
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
