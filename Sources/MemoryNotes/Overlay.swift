@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import Combine
 import SwiftUI
 
@@ -32,6 +33,7 @@ final class OverlayController {
 
     func start() {
         subscription = model.$frontContext.removeDuplicates().sink { [weak self] context in self?.contextChanged(context) }
+        HotKeys.register(kVK_ANSI_M, optionKey | shiftKey, name: "⌥⇧M") { [weak self] in self?.toggle() }
     }
 
     func toggle() {

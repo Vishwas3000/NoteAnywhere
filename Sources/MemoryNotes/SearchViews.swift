@@ -93,7 +93,6 @@ extension Note {
 /// Spotlight-style search panel toggled by a global hotkey (⌥⇧Space).
 final class SearchPopup: NSObject, NSWindowDelegate {
     static let shared = SearchPopup()
-    private var hotKey: EventHotKeyRef?
 
     private lazy var panel: NSPanel = {
         let panel = KeyPanel(
@@ -112,15 +111,7 @@ final class SearchPopup: NSObject, NSWindowDelegate {
     }()
 
     func start() {
-        // Carbon hotkeys need no Accessibility permission. The C handler can't capture, hence the shared instance.
-        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
-            DispatchQueue.main.async { SearchPopup.shared.toggle() }
-            return noErr
-        }, 1, &spec, nil, nil)
-        let status = RegisterEventHotKey(UInt32(kVK_Space), UInt32(optionKey | shiftKey),
-                                         EventHotKeyID(signature: OSType(0x4D4E5345), id: 1), GetApplicationEventTarget(), 0, &hotKey)
-        if status != noErr { NSLog("MemoryNotes: ⌥⇧Space is taken by another app (\(status))") }
+        HotKeys.register(kVK_Space, optionKey | shiftKey, name: "⌥⇧Space") { [weak self] in self?.toggle() }
     }
 
     func toggle() {

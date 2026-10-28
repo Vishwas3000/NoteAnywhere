@@ -182,3 +182,10 @@ Made by the subagent that wrote the extension:
   on every install, so macOS may ask to re-allow Accessibility after updates (fix later: a stable signing identity).
 - **Rejected:** Screen Recording permission (scarier prompt, needs polling); Slack-only or hand-tuned per-app parsers (user chose every app).
 - **Status:** Decided (user). Parser covered by `swift test` (Slack, VS Code, Xcode, browsers, counts, "/").
+
+## D24 — ⌥⇧M shows/hides the overlay from any app (2026-10-28)
+- **Why:** user wants one shortcut to show or hide notes in any app; before, only the menu-bar item did it.
+- Global Carbon hotkey (no extra permission), same mechanism as ⌥⇧Space, now shared in `HotKeys`. Toggles the overlay
+  for the app/context in front, so "New Note for …" is one shortcut away even where no notes exist yet.
+- **Rejected:** ⌥⇧N, the browser extension's key; a global hotkey would swallow it in Chrome/Brave.
+- **Status:** Decided (user asked; key chosen by Claude, easy to change).

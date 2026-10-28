@@ -81,6 +81,7 @@ private struct MenuContent: View {
 
     var body: some View {
         Button("Show/Hide Overlay") { overlay.toggle() }
+            .keyboardShortcut("m", modifiers: [.option, .shift])  // shows the glyphs; the Carbon hotkey does the work
         Button("Search Notes") { SearchPopup.shared.toggle() }
             .keyboardShortcut(.space, modifiers: [.option, .shift])  // shows the glyphs; the Carbon hotkey does the work
         Button("Open Notes") {
