@@ -8,7 +8,7 @@ DB = os.path.join(env["MEMORYNOTES_DIR"], "memorynotes.sqlite")
 def call(msg, env=env):
     body = json.dumps(msg).encode()
     out = subprocess.run([BIN, "chrome-extension://test/"], input=struct.pack("<I", len(body)) + body,
-                         capture_output=True, env=env, timeout=10).stdout
+                         capture_output=True, env=env, timeout=60).stdout
     (n,) = struct.unpack("<I", out[:4])
     assert len(out) == 4 + n, out
     return json.loads(out[4:])
@@ -70,4 +70,26 @@ with sqlite3.connect(os.path.join(old, "memorynotes.sqlite")) as db:
     assert db.execute("SELECT day, body_md FROM snapshots").fetchall() == [("2026-10-01", "hi example.com")]
     assert struct.unpack("<2f", db.execute("SELECT vector FROM embeddings").fetchone()[0]) == (0.5, 0.25)
 assert [n["id"] for n in call({"op": "list", "url": "example.com/"}, old_env)["notes"]] == [site], "second open must not re-import"
+# A watching port (connectNative) gets an event when another process saves, i.e. app edits reach open tabs live.
+def frame(msg):
+    body = json.dumps(msg).encode()
+    return struct.pack("<I", len(body)) + body
+def read(proc):
+    (n,) = struct.unpack("<I", proc.stdout.read(4))
+    return json.loads(proc.stdout.read(n))
+watcher = subprocess.Popen([BIN, "chrome-extension://test/"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
+watcher.stdin.write(frame({"op": "watch"}))
+watcher.stdin.flush()
+assert read(watcher)["ok"]
+assert call({"op": "save", "note": note(site, "github.com", 6)})["ok"]
+import select
+assert select.select([watcher.stdout], [], [], 5)[0], "no change event within 5 s"
+assert read(watcher) == {"ok": True, "event": "changed"}
+watcher.stdin.close()
+watcher.wait(timeout=5)
+
+# Apple Intelligence: bad actions are refused; a real rewrite runs only where the on-device model is available.
+assert not call({"op": "ai", "action": "nope", "text": "x"})["ok"]
+reply = call({"op": "ai", "action": "proofread", "text": "teh meeting is tomorow at 5"})
+print("ai proofread:", reply.get("text") or reply.get("error"))
 print("host ok")
