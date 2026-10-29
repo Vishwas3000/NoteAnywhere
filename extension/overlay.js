@@ -52,6 +52,29 @@ function edited(ms) {
   return `Edited ${d.toLocaleDateString([], { month: "short", day: "numeric", year })}`;
 }
 
+// A note's image (noteimage:<id>) as a blob: URL, fetched once per frame. A host reply is capped at 1 MB, so it comes in
+// pieces. shortcut: each piece starts a host process (~0.1 s); move to the watch port if big images feel slow.
+const images = new Map();
+function imageURL(src) {
+  if (!images.has(src)) {
+    images.set(src, (async () => {
+      const id = src.slice(src.indexOf(":") + 1), parts = [];
+      let got = 0, size = 1, mime;
+      while (got < size) {
+        const r = await send({ op: "image", id, offset: got });
+        if (!r.ok) throw new Error(r.error);
+        const bytes = Uint8Array.from(atob(r.data), (c) => c.charCodeAt(0));
+        if (!bytes.length) throw new Error("The image came back empty.");
+        parts.push(bytes);
+        got += bytes.length;
+        ({ size, mime } = r);
+      }
+      return URL.createObjectURL(new Blob(parts, { type: mime }));
+    })().catch((e) => { images.delete(src); throw e; })); // a later look retries, e.g. once sync brings it
+  }
+  return images.get(src);
+}
+
 // Tell content.js whether to show the frame and how big the panel wants to be. It replies with the page's viewport height.
 function report() {
   if (tabId === undefined) return; // not wired up yet; the first load reports
@@ -258,6 +281,12 @@ function noteRow(note) {
       clearTimeout(timer);
       timer = setTimeout(() => save(note), 400);
     },
+    // Images (D53) live in the Mac app: pasted ones go there, and come back as blob: URLs for this frame.
+    onAddImage: (mime, data) => send({ op: "addImage", mime, data }).then((r) => {
+      if (!r.ok) throw new Error(r.error);
+      return r.src;
+    }),
+    imageURL,
     // Ignored by editor bundles that predate the ✨ menu.
     onAI: (action, markdown) => send({ op: "ai", action, text: markdown }).then((r) => {
       if (!r.ok) throw new Error(r.error);

@@ -290,6 +290,36 @@ enum NoteStore {
         notify_post(changed)
     }
 
+    // MARK: Images (D53): bytes in images/<id>, shown in notes as ![](noteimage:<id>)
+
+    struct ImageError: LocalizedError { let errorDescription: String? }
+
+    /// What browsers and WebKit both draw; HEIC only in WebKit (Mac, iPhone).
+    static let imageTypes: Set = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/heic", "image/heif"]
+    static let maxImageBytes = 20 << 20
+    static let imageScheme = "noteimage"  // served by ImageScheme in the apps' web views
+    static var imagesDir: URL { root.appendingPathComponent("images") }
+
+    /// Keeps a pasted or dropped image and returns its id. The note that shows it saves separately, and that save
+    /// is what tells sync to push both.
+    // shortcut: images are never deleted (like a deleted note's text); clean up unreferenced ones with "wipe on delete".
+    static func saveImage(_ data: Data, type: String) throws -> String {
+        guard imageTypes.contains(type) else { throw ImageError(errorDescription: "Notes can't hold this kind of image (\(type)).") }
+        guard data.count <= maxImageBytes else { throw ImageError(errorDescription: "Images can be up to \(maxImageBytes >> 20) MB.") }
+        let id = UUID().uuidString.lowercased()
+        try FileManager.default.createDirectory(at: imagesDir, withIntermediateDirectories: true)
+        try data.write(to: imagesDir.appendingPathComponent(id), options: .atomic)
+        try transaction { try run("INSERT INTO images (id, type, created_at) VALUES (?, ?, ?)", [id, type, Date().timeIntervalSince1970 * 1000]) }
+        return id
+    }
+
+    /// nil when the id is unknown, or its bytes haven't arrived from another device yet.
+    static func image(_ id: String) -> (data: Data, type: String)? {
+        guard (try? validate(id)) != nil, let type = (try? query("SELECT type FROM images WHERE id = ?", [id]) { text($0, 0) })?.first,
+              let data = try? Data(contentsOf: imagesDir.appendingPathComponent(id)) else { return nil }
+        return (data, type)
+    }
+
     // MARK: Locked notes
 
     /// Locks or unlocks a note. Locking also replaces its history with the envelope and drops its search vector,
@@ -398,9 +428,43 @@ enum NoteStore {
         }) ?? []
     }
 
-    /// After a push: clean only rows nobody edited meanwhile.
-    static func markPushed(notes: [CloudNote] = [], snapshots: [CloudSnapshot] = [], folders: [CloudFolder] = []) throws {
+    /// An image row: the bytes travel separately, sealed, through Storage (CloudSync).
+    struct CloudImage: Codable, Equatable {
+        var id: String, type: String, created_at: Double
+        var seq: Int?
+    }
+
+    static func dirtyImages(limit: Int = 50) -> [CloudImage] {
+        (try? query("SELECT id, type, created_at FROM images WHERE dirty = 1 LIMIT ?", [limit]) { row in
+            CloudImage(id: text(row, 0), type: text(row, 1), created_at: sqlite3_column_double(row, 2))
+        }) ?? []
+    }
+
+    /// A pulled image row worth downloading: well-formed, and not complete on this device yet. Bad rows are skipped, like bad notes.
+    static func wantsImage(_ image: CloudImage) -> Bool {
+        guard (try? validate(image.id)) != nil, imageTypes.contains(image.type) else { return false }
+        let hasRow = (try? query("SELECT 1 FROM images WHERE id = ?", [image.id]) { _ in true })?.isEmpty == false
+        return !hasRow || !FileManager.default.fileExists(atPath: imagesDir.appendingPathComponent(image.id).path)
+    }
+
+    /// A pulled image's bytes: the file first, then the row, so a row never points at nothing.
+    static func saveRemoteImage(_ image: CloudImage, data: Data) throws {
+        try validate(image.id)
+        guard imageTypes.contains(image.type), data.count <= maxImageBytes else {
+            throw ImageError(errorDescription: "A synced image isn't one notes can hold (\(image.type), \(data.count) bytes).")
+        }
+        try FileManager.default.createDirectory(at: imagesDir, withIntermediateDirectories: true)
+        try data.write(to: imagesDir.appendingPathComponent(image.id), options: .atomic)
         try transaction {
+            try run("INSERT OR IGNORE INTO images (id, type, created_at, dirty) VALUES (?, ?, ?, 0)", [image.id, image.type, image.created_at])
+        }
+    }
+
+    /// After a push: clean only rows nobody edited meanwhile. Images never change, so any pushed one is clean.
+    static func markPushed(notes: [CloudNote] = [], snapshots: [CloudSnapshot] = [], folders: [CloudFolder] = [],
+                           images: [CloudImage] = []) throws {
+        try transaction {
+            for i in images { try run("UPDATE images SET dirty = 0 WHERE id = ?", [i.id]) }
             for f in folders { try run("UPDATE folders SET dirty = 0 WHERE id = ? AND updated_at = ?", [f.id, f.updated_at]) }
             for n in notes { try run("UPDATE notes SET dirty = 0 WHERE id = ? AND updated_at = ?", [n.id, n.updated_at]) }
             for s in snapshots {
@@ -470,6 +534,7 @@ enum NoteStore {
             try run("UPDATE notes SET dirty = 1", [])
             try run("UPDATE folders SET dirty = 1", [])
             try run("UPDATE snapshots SET dirty = 1", [])
+            try run("UPDATE images SET dirty = 1", [])
             try run("DELETE FROM sync_state WHERE key LIKE 'cursor.%'", [])
         }
     }
@@ -614,6 +679,14 @@ enum NoteStore {
                     ALTER TABLE folders ADD COLUMN deleted_at REAL;
                     ALTER TABLE folders ADD COLUMN dirty INTEGER NOT NULL DEFAULT 1;
                     PRAGMA user_version = 4;
+                    """)
+            }
+            if try userVersion(handle) < 5 {
+                // Pasted and dropped images (D53): the bytes are files in images/; a row per image so sync knows what to send.
+                try exec(handle, """
+                    CREATE TABLE images (id TEXT PRIMARY KEY, type TEXT NOT NULL, created_at REAL NOT NULL,
+                        dirty INTEGER NOT NULL DEFAULT 1);
+                    PRAGMA user_version = 5;
                     """)
             }
             try exec(handle, "COMMIT")

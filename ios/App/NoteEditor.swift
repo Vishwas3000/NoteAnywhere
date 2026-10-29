@@ -53,6 +53,7 @@ private struct EditorWebView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "mn")
+        config.setURLSchemeHandler(ImageScheme(), forURLScheme: NoteStore.imageScheme)
         let style = "document.head.append(Object.assign(document.createElement('style'), { textContent: \(Self.quoted(Self.css)) }))"
         config.userContentController.addUserScript(WKUserScript(source: style, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         config.writingToolsBehavior = .complete  // Apple Intelligence Writing Tools rewrite in place, like in Notes
@@ -123,6 +124,16 @@ private struct EditorWebView: UIViewRepresentable {
                     } catch {
                         call("aiDone", id, NSNull(), error.localizedDescription)
                     }
+                }
+            case "addImage":
+                guard let id = body["id"] as? Int else { return }
+                do {
+                    guard let data = (body["data"] as? String).flatMap({ Data(base64Encoded: $0) }) else {
+                        throw NoteStore.ImageError(errorDescription: "The image data was unreadable.")
+                    }
+                    call("reply", id, NoteStore.imageScheme + ":" + (try NoteStore.saveImage(data, type: body["mime"] as? String ?? "")), NSNull())
+                } catch {
+                    call("reply", id, NSNull(), error.localizedDescription)
                 }
             case "date":  // ⌘-click, so only with a hardware keyboard on the phone
                 if let day = body["day"] as? String { NotesModel.shared.calendarRequest = day }

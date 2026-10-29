@@ -1,4 +1,5 @@
 import CryptoKit
+import Foundation
 import Testing
 @testable import MemoryNotes
 
@@ -17,4 +18,13 @@ import Testing
     back.body_md = row["body_md"] as! String
     #expect(try back.opened(with: key) == note)
     #expect(throws: CloudSync.Failure.self) { try back.opened(with: SymmetricKey(size: .bits256)) }
+}
+
+@Test func syncedImageBytesAreSealed() throws {
+    let key = SymmetricKey(size: .bits256)
+    let png = Data("\u{89}PNG secret screenshot".utf8)
+    let sealed = try SyncVault.seal(png, key)
+    #expect(sealed.range(of: Data("secret".utf8)) == nil)
+    #expect(try SyncVault.open(sealed, key) == png)
+    #expect(throws: CloudSync.Failure.self) { try SyncVault.open(sealed, SymmetricKey(size: .bits256)) }
 }

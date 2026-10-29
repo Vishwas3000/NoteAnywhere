@@ -355,6 +355,57 @@ await checkAsync("✨ errors show in the status line and leave the note alone", 
   assert.equal(ed.editor.isEditable, true);
 });
 
+// Images (D53): files the clipboard or a drop carries are kept by the host; the note gets noteimage:<id>.
+const PNG = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const clip = (files, types = {}) => ({ files, getData: (t) => types[t] ?? "" });
+const paste = (ed, data) => ed.editor.view.someProp("handlePaste", (f) => f(ed.editor.view, { clipboardData: data }));
+const waitFor = async (ok) => { for (let i = 0; i < 50 && !ok(); i++) await new Promise((r) => setTimeout(r, 10)); };
+const imageHost = (saved) => ({ onAddImage: async (type, data) => { saved.push([type, data]); return `noteimage:id${saved.length}`; } });
+await checkAsync("a pasted screenshot is kept by the host and shows as noteimage:", async () => {
+  const saved = [];
+  const ed = mount("Before", imageHost(saved));
+  ed.editor.commands.setTextSelection(7);
+  assert.equal(paste(ed, clip([new window.File([PNG], "image.png", { type: "image/png" })])), true);
+  await waitFor(() => saved.length && ed.getMarkdown().includes("noteimage"));
+  assert.deepEqual(saved, [["image/png", "iVBORw0KGgo="]]);
+  assert.equal(ed.getMarkdown().trim(), "Before\n\n![](noteimage:id1)");
+});
+await checkAsync("Copy Image on a web page keeps the bytes, not the site's link", async () => {
+  const saved = [];
+  const ed = mount("", imageHost(saved));
+  const file = new window.File([PNG], "image.png", { type: "image/png" });
+  assert.equal(paste(ed, clip([file], { "text/html": '<img src="https://example.com/cat.png">' })), true);
+  await waitFor(() => ed.getMarkdown().includes("noteimage"));
+  assert.equal(ed.getMarkdown().trim(), "![](noteimage:id1)");
+});
+check("copied text with a picture of itself (Office) pastes as text", () => {
+  const saved = [];
+  const ed = mount("", imageHost(saved));
+  const file = new window.File([PNG], "image.png", { type: "image/png" });
+  assert.ok(!paste(ed, clip([file], { "text/plain": "Sales 42" })), "left to the normal paste");
+  assert.equal(saved.length, 0);
+});
+await checkAsync("an image notes can't hold says so and adds nothing", async () => {
+  const saved = [];
+  const ed = mount("x", imageHost(saved));
+  paste(ed, clip([new window.File([PNG], "a.tiff", { type: "image/tiff" })]));
+  const root = ed.editor.options.element.closest(".mn-editor");
+  await waitFor(() => root.querySelector(".mn-notice"));
+  assert.match(root.querySelector(".mn-notice").textContent, /Image not added: .*image\/tiff/);
+  assert.equal(saved.length, 0);
+  assert.equal(ed.getMarkdown().trim(), "x");
+});
+await checkAsync("imageURL shows noteimage: sources; one it can't fetch says why", async () => {
+  const ed = mount("![](noteimage:aa)\n\n![](noteimage:bb)\n\n![](https://example.com/c.png)", {
+    imageURL: async (src) => { if (src.endsWith("bb")) throw new Error("Open NoteAnywhere"); return "blob:x/" + src.slice(10); } });
+  await settle();
+  const imgs = [...ed.editor.view.dom.querySelectorAll("img")];
+  assert.deepEqual(imgs.map((i) => i.getAttribute("src")), ["blob:x/aa", null, "https://example.com/c.png"]);
+  assert.equal(imgs[1].alt, "Open NoteAnywhere");
+  assert.ok(imgs[1].classList.contains("mn-image-broken"));
+  assert.equal(ed.getMarkdown().trim(), "![](noteimage:aa)\n\n![](noteimage:bb)\n\n![](https://example.com/c.png)");
+});
+
 await window.happyDOM.close();
 console.log(failed ? `${failed} failed` : "all passed");
 process.exit(failed ? 1 : 0);

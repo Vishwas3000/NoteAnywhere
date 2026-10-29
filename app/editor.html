@@ -37,6 +37,7 @@
         onDate: (day) => post({ type: "date", day }),
         onHeight: (px) => post({ type: "height", value: px }),
         onAI: (action, text) => ask("ai", { action, text }),
+        onAddImage: (mime, data) => ask("addImage", { mime, data }),  // shown through ImageScheme (noteimage:)
         // The Mac app makes pages from highlighted text, finds notes to link and previews them on hover.
         ...(options.pages ? {
           onAddPage: (text) => ask("addPage", { text }),

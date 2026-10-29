@@ -12,6 +12,9 @@ enum NativeHost {
         var query: String?
         var action: String?
         var text: String?
+        var mime: String?  // addImage: the image's type, data: its bytes (base64)
+        var data: String?
+        var offset: Int?  // image: where the next piece starts
     }
 
     struct Reply: Encodable {
@@ -23,7 +26,12 @@ enum NativeHost {
         var event: String?
         var error: String?
         var datePattern: String?  // with "list": how the extension's editor shows dates (Settings ▸ General)
+        var src: String?  // addImage: what the note shows, noteimage:<id>
+        var data: String?, mime: String?, size: Int?  // image: one piece (base64), the type and the whole size
     }
+
+    /// Image bytes per reply: their base64 stays under Chrome's 1 MB cap on what a host sends back.
+    static let imagePiece = 600_000
 
     private static let writeLock = NSLock()  // replies (main loop) and change events (notify queue) share stdout
     private static var watchToken: Int32 = 0
@@ -79,6 +87,14 @@ enum NativeHost {
             case "search":
                 let query = req.query ?? ""
                 return Reply(results: blocking { await SearchIndex.shared.search(query, in: NoteStore.loadAll()) })
+            case "addImage":
+                guard let data = req.data.flatMap({ Data(base64Encoded: $0) }) else { return Reply(ok: false, error: "The image data was unreadable.") }
+                return Reply(src: NoteStore.imageScheme + ":" + (try NoteStore.saveImage(data, type: req.mime ?? "")))
+            case "image":
+                guard let image = NoteStore.image(req.id ?? "") else { return Reply(ok: false, error: "This image isn't on this device (yet).") }
+                let start = min(max(req.offset ?? 0, 0), image.data.count)
+                let piece = image.data[start..<min(start + imagePiece, image.data.count)]
+                return Reply(data: piece.base64EncodedString(), mime: image.type, size: image.data.count)
             case "delete":
                 try NoteStore.delete(req.id ?? "")
                 return Reply()
@@ -104,7 +120,7 @@ enum NativeHost {
                 return Reply(ok: false, error: "unknown op \(req.op)")
             }
         } catch {
-            return Reply(ok: false, error: "\(error)")
+            return Reply(ok: false, error: (error as? LocalizedError)?.errorDescription ?? "\(error)")
         }
     }
 }

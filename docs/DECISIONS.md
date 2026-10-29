@@ -481,3 +481,32 @@ Made by the subagent that wrote the extension:
   but TipTap's nodes call KaTeX); rendering math as decorations over text (Markdown would still mangle `_` and `\`).
 - **Status:** Decided (user reported it). Editor tests cover parsing, saving, prices, legacy escaped text, typing and
   click-to-edit; checked in WebKit, light and dark.
+
+## D53 — Images in notes: pasted and dropped, kept by the app, synced encrypted (2026-10-29)
+- **Why:** user couldn't paste an image into a note in the browser overlay, and a pasted web image didn't show. Notes had
+  no place for image bytes: a screenshot pasted nothing, and "Copy Image" from a page only linked to the site's copy,
+  which the extension's page can't load when the site blocks other origins or the link expires (ChatGPT, Slack, Notion).
+- **Chosen by the user:** images are files the app keeps, synced end-to-end encrypted ("App files, synced").
+- The bytes are files in `images/<id>` next to the database, with a row per image (`images` table, schema v5). A note
+  shows one as `![](noteimage:<id>)`. Allowed: PNG, JPEG, GIF, WebP, AVIF, HEIC/HEIF (HEIC shows in WebKit only), up to
+  20 MB; checked in the editor and again where the bytes arrive.
+- Editor: image files on the clipboard or in a drop go to the host, which answers the source; "Copy Image" keeps the
+  bytes, not the site's link. A clipboard that also carries text (Office copies a picture of the cells) pastes as text.
+  A failure shows a red notice; an image that can't load shows why in a dashed box instead of vanishing.
+- Mac and iPhone serve `noteimage:` to their web views with a WKURLSchemeHandler (`ImageScheme`). The browser asks the
+  Mac app (native host ops `addImage`, `image`): replies are capped at 1 MB, so images come in 600 KB pieces and become
+  `blob:` URLs, fetched once per panel.
+- Sync (decided by Claude's subagent): images go up before the notes that show them, sealed with the vault key
+  (AES-GCM, no prefix), into a private Storage bucket `images` at `<user id>/<image id>`; a `public.images` row
+  (id, type, created_at, seq) tells other devices to fetch them. The type stays plaintext, like a note's kind. Storage
+  policies limit each account to its own folder; nothing deletes. Image rows never change, so seq is set on insert only.
+  An image failure never holds up notes: they sync, then "Images didn't sync: …" shows.
+- **Known limits:** images are never deleted (follow-up with the "wipe on delete" item); a locked note's images stay
+  unencrypted on this device; images inside pasted HTML (copying part of an article) still link to the site.
+- **Rejected:** base64 inside the Markdown (a few screenshots pass Chrome's 1 MB host reply cap and the page's notes stop
+  loading; bloats search, daily snapshots and MCP replies); the existing `attachments` table (it needs a saved note,
+  and one image can be pasted into many notes).
+- **Status:** Decided (user). Editor tests, host test (pieces under 1 MB, bad types and ids refused), Swift store and
+  vault tests, and a headless Chromium run with the real host: a note's image shows, a pasted screenshot is kept.
+  WebKit loads `noteimage:` from the editor's file page. The Supabase migration is written and was checked in a local
+  Postgres; it is **not applied** to the hosted project yet, and the Storage calls haven't run against a real server.

@@ -88,6 +88,28 @@ assert read(watcher) == {"ok": True, "event": "changed"}
 watcher.stdin.close()
 watcher.wait(timeout=5)
 
+# Images (D53): kept by the host, read back in pieces whose base64 fits Chrome's 1 MB reply cap.
+import base64
+big = os.urandom(1_300_000)
+added = call({"op": "addImage", "mime": "image/png", "data": base64.b64encode(big).decode()})
+assert added["ok"] and added["src"].startswith("noteimage:"), added
+image_id = added["src"].split(":", 1)[1]
+pieces, got = [], 0
+while got < len(big):
+    r = call({"op": "image", "id": image_id, "offset": got})
+    assert r["ok"] and r["mime"] == "image/png" and r["size"] == len(big), {k: v for k, v in r.items() if k != "data"}
+    assert len(json.dumps(r)) < 1024 * 1024
+    pieces.append(base64.b64decode(r["data"]))
+    got += len(pieces[-1])
+assert b"".join(pieces) == big and len(pieces) == 3
+with sqlite3.connect(DB) as db:
+    assert db.execute("SELECT type, dirty FROM images WHERE id = ?", (image_id,)).fetchone() == ("image/png", 1)
+assert "can't hold" in call({"op": "addImage", "mime": "image/svg+xml", "data": "PHN2Zz4="})["error"]
+assert not call({"op": "addImage", "mime": "image/png", "data": "not base64!"})["ok"]
+assert not call({"op": "addImage", "mime": "image/png", "data": base64.b64encode(b"x" * (20 * 2**20 + 1)).decode()})["ok"]
+assert not call({"op": "image", "id": "../memorynotes.sqlite"})["ok"], "only image ids"
+assert not call({"op": "image", "id": "aaaaaaaa-0000-0000-0000-00000000dead"})["ok"]
+
 # Apple Intelligence: bad actions are refused; a real rewrite runs only where the on-device model is available.
 assert not call({"op": "ai", "action": "nope", "text": "x"})["ok"]
 reply = call({"op": "ai", "action": "proofread", "text": "teh meeting is tomorow at 5"})

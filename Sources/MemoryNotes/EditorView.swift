@@ -64,6 +64,7 @@ private struct EditorWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "mn")
+        config.setURLSchemeHandler(ImageScheme(), forURLScheme: NoteStore.imageScheme)
         config.writingToolsBehavior = .complete  // Apple Intelligence Writing Tools rewrite in place, like in Notes
         let web = WebView(frame: .zero, configuration: config)
         web.setValue(false, forKey: "drawsBackground")  // transparent, so the panel/window material shows through
@@ -132,6 +133,16 @@ private struct EditorWebView: NSViewRepresentable {
             case "addPage":
                 guard let id = body["id"] as? Int, let text = body["text"] as? String else { return }
                 call("reply", id, NotesModel.shared.addPage(titled: text, from: parent.noteID).id, NSNull())
+            case "addImage":
+                guard let id = body["id"] as? Int else { return }
+                do {
+                    guard let data = (body["data"] as? String).flatMap({ Data(base64Encoded: $0) }) else {
+                        throw NoteStore.ImageError(errorDescription: "The image data was unreadable.")
+                    }
+                    call("reply", id, NoteStore.imageScheme + ":" + (try NoteStore.saveImage(data, type: body["mime"] as? String ?? "")), NSNull())
+                } catch {
+                    call("reply", id, NSNull(), error.localizedDescription)
+                }
             case "findNotes":
                 // Notes to link highlighted text to: titles and first lines that contain the words, newest first.
                 guard let id = body["id"] as? Int else { return }

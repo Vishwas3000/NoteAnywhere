@@ -88,6 +88,35 @@ import Testing
         #expect(NoteStore.loadAll().first { $0.id == id }?.text == sealed)
     }
 
+    @Test func imagesSyncAsFilesPlusRows() throws {
+        let png = Data([0x89, 0x50, 0x4E, 0x47, 1, 2, 3])
+        let id = try NoteStore.saveImage(png, type: "image/png")
+        let dirty = NoteStore.dirtyImages(limit: 10_000).filter { $0.id == id }
+        #expect(dirty.map(\.type) == ["image/png"])
+        #expect(!NoteStore.wantsImage(dirty[0]), "this device already has it")
+        try NoteStore.markPushed(images: dirty)
+        #expect(!NoteStore.dirtyImages(limit: 10_000).contains { $0.id == id })
+
+        // From another device: wanted until its bytes are written, then shows like a local one and isn't pushed back.
+        let remote = NoteStore.CloudImage(id: UUID().uuidString.lowercased(), type: "image/jpeg", created_at: 5)
+        #expect(NoteStore.wantsImage(remote))
+        try NoteStore.saveRemoteImage(remote, data: Data([0xFF, 0xD8, 9]))
+        #expect(NoteStore.image(remote.id)?.data == Data([0xFF, 0xD8, 9]) && NoteStore.image(remote.id)?.type == "image/jpeg")
+        #expect(!NoteStore.wantsImage(remote))
+        #expect(!NoteStore.dirtyImages(limit: 10_000).contains { $0.id == remote.id })
+
+        // Malformed rows are skipped, and bytes that aren't an image notes hold are refused.
+        #expect(!NoteStore.wantsImage(.init(id: "../notes", type: "image/png", created_at: 1)))
+        #expect(!NoteStore.wantsImage(.init(id: UUID().uuidString, type: "text/html", created_at: 1)))
+        let big = NoteStore.CloudImage(id: UUID().uuidString, type: "image/png", created_at: 1)
+        #expect(throws: NoteStore.ImageError.self) { try NoteStore.saveRemoteImage(big, data: Data(count: NoteStore.maxImageBytes + 1)) }
+        #expect(NoteStore.image(big.id) == nil)
+
+        // Another account: every image goes up again.
+        try NoteStore.resetSync()
+        #expect(Set(NoteStore.dirtyImages(limit: 10_000).map(\.id)).isSuperset(of: [id, remote.id]))
+    }
+
     @Test func snapshotsNeedTheirNoteAndCursorsPersist() throws {
         let id = UUID().uuidString
         let snap = NoteStore.CloudSnapshot(note_id: id, day: "2026-10-01", body_md: "s", updated_at: 3)

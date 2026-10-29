@@ -208,9 +208,17 @@ final class CloudSync: ObservableObject {
         running = true
         Task {
             await perform(showBusy: pull) {
+                // Images go up before the notes that show them, but a failing image (say the server isn't set up for
+                // them yet) mustn't hold up notes: it's reported after they're through.
+                var imageError: Error?
+                do { try await self.pushImages() } catch { imageError = error }
                 try await self.push()
-                if pull { try await self.pull() }
+                if pull {
+                    try await self.pull()
+                    do { try await self.pullImages() } catch { imageError = imageError ?? error }
+                }
                 self.lastSynced = Date()
+                if let imageError { throw Failure(errorDescription: "Images didn't sync: \(imageError.localizedDescription)") }
             }
             running = false
             if let again = rerun { rerun = nil; sync(pull: again) }
@@ -240,15 +248,16 @@ final class CloudSync: ObservableObject {
         }
     }
 
+    // shortcut: a row committed out of seq order by a concurrent writer could be skipped until it changes again;
+    // fine for one person's devices, switch to a server-side "changes since" function if that ever matters.
+    private func page<Row: Decodable>(_ table: String, _ columns: String, _ type: Row.Type) async throws -> [Row] {
+        let cursor = NoteStore.syncValue("cursor.\(table)") ?? "0"
+        let data = try await rest("\(table)?select=\(columns),seq&seq=gt.\(cursor)&order=seq.asc&limit=500", method: "GET")
+        return try JSONDecoder().decode([Row].self, from: data)
+    }
+
     private func pull() async throws {
         guard let key = vaultKey else { return }
-        // shortcut: a row committed out of seq order by a concurrent writer could be skipped until it changes again;
-        // fine for one person's devices, switch to a server-side "changes since" function if that ever matters.
-        func page<Row: Decodable>(_ table: String, _ columns: String, _ type: Row.Type) async throws -> [Row] {
-            let cursor = NoteStore.syncValue("cursor.\(table)") ?? "0"
-            let data = try await rest("\(table)?select=\(columns),seq&seq=gt.\(cursor)&order=seq.asc&limit=500", method: "GET")
-            return try JSONDecoder().decode([Row].self, from: data)
-        }
         while true {
             let folders = try await page("folders", "id,name,updated_at,deleted_at", NoteStore.CloudFolder.self)
             let notes = try await page("notes", "id,kind,target,label,body_md,created_at,updated_at,deleted_at,pinned,folder_id,color,locked",
@@ -261,6 +270,39 @@ final class CloudSync: ObservableObject {
             if let last = notes.last?.seq { try NoteStore.setSyncValue("cursor.notes", String(last)) }
             if let last = snapshots.last?.seq { try NoteStore.setSyncValue("cursor.snapshots", String(last)) }
             if notes.count < 500 && snapshots.count < 500 && folders.count < 500 { return }
+        }
+    }
+
+    /// Image bytes, sealed with the vault key, go to Storage under the account's folder; then the row says they're there.
+    private func pushImages() async throws {
+        guard let key = vaultKey, let user = session?.userID else { return }
+        while true {
+            let images = NoteStore.dirtyImages()
+            for image in images {
+                guard let bytes = NoteStore.image(image.id)?.data else {
+                    throw Failure(errorDescription: "Image \(image.id) is missing from this device.")
+                }
+                try await storage("\(user)/\(image.id)", upload: try SyncVault.seal(bytes, key))
+            }
+            if !images.isEmpty {
+                try await rest("images?on_conflict=id", method: "POST",
+                               body: images.map { ["id": $0.id, "type": $0.type, "created_at": $0.created_at] })
+                try NoteStore.markPushed(images: images)
+            }
+            if images.count < 50 { return }
+        }
+    }
+
+    /// New image rows from other devices; each one's bytes are downloaded and written before the cursor moves past it.
+    private func pullImages() async throws {
+        guard let key = vaultKey, let user = session?.userID else { return }
+        while true {
+            let images = try await page("images", "id,type,created_at", NoteStore.CloudImage.self)
+            for image in images where NoteStore.wantsImage(image) {
+                try NoteStore.saveRemoteImage(image, data: try SyncVault.open(try await storage("\(user)/\(image.id)"), key))
+            }
+            if let last = images.last?.seq { try NoteStore.setSyncValue("cursor.images", String(last)) }
+            if images.count < 500 { return }
         }
     }
 
@@ -299,10 +341,27 @@ final class CloudSync: ObservableObject {
         return try await send(request)
     }
 
+    /// One image's sealed bytes in the private "images" bucket: uploads (replacing) with `upload`, downloads without.
+    @discardableResult
+    private func storage(_ path: String, upload: Data? = nil) async throws -> Data {
+        let route = upload == nil ? "storage/v1/object/authenticated/images/" : "storage/v1/object/images/"
+        var request = URLRequest(url: URL(string: route + path, relativeTo: Self.projectURL)!)
+        request.setValue("Bearer \(try await accessToken())", forHTTPHeaderField: "Authorization")
+        if let upload {
+            request.httpMethod = "POST"
+            request.httpBody = upload
+            request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+            request.setValue("true", forHTTPHeaderField: "x-upsert")
+        }
+        return try await send(request)
+    }
+
     private func send(_ request: URLRequest) async throws -> Data {
         var request = request
         request.setValue(Self.publishableKey, forHTTPHeaderField: "apikey")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if request.value(forHTTPHeaderField: "Content-Type") == nil {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
         request.timeoutInterval = 30
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -344,6 +403,16 @@ enum SyncVault {
             throw CloudSync.Failure(errorDescription: "A synced note can't be read with this passphrase.")
         }
         return String(decoding: plain, as: UTF8.self)
+    }
+
+    /// Image bytes: AES-GCM's combined form (nonce, ciphertext, tag), with no prefix since there's no plain legacy to tell apart.
+    static func seal(_ data: Data, _ key: SymmetricKey) throws -> Data { try AES.GCM.seal(data, using: key).combined! }
+
+    static func open(_ data: Data, _ key: SymmetricKey) throws -> Data {
+        guard let plain = try? AES.GCM.open(AES.GCM.SealedBox(combined: data), using: key) else {
+            throw CloudSync.Failure(errorDescription: "A synced image can't be read with this passphrase.")
+        }
+        return plain
     }
 }
 

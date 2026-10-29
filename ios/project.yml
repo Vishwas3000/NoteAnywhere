@@ -45,6 +45,8 @@ targets:
         group: Shared
       - path: ../Sources/MemoryNotes/SyncSettingsView.swift
         group: Shared
+      - path: ../Sources/MemoryNotes/ImageScheme.swift
+        group: Shared
     dependencies:
       - package: swift-embeddings
         product: Embeddings

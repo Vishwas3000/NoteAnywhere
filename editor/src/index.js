@@ -438,6 +438,92 @@ function maths(getEditor) {
   ];
 }
 
+const IMAGE_TYPES = /^image\/(png|jpeg|gif|webp|avif|heic|heif)$/; // NoteStore.imageTypes
+const MAX_IMAGE = 20 << 20; // NoteStore.maxImageBytes
+const base64 = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result.slice(reader.result.indexOf(",") + 1));
+  reader.onerror = () => reject(reader.error);
+  reader.readAsDataURL(file);
+});
+
+/**
+ * Images (D53). Pasted or dropped image files go to onAddImage(type, base64) => Promise<src>, which keeps the bytes
+ * and answers the note's source, "noteimage:<id>"; a copied web image keeps its bytes too, not a link that can break.
+ * imageURL(src) => url | Promise<url> turns such a source into one this page can load (the browser asks the Mac app);
+ * without it sources load as they are (the Mac and iPhone serve noteimage: themselves). An image that can't load
+ * says so instead of vanishing.
+ */
+function images(getEditor, { onAddImage, imageURL, say }) {
+  const Shown = Image.extend({
+    addNodeView: () => ({ node }) => {
+      const img = document.createElement("img");
+      img.onerror = () => {
+        if (!img.getAttribute("src")) return;
+        img.classList.add("mn-image-broken");
+        img.alt = "Image couldn't load";
+      };
+      const show = () => {
+        const { src, alt, title } = node.attrs;
+        img.classList.remove("mn-image-broken");
+        img.alt = alt ?? "";
+        img.title = title ?? "";
+        if (!imageURL || !src?.startsWith("noteimage:")) return (img.src = src ?? "");
+        Promise.resolve(imageURL(src)).then(
+          (url) => { if (node.attrs.src === src) img.src = url; },
+          (e) => { if (node.attrs.src === src) { img.classList.add("mn-image-broken"); img.alt = e.message; } });
+      };
+      show();
+      return {
+        dom: img,
+        update: (next) => {
+          if (next.type !== node.type) return false;
+          const changed = next.attrs.src !== node.attrs.src || next.attrs.alt !== node.attrs.alt;
+          node = next;
+          if (changed) show();
+          return true;
+        },
+      };
+    },
+  });
+  if (!onAddImage) return [Shown];
+
+  // at() is where they go, or undefined for the cursor; the save is async, so a moved document falls back to the cursor.
+  const add = (view, files, at) => {
+    const doc = view.state.doc;
+    Promise.all(files.map(async (file) => {
+      if (!IMAGE_TYPES.test(file.type)) throw new Error(`Notes can't hold this kind of image (${file.type}).`);
+      if (file.size > MAX_IMAGE) throw new Error("Images can be up to 20 MB.");
+      return onAddImage(file.type, await base64(file));
+    })).then((srcs) => {
+      const editor = getEditor();
+      const pos = at !== undefined && editor.state.doc === doc ? at : editor.state.selection.from;
+      editor.chain().focus().insertContentAt(pos, srcs.map((src) => ({ type: "image", attrs: { src } }))).run();
+    }).catch((e) => say(`Image not added: ${e.message}`));
+    return true;
+  };
+  const imageFiles = (data) => [...(data?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+  return [Shown, Extension.create({
+    name: "mnImageDrop",
+    addProseMirrorPlugins: () => [new Plugin({
+      props: {
+        handlePaste(view, event) {
+          const files = imageFiles(event.clipboardData);
+          // Office apps put a picture of copied text next to the text; that pastes as text. A lone URL isn't text.
+          const text = event.clipboardData?.getData("text/plain").trim();
+          if (!files.length || (text && !/^(https?|file|blob|data):\S*$/i.test(text))) return false;
+          return add(view, files);
+        },
+        handleDrop(view, event, _slice, moved) {
+          const files = moved ? [] : imageFiles(event.dataTransfer);
+          if (!files.length) return false;
+          return add(view, files, view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos);
+        },
+      },
+    })],
+  })];
+}
+
 const AT_QUERY = /(?:^|[\s(\[])@([a-z]*)$/i;
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -859,10 +945,11 @@ const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.0
  * Apple Intelligence edits (see AI_ACTIONS); the host runs the model, the editor applies the result as one undoable step.
  * datePattern ("dd/MM/yyyy", …) shows date chips that way; the Markdown keeps "@yyyy-mm-dd".
  * onAddPage / onFindNotes add "Add page" and "Link to a note…" on highlighted text (see selectionMenu); onNotePreview(id)
- * => Promise<{title, preview}> shows a card when hovering a note link.
+ * => Promise<{title, preview}> shows a card when hovering a note link. onAddImage / imageURL: pasted and dropped images
+ * (see images).
  */
 export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
-  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview } = {}) {
+  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview, onAddImage, imageURL } = {}) {
   const root = document.createElement("div");
   root.className = "mn-editor" + (titleLine ? " mn-title-line" : "");
   if (fontSize) root.style.setProperty("--mn-font-size", `${fontSize}px`);
@@ -885,6 +972,16 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   body.className = "mn-body";
   root.append(bar, linkForm, body);
   element.append(root);
+  // Problems the user must see (an image that wasn't added), at the bottom of the view whatever the scroll.
+  const notice = el("div", "mn-notice");
+  notice.setAttribute("role", "alert");
+  let noticeTimer;
+  const say = (message) => {
+    notice.textContent = message;
+    root.append(notice);
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => notice.remove(), 6000);
+  };
 
   const openLink = () => {
     linkInput.value = editor.getAttributes("link").href || "";
@@ -933,7 +1030,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
       TaskList,
       TaskItem.configure({ nested: true }),
       TableKit.configure({ table: { resizable: false } }),
-      Image,
+      ...images(() => editor, { onAddImage, imageURL, say }),
       Placeholder.configure({ placeholder }),
       Markdown,
       Extra,
