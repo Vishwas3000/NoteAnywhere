@@ -47,8 +47,9 @@ for (i, width) in [300.0, 230, 270].enumerated() {
 
 // The note on top, slightly tilted, with a soft shadow.
 ctx.saveGState()
-ctx.translateBy(x: 600, y: 400)
+ctx.translateBy(x: 585, y: 410)
 ctx.rotate(by: -0.07)
+ctx.scaleBy(x: 1.22, y: 1.22)  // the note is the subject: about 60% of the tile
 let note = NSRect(x: -210, y: -200, width: 420, height: 400)
 let notePath = NSBezierPath(roundedRect: note, xRadius: 40, yRadius: 40)
 ctx.saveGState()
