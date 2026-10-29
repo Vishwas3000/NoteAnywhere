@@ -150,9 +150,6 @@ struct NoteRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 5) {
-                if let color = note.color {
-                    Circle().fill(color.swatch).frame(width: 9, height: 9).accessibilityLabel("\(color.title) label")
-                }
                 if note.locked { Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary) }
                 Text(note.title).font(.headline).lineLimit(1)
             }
@@ -167,6 +164,12 @@ struct NoteRow: View {
             }
         }
         .padding(.vertical, 2)
+        .overlay(alignment: .leading) {  // the colour label: a strip at the row's edge, like the Mac's sidebar
+            if let color = note.color {
+                Capsule().fill(color.swatch).frame(width: 4).padding(.vertical, 2).offset(x: -12)
+                    .accessibilityLabel("\(color.title) label")
+            }
+        }
         .accessibilityElement(children: .combine)
     }
 }

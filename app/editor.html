@@ -7,6 +7,8 @@
 <style>
   html, body { margin: 0; background: transparent; }
   body { padding: 0 2px; }
+  /* A note filling a window: the web view is full width (scroll bar at the edge), the text a centred column. */
+  body.page #editor { max-width: 720px; margin: 0 auto; padding: 0 40px; }
 </style>
 </head>
 <body>
@@ -18,9 +20,10 @@
   const aiPending = new Map();  // ✨ requests waiting for Swift to run the on-device model
   const post = (msg) => webkit.messageHandlers.mn.postMessage(msg);
   window.MNHost = {
-    // options: { toolbar, fontSize, titleLine }
+    // options: { toolbar, fontSize, titleLine, page }
     load(markdown, options) {
       editor?.destroy();
+      document.body.classList.toggle("page", !!options.page);
       editor = MNEditor.mount(document.getElementById("editor"), {
         markdown, ...options, placeholder: "Write a note…",
         onChange: (md) => post({ type: "change", markdown: md }),

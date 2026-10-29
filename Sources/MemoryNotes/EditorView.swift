@@ -23,7 +23,8 @@ struct NoteEditor: View {
             LockedNoteView(compact: fit != nil)
         } else if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
             EditorWebView(dir: dir, markdown: model.textBinding(noteID),
-                          options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine], showMainWindow: showMainWindow,
+                          options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine,
+                                    "page": fit == nil], showMainWindow: showMainWindow,
                           focusIfEmpty: focusIfEmpty,
                           passesScroll: fit.map { contentHeight <= $0.upperBound } ?? false) { contentHeight = $0 }
                 .id(noteID)  // a fresh editor per note keeps undo history per note

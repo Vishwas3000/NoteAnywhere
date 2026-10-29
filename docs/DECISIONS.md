@@ -369,3 +369,35 @@ Made by the subagent that wrote the extension:
 - **Rejected:** `<input type="date">` with `showPicker()` (it showed a field, not a calendar, in the app's WebView);
   a native NSDatePicker over the bridge (the browser panel and iPhone would each need their own).
 - **Status:** Decided (user asked). Editor test covers open, keys, pick and Esc.
+
+## D44 — The note's scroll bar at the window's edge (2026-10-29)
+- **Why:** user: "the scroll bar of the notes is not to the edge". The editor's web view was padded 40 pt in, so its
+  scroll bar sat inside the text column.
+- The web view now fills the pane (main window and a note's own window); with `page: true` the page centres the text
+  in the same 720 px column with 40 px sides. Content-sized editors (panel cards, search) are unchanged.
+- **Status:** Decided (user asked). A note in its own window now uses the same column (was 32 pt sides, no maximum).
+
+## D45 — A bigger note on the app icon (2026-10-29)
+- **Why:** user asked for the icon's note to be bigger. The tile was already the system size (checked against Notes and
+  Calendar as macOS draws them), so only the note grew: ×1.22, about 60% of the tile. Extension icons redrawn from it.
+- **Status:** Decided (user asked).
+
+## D46 — Fast calendar, and timing every view switch (2026-10-29)
+- **Why:** user: switching to Calendar was slow; asked to track compute during transitions like it.
+- **Cause, measured** (release build): the month view re-read every note's dated lines once per day cell (43 times a
+  draw), and Swift Regex costs ~0.1 ms per line. 5 notes: 0.47 s a draw; 200 notes: 18 s.
+- **Fix:** dated lines are read once per draw; the tag, date and plain-text parsers skip lines that lack the character
+  their patterns need (`#`, `@`/📅, Markdown marks), so the result is identical; a title or preview reads only its first
+  lines. Dates for 5 notes now take ~8 ms per draw.
+- **Tracking:** `Perf` times each Notes/Calendar/Graph switch from the click until the new view is committed: wall
+  time, CPU time (all threads) and memory, as a log line (`log stream --predicate 'subsystem ==
+  "com.memorynotes.app" AND category == "perf"'`) and an interval in Instruments' Points of Interest.
+- **Rejected:** caching parsed dates on the model (more state to keep right; not needed at this size); an on-screen
+  HUD (the log and Instruments already show it).
+- **Status:** Decided. Switch timings from the real app still to be read once the user switches views.
+
+## D47 — Colour labels as a strip at the note's edge (2026-10-29)
+- **Why:** user asked for a strip instead of the dot. The sidebar row (Mac) and list row (iPhone) draw a 4 pt
+  capsule in the row's leading margin, like the floating panel's cards and Chrome's tab groups; VoiceOver still reads
+  "<Color> label".
+- **Status:** Decided (user asked).

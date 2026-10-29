@@ -52,6 +52,13 @@ struct NotesWindow: View {
     /// The notes in the selected folder (all of them in All Notes).
     private var visibleNotes: [Note] { model.notes.filter { folderFilter == nil || $0.folderID == folderFilter } }
 
+    /// Every switch between Notes, Calendar and Graph comes through here, so Perf can time it.
+    private func switchTo(_ new: WindowMode) {
+        guard new != mode else { return }
+        Perf.begin("\(mode.rawValue) → \(new.rawValue)")
+        mode = new
+    }
+
     private var searching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
@@ -59,14 +66,14 @@ struct NotesWindow: View {
             sidebar
         } detail: {
             switch mode {
-            case .calendar: CalendarView()
-            case .graph: GraphView()
-            case .notes: detail
+            case .calendar: CalendarView().onAppear(perform: Perf.end)
+            case .graph: GraphView().onAppear(perform: Perf.end)
+            case .notes: detail.onAppear(perform: Perf.end)
             }
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Picker("View", selection: $mode) {
+                Picker("View", selection: Binding(get: { mode }, set: switchTo)) {
                     ForEach(WindowMode.allCases, id: \.self) { Text($0.rawValue) }
                 }
                 .pickerStyle(.segmented)
@@ -83,8 +90,8 @@ struct NotesWindow: View {
         .focusedSceneValue(\.windowActions, WindowActions(
             newNote: newNote,
             newWebsiteNote: newWebsiteNote,
-            findNotes: { mode = .notes; searchFocused = true },
-            show: { mode = $0 },
+            findNotes: { switchTo(.notes); searchFocused = true },
+            show: switchTo,
             deleteSelected: selectedNote.map { note in { pendingDelete = note } }
         ))
         .confirmationDialog("Delete this note?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
@@ -182,18 +189,18 @@ struct NotesWindow: View {
         .onChange(of: model.openRequest, initial: true) { _, id in  // initial: a request made while the window was closed
             guard let id else { return }
             query = ""
-            mode = .notes
+            switchTo(.notes)
             selection = id
             model.openRequest = nil
         }
         .onChange(of: model.searchRequest, initial: true) { _, request in
             guard let request else { return }
-            mode = .notes
+            switchTo(.notes)
             query = request
             model.searchRequest = nil
         }
-        .onChange(of: model.calendarRequest) { _, day in if day != nil { mode = .calendar } }  // CalendarView takes it from there
-        .onChange(of: selection) { _, id in if id != nil { mode = .notes } }
+        .onChange(of: model.calendarRequest) { _, day in if day != nil { switchTo(.calendar) } }  // CalendarView takes it from there
+        .onChange(of: selection) { _, id in if id != nil { switchTo(.notes) } }
         .navigationSplitViewColumnWidth(min: 240, ideal: 290)
     }
 
@@ -345,16 +352,19 @@ struct NotesWindow: View {
     @ViewBuilder
     private var detail: some View {
         if let note = selectedNote {
-            VStack(alignment: .leading, spacing: 10) {
-                header(note)
-                Text("Edited \(note.edited.formatted(date: .long, time: .shortened))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
+            VStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 10) {
+                    header(note)
+                    Text("Edited \(note.edited.formatted(date: .long, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
+                .frame(maxWidth: 720)
+                .padding(.horizontal, 40)
+                // Full width, so its scroll bar is at the window's edge; the page keeps the text in the same column.
                 NoteEditor(noteID: note.id, fontSize: 15, titleLine: true, focusIfEmpty: !editingAddress)
             }
-            .frame(maxWidth: 720)
-            .padding(.horizontal, 40)
             .padding(.top, 16)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .textBackgroundColor))
@@ -456,7 +466,7 @@ struct NotesWindow: View {
 
     /// A note on its own; the editor takes the focus (see EditorView) so you can type right away.
     private func newNote() {
-        mode = .notes
+        switchTo(.notes)
         query = ""
         editingAddress = false
         selection = model.add(kind: .url, target: "", label: "", folderID: folderFilter).id  // in the folder you're looking at
@@ -501,9 +511,6 @@ struct NoteRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 5) {
-                if let color = note.color {
-                    Circle().fill(color.swatch).frame(width: 8, height: 8).accessibilityLabel("\(color.title) label")
-                }
                 if note.locked { Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary) }
                 Text(note.title).font(.headline).lineLimit(1)
             }
@@ -518,6 +525,12 @@ struct NoteRow: View {
             }
         }
         .padding(.vertical, 6)
+        .overlay(alignment: .leading) {  // the colour label: a strip at the sidebar's edge, like a Chrome tab group's
+            if let color = note.color {
+                Capsule().fill(color.swatch).frame(width: 4).padding(.vertical, 4).offset(x: -12)
+                    .accessibilityLabel("\(color.title) label")
+            }
+        }
         .accessibilityElement(children: .combine)
     }
 }
@@ -534,7 +547,6 @@ struct NoteWindow: View {
                     .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity)
                 NoteEditor(noteID: note.id, fontSize: 15, titleLine: true)
             }
-            .padding(.horizontal, 32)
             .padding(.top, 12)
             .background(Color(nsColor: .textBackgroundColor))
             .navigationTitle(note.title)
