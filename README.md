@@ -26,6 +26,13 @@ there, it's waiting in a small floating panel.
 Everything is also in one Apple Notes–style window, with on-device search, a calendar, #tags and a graph of how your
 notes link up.
 
+## Calendar and graph
+
+| Dated lines and tasks, in a calendar | How your notes connect |
+|---|---|
+| ![The month view: checklist tasks and dated lines from notes on their days](docs/images/calendar.png) | ![The graph: notes joined to their chats, apps, websites and #tags](docs/images/graph.png) |
+| Type `@` for a date, or `@fri`. The line shows up on that day, and its circle ticks the task in the note. | Each note joins its chat, app or site, the notes it links to and its #tags. Drag, zoom and filter. |
+
 ## Features
 
 - **Notes per chat, channel, DM, project or file**: Slack, WhatsApp, VS Code, Xcode and more.
