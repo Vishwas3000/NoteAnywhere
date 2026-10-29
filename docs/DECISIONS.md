@@ -455,6 +455,8 @@ Made by the subagent that wrote the extension:
   side peek beside the note (main window), with Open as Main Note and Close. Links in the peek replace the peek.
   Elsewhere (floating panel, own window) a click opens it in the main window as before.
 - Pages are ordinary notes (user's choice): in the list, search and graph, linked both ways.
+- The `↖ [note](note://…)` line is left out of previews (hover card, sidebar row, link search, MCP summaries): user
+  didn't want it in the hover card; it's for getting back, not the page's content. It stays in the note itself.
 - The editor bridge's request/reply became generic (`ask`/`reply`); `aiDone` stays as an alias for the iPhone app.
 - **Not done:** the browser extension and iPhone don't get the menu or hover cards yet (their hosts would need the
   same three requests).

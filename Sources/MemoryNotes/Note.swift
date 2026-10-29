@@ -108,6 +108,7 @@ extension Note {
         for line in text.split(separator: "\n") {
             if found.count == limit { break }
             if line.hasPrefix("```") { inFence.toggle(); continue }
+            if !inFence, line.hasPrefix("↖ ["), line.contains("](note://") { continue }  // a page's way back, not its content
             let plain = inFence ? String(line).trimmingCharacters(in: .whitespaces) : Self.plain(line)
             if !plain.isEmpty { found.append(plain) }
         }

@@ -75,5 +75,8 @@ func pageTargets(url: String, expected: String) {
     var page = Note(kind: .url, target: "", label: "", updatedAt: 0)
     page.text = text
     #expect(page.title == "Why does sync lag?")
+    #expect(page.preview == "", "the ↖ link back isn't shown as the page's text")
+    page.text += "Supabase closes idle sockets."
+    #expect(page.preview == "Supabase closes idle sockets.")
     #expect(NotesModel.pageText("Alone", backTo: nil) == "Alone\n\n")
 }
