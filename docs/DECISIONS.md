@@ -414,3 +414,12 @@ Made by the subagent that wrote the extension:
   an atomic date node in the editor (a custom Markdown node for little gain).
 - Not done: typing `@30/10/2026` isn't recognised; `@today`, the @ menu and the calendar pop-up are the ways in.
 - **Status:** Decided (user asked). Mac Settings gained a General tab; the menu's "Sync Settings…" is now "Settings…".
+
+## D49 — A "/" block menu, like Notion's (2026-10-29)
+- **Why:** user asked for Notion-style "/" commands, only the most used, plus "/break page" (chosen: a divider line).
+- "/" at a line's start or after a space opens: Text, Heading 1–3, Bulleted list, Numbered list, To-do list, Quote,
+  Code, Break page (a `---` divider; also found by "divider", "line", "hr"), Table, Date (the calendar pop-up).
+  Typing filters by name or keyword; Return/Tab applies; Esc dismisses. Each row shows its Markdown shortcut.
+- The "@" date menu and the "/" menu now share one popup (`suggestMenu`), so they behave the same.
+- **Rejected:** a page break for print/PDF (user picked the divider); a long Notion-sized list (user: most used only).
+- **Status:** Decided (user asked). Editor tests cover filter, apply, divider, to-do, Esc and no menu inside URLs.

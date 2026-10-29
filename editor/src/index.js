@@ -366,42 +366,93 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 
 /** The "@" menu, like Notion's: Today, Tomorrow, the next weekdays, or "Pick a date…"; typing filters it. */
 function atMenu(pickDate) {
+  const fmt = (d) => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  return suggestMenu({
+    find: AT_QUERY,
+    label: "Dates",
+    choices: (query) => {
+      const now = new Date(), q = query.toLowerCase();
+      // Today, Tomorrow, then the next six days by name; a week out is "Next <today's weekday>".
+      const days = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+        const name = DAY_NAMES[d.getDay()];
+        return { label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : i === 7 ? `Next ${name}` : name, hint: fmt(d), day: isoDay(d) };
+      });
+      return [...days, { label: "Pick a date…", hint: "", day: null }]
+        .filter((o) => !q || o.label.toLowerCase().startsWith(q) || (o.day === null && "pick".startsWith(q)));
+    },
+    apply: (option, view, range) => {
+      const tr = view.state.tr;
+      if (option.day) tr.insertText(`@${option.day} `, range.from, range.to);
+      else tr.delete(range.from, range.to);
+      view.dispatch(tr);
+      view.focus();
+      if (!option.day) pickDate?.();
+    },
+  });
+}
+
+// "/" at the start of a line or after a space; the query may hold single spaces ("/break page").
+const SLASH_QUERY = /(?:^|\s)\/((?:[a-z0-9]+ ?)*)$/i;
+
+/** Notion's most used "/" blocks; `keys` are other words that find one. Each command replaces the typed "/query". */
+const SLASH_COMMANDS = [
+  ["Text", "", "paragraph plain", (c) => c.setParagraph()],
+  ["Heading 1", "#", "h1 title", (c) => c.setHeading({ level: 1 })],
+  ["Heading 2", "##", "h2 subtitle", (c) => c.setHeading({ level: 2 })],
+  ["Heading 3", "###", "h3", (c) => c.setHeading({ level: 3 })],
+  ["Bulleted list", "-", "bullet unordered ul", (c) => c.toggleBulletList()],
+  ["Numbered list", "1.", "ordered ol number", (c) => c.toggleOrderedList()],
+  ["To-do list", "[]", "todo checklist task checkbox", (c) => c.toggleTaskList()],
+  ["Quote", ">", "blockquote", (c) => c.toggleBlockquote()],
+  ["Code", "```", "codeblock snippet", (c) => c.toggleCodeBlock()],
+  ["Break page", "---", "divider line hr separator page break", (c) => c.setHorizontalRule()],
+  ["Table", "", "grid", (c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true })],
+  ["Date", "@", "day calendar due reminder", null],  // the calendar pop-up
+].map(([label, hint, keys, run]) => ({ label, hint, words: [...label.toLowerCase().split(" "), ...keys.split(" ")], run }));
+
+function slashMenu(editor, pickDate) {
+  return suggestMenu({
+    find: SLASH_QUERY,
+    label: "Blocks",
+    choices: (query) => {
+      const q = query.trim().toLowerCase();
+      return SLASH_COMMANDS.filter((o) => !q || o.label.toLowerCase().startsWith(q) || o.words.some((w) => w.startsWith(q)));
+    },
+    apply: (option, view, range) => {
+      // "Intro /divider": the space before the "/" goes too, so no line ends in a stray space.
+      const from = view.state.doc.textBetween(range.from - 1, range.from) === " " ? range.from - 1 : range.from;
+      const chain = editor.chain().focus().deleteRange({ from, to: range.to });
+      (option.run ? option.run(chain) : chain).run();
+      if (!option.run) pickDate?.();
+    },
+  });
+}
+
+/**
+ * A menu that follows the caret while the text before it matches `find` (group 1 is the query): arrows move,
+ * Return/Tab picks, Esc dismisses it for that trigger. apply(option, view, {from, to}) replaces the trigger text.
+ */
+function suggestMenu({ find, label, choices, apply }) {
   let menuView;
   return new Plugin({
-    view: (view) => (menuView = atMenuView(view, pickDate)),
+    view: (view) => (menuView = suggestMenuView(view, find, label, choices, apply)),
     props: { handleKeyDown: (view, event) => menuView?.key(event) ?? false },
   });
 }
 
-function atMenuView(view, pickDate) {
+function suggestMenuView(view, find, label, choices, apply) {
   const menu = Object.assign(document.createElement("div"), { className: "mn-at-menu" });
   menu.setAttribute("role", "listbox");
-  menu.setAttribute("aria-label", "Dates");
+  menu.setAttribute("aria-label", label);
   let options = [], active = 0, at = null, dismissed = null;
 
-  const choices = (query) => {
-    const now = new Date(), q = query.toLowerCase();
-    const fmt = (d) => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-    // Today, Tomorrow, then the next six days by name; a week out is "Next <today's weekday>".
-    const days = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-      const name = DAY_NAMES[d.getDay()];
-      return { label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : i === 7 ? `Next ${name}` : name, hint: fmt(d), day: isoDay(d) };
-    });
-    return [...days, { label: "Pick a date…", hint: "", day: null }]
-      .filter((o) => !q || o.label.toLowerCase().startsWith(q) || (o.day === null && "pick".startsWith(q)));
-  };
   const close = () => { menu.remove(); at = null; const root = view.dom.closest(".mn-editor"); if (root) root.style.minHeight = ""; };
   const choose = (option) => {
     if (at == null) return;
-    const { from } = view.state.selection;
-    const tr = view.state.tr;
-    if (option.day) tr.insertText(`@${option.day} `, at, from);
-    else tr.delete(at, from);
+    const range = { from: at, to: view.state.selection.from };
     close();
-    view.dispatch(tr);
-    view.focus();
-    if (!option.day) pickDate?.();
+    apply(option, view, range);
   };
   const render = () => {
     menu.replaceChildren(...options.map((o, i) => {
@@ -415,12 +466,13 @@ function atMenuView(view, pickDate) {
       item.onmouseenter = () => { active = i; render(); };
       return item;
     }));
+    menu.children[active]?.scrollIntoView?.({ block: "nearest" });
   };
   const update = () => {
     const { $from, empty } = view.state.selection;
     const inCode = $from.parent.type.name === "codeBlock" || $from.marks().some((m) => m.type.name === "code");
-    const before = empty && !inCode ? $from.parent.textBetween(Math.max(0, $from.parentOffset - 20), $from.parentOffset, null, "\ufffc") : "";
-    const match = before.match(AT_QUERY);
+    const before = empty && !inCode ? $from.parent.textBetween(Math.max(0, $from.parentOffset - 30), $from.parentOffset, null, "￼") : "";
+    const match = before.match(find);
     const start = match ? $from.pos - match[1].length - 1 : null;
     if (start == null || start === dismissed) return close();
     if (start !== at) active = 0;
@@ -638,6 +690,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     extensions: [
       tagHighlighter(onTag),
       dates(onDate, () => pickDate?.(), datePattern),
+      Extension.create({ name: "mnSlash", addProseMirrorPlugins() { return [slashMenu(this.editor, () => pickDate?.())]; } }),
       dragHandle(),
       StarterKit.configure({ link: { openOnClick: false, protocols: ["note"], autolink: true },
         dropcursor: false }), // the drag handle draws its own line between blocks

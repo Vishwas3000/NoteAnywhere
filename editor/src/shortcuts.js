@@ -12,6 +12,7 @@ export const shortcuts = [
   { group: "Blocks", keys: "⌘⌥0", action: "Normal text" },
   { group: "Blocks", keys: "⌘⇧B", action: "Quote" },
   { group: "Blocks", keys: "⌘⌥C", action: "Code block" },
+  { group: "Blocks", keys: "/", action: "Block menu: headings, lists, to-do, quote, code, table, date; /break page draws a divider" },
   { group: "Blocks", keys: "⇧Enter", action: "Line break inside a block (a new line inside code blocks)" },
   { group: "Blocks", keys: "⌘⇧↑ / ⌘⇧↓", action: "Move the current line, list item or block up / down" },
   { group: "Blocks", keys: "Drag ⋮⋮", action: "Drag the handle left of any block to move it" },

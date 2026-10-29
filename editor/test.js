@@ -202,6 +202,42 @@ check("datePattern shows chips as 30/10/2026, keeps @2026-10-30, and shows the s
   assert.equal(MNEditor.formatDay("2026-10-30", "MM/dd/yyyy"), "10/30/2026");
   assert.equal(MNEditor.formatDay("2026-10-30", "dd.MM.y"), "30.10.2026");
 });
+check("/ opens the block menu; typing filters it, Return applies the block and removes the /query", () => {
+  const key = (k) => ed.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+  const menu = () => ed.editor.view.dom.parentElement.querySelector('.mn-at-menu[aria-label="Blocks"]');
+  const labels = () => [...menu().querySelectorAll(".mn-at-item")].map((i) => i.firstChild.textContent);
+  const ed = mount("Intro");
+  ed.editor.commands.focus("end");
+  ed.editor.commands.insertContent(" /");
+  assert.ok(menu(), "menu shows after /");
+  assert.equal(labels()[0], "Text");
+  ed.editor.commands.insertContent("break page");
+  assert.deepEqual(labels(), ["Break page"]);
+  key("Enter");
+  assert.equal(menu(), null);
+  assert.equal(ed.getMarkdown().trim(), "Intro\n\n---");
+  ed.editor.commands.focus("end");
+  ed.editor.commands.insertContent("/todo");
+  assert.deepEqual(labels(), ["To-do list"]);
+  key("Enter");
+  ed.editor.commands.insertContent("Buy milk");
+  assert.match(ed.getMarkdown().trim(), /- \[ \] Buy milk$/);
+  ed.editor.commands.insertContent(" see https://a.b/c");  // a slash inside a word or URL isn't a command
+  assert.equal(menu(), null);
+  ed.editor.commands.insertContent(" /zzz");
+  assert.equal(menu(), null, "no match, no menu");
+});
+check("/divider and /h2 find their blocks", () => {
+  const ed = mount("");
+  ed.editor.commands.focus("end");
+  ed.editor.commands.insertContent("/divider");
+  const menu = ed.editor.view.dom.parentElement.querySelector('.mn-at-menu[aria-label="Blocks"]');
+  assert.deepEqual([...menu.querySelectorAll(".mn-at-item")].map((i) => i.firstChild.textContent), ["Break page"]);
+  ed.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+  ed.editor.commands.insertContent(" /h2");
+  ed.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+  assert.match(ed.getMarkdown().trim(), /^## /);
+});
 check("shortcuts list is exported", () => assert.ok(MNEditor.shortcuts.length >= 20));
 
 // ✨ menu: the host's reply replaces the whole note (or the selection) as one undoable step; titles go on top.

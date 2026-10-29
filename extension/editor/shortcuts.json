@@ -56,6 +56,11 @@
   },
   {
     "group": "Blocks",
+    "keys": "/",
+    "action": "Block menu: headings, lists, to-do, quote, code, table, date; /break page draws a divider"
+  },
+  {
+    "group": "Blocks",
     "keys": "⇧Enter",
     "action": "Line break inside a block (a new line inside code blocks)"
   },
