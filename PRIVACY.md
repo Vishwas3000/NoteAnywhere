@@ -1,6 +1,6 @@
 # NoteAnywhere Privacy Policy
 
-Last updated: 2026-10-28
+Last updated: 2026-10-29
 
 NoteAnywhere is a notes app for macOS with a companion extension for Chrome and Brave. It is open source
 (GPL-3.0), so every claim below can be checked in the code at https://github.com/Vishwas3000/NoteAnywhere.
@@ -20,7 +20,7 @@ you turn it on. There are no analytics, no ads, no tracking and no account unles
 - search vectors computed from your notes (see "On-device search");
 - icons of the websites you have notes for.
 
-The same folder holds the search model once it is downloaded (`models/`). A few settings (such as whether sync is on
+The same folder holds images you paste into notes (`images/`) and the search model once it is downloaded (`models/`). A few settings (such as whether sync is on
 and where the floating panel sits) are kept in the app's standard macOS preferences. If you sign in to sync, the
 sign-in session is kept in your macOS Keychain, never in the database.
 
@@ -87,22 +87,27 @@ controls. When you use it, Apple's privacy terms for Apple Intelligence apply.
 Sync is off by default. If you turn it on in Settings, you sign in with your email address: you receive a one-time
 sign-in link or code, and there is no password.
 
-With sync on, these are copied to a database hosted on [Supabase](https://supabase.com) and operated by the
-NoteAnywhere developer:
+With sync on, your notes are copied to a database hosted on [Supabase](https://supabase.com) and operated by the
+NoteAnywhere developer. They are **end-to-end encrypted**: before anything leaves your Mac, a random 256-bit key for
+your account seals (AES-GCM) each note's text, the app, chat or page it belongs to and that place's name (such as a
+page title), your folders' names, the daily snapshots the calendar uses, and the images in your notes. The server keeps
+that key only locked with your sync passphrase, which never leaves your devices, so neither the developer nor Supabase
+can read what is sealed. If you forget the passphrase, the cloud copy can't be opened; the notes on your Mac are
+unaffected.
+
+What the server can see:
 
 - your email address and account id (managed by Supabase Auth, which also keeps sign-in records such as times and
   IP addresses, and sends the sign-in emails);
-- each note's text, the app, chat or page it belongs to, that place's name (such as a page title), its timestamps,
-  whether it was deleted, and its folder, pin and color label;
-- your folders' names;
-- the daily snapshots the calendar uses.
+- each note's id, whether it is an app or website note, its timestamps, whether it was deleted or locked, and its
+  folder, pin and color label;
+- each image's id, creation time and file type (such as PNG).
 
-Search vectors and website icons are not synced. Data travels over HTTPS. Database rules ensure each account can only
-read and write its own notes. Notes are **not end-to-end encrypted**: they are stored readable by the database, like
-most cloud notes services. If that matters to you, keep sync off; everything else works without it.
+Search vectors and website icons are not synced. Data travels over HTTPS, and database rules ensure each account can
+only read and write its own data.
 
 Signing out stops syncing and leaves your notes on your Mac. To delete your synced data and account, email
-{{CONTACT_EMAIL}} from the address you signed in with; deleting the account deletes all of its notes and snapshots
+timeupvishwa@gmail.com from the address you signed in with; deleting the account deletes all of its notes and snapshots
 from the cloud database.
 
 ## Sharing and selling
@@ -125,5 +130,5 @@ git log.
 
 ## Contact
 
-Questions or requests: {{CONTACT_EMAIL}}, or open an issue at
+Questions or requests: timeupvishwa@gmail.com, or open an issue at
 https://github.com/Vishwas3000/NoteAnywhere/issues.

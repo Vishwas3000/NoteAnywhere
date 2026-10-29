@@ -3,9 +3,9 @@
 Notes that show up where they belong: in the app, chat, project or web page they're about.
 
 **[Download for Mac](https://github.com/Vishwas3000/NoteAnywhere/releases/latest)** ·
-**[Get the Chrome extension]({{CHROME_WEB_STORE_URL}})** · Free and open source (GPL-3.0)
+**[Get the browser extension](#install)** · Free and open source (GPL-3.0)
 
-![NoteAnywhere: notes for a Slack channel in the floating panel, next to the main window]({{HERO_SCREENSHOT_URL}})
+![The NoteAnywhere panel on a Wikipedia page, with two notes written for that page](docs/images/hero.png)
 
 Write a note while you're in a Slack DM, a VS Code project, a WhatsApp chat or on a GitHub page. Next time you're
 back there, the note is waiting in a small floating panel. Everything is also in one Apple Notes–style window, with
@@ -48,7 +48,7 @@ by default.
   tables, code, quotes, links between notes and maths: `$…$` or `\(…\)` inline, `$$…$$` or `\[…\]` on its own line
   (what ChatGPT and Claude give you when you copy an answer), drawn as real formulas; click one to edit it. A Notion-style ⋮⋮ handle drags any block or list item between
   blocks, and ⌘⇧↑/↓ moves the current one.
-- **Images.** Paste a screenshot or a copied image, or drop an image file, into any note: in the app, the browser panel
+- **Images** (in the next release). Paste a screenshot or a copied image, or drop an image file, into any note: in the app, the browser panel
   or on iPhone. NoteAnywhere keeps a copy (so a web image still shows when the site goes away) and syncs it end-to-end
   encrypted like the notes.
 - **Organized like Apple Notes.** Right-click a note to open it in its own window, pin it, duplicate it, share it,
@@ -68,7 +68,10 @@ supports Apple Intelligence.
 2. Allow **Accessibility** when asked (System Settings ▸ Privacy & Security ▸ Accessibility). This lets NoteAnywhere
    read window titles so notes can follow the channel or file you're in. Without it, notes are per app, and the
    floating panel says so, with a button to the right Settings pane.
-3. For website notes, add the extension from the [Chrome Web Store]({{CHROME_WEB_STORE_URL}}) (works in Brave too).
+3. For website notes, add the browser extension. It's in review on the Chrome Web Store; until it's listed, download
+   the source code from the [latest release](https://github.com/Vishwas3000/NoteAnywhere/releases/latest), open
+   `chrome://extensions`, turn on Developer mode, click **Load unpacked** and choose the `extension` folder. It works
+   in Chrome, Brave, Edge and Arc.
 
 The first search downloads the search model once (about 87 MB). Until then, search matches exact words.
 
