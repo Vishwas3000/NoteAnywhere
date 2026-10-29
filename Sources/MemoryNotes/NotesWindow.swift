@@ -560,7 +560,9 @@ struct NoteRow: View {
                 }
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) { Rectangle().fill(.separator).frame(height: 1) }  // a hairline between notes, like Notes
         .overlay(alignment: .leading) {  // the colour label: a strip at the sidebar's edge, like a Chrome tab group's
             if let color = note.color {
                 Capsule().fill(color.swatch).frame(width: 4).padding(.vertical, 4).offset(x: -12)
