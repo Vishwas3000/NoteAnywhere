@@ -21,6 +21,7 @@ extension FocusedValues {
 struct NotesWindow: View {
     @ObservedObject private var model = NotesModel.shared
     @AppStorage("windowMode") private var mode = WindowMode.notes
+    @AppStorage("welcomeShown") private var welcomeShown = false
     @State private var selection: String?
     @State private var query = ""
     @State private var hits: [SearchIndex.Hit] = []
@@ -103,6 +104,11 @@ struct NotesWindow: View {
         }
         .tint(.notesAccent)
         .frame(minWidth: 760, minHeight: 480)
+        .onAppear {  // first launch: what Accessibility and the browser extension add
+            guard !welcomeShown else { return }
+            welcomeShown = true
+            openWindow(id: "welcome")
+        }
         .navigationSubtitle(searching ? "^[\(hits.count) result](inflect: true)" : "^[\(visibleNotes.count) note](inflect: true)")
     }
 

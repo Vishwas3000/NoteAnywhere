@@ -8,6 +8,12 @@ enum BrowserBridge {
     static let devExtensionID = "fmjimldgmehkakonbffiaacmpijhajop"
     /// FILL IN: the id the Chrome Web Store assigns on the first upload (docs/RELEASING.md), then ship a new app release.
     static let storeExtensionID = ""
+    /// Where to get the extension: its Web Store page once it has an id; until then the latest release, whose notes say
+    /// how to load it unpacked.
+    static var extensionPage: URL {
+        URL(string: storeExtensionID.isEmpty ? "https://github.com/Vishwas3000/NoteAnywhere/releases/latest"
+                                             : "https://chromewebstore.google.com/detail/\(storeExtensionID)")!
+    }
 
     /// User-data folders under ~/Library/Application Support; each browser reads NativeMessagingHosts/ inside its own.
     static let browsers = ["Google/Chrome", "Google/Chrome Beta", "Google/Chrome Canary", "Chromium",

@@ -525,3 +525,18 @@ Made by the subagent that wrote the extension:
   extension (`BrowserBridge.devExtensionID`), so the store extension needs a follow-up release with
   `storeExtensionID` set; store review takes days, so that release can be out first.
 - **Status:** Done. Published at https://github.com/Vishwas3000/NoteAnywhere/releases/tag/v0.1.0.
+
+## D55 — A welcome window on first launch (2026-10-29)
+
+- **Asked by the user:** show that the app works with the Chrome extension, as "just a simple step" in onboarding.
+  There was no onboarding, only an "Allow Accessibility" line in the floating panel.
+- **Chosen by the user:** one welcome window (over a hint in the panel), shown once when the main window first appears
+  (`welcomeShown`), and again from Help ▸ Welcome to NoteAnywhere. Two steps: Allow Accessibility (ticks itself when
+  the app comes back to the front with the permission) and Add the browser extension. Existing installs see it once
+  after updating, which is how they hear about the extension.
+- "Get the Extension" opens the Web Store page once `BrowserBridge.storeExtensionID` is set; until then the latest
+  GitHub release, whose notes explain loading it unpacked.
+- **Rejected:** a multi-page tour; detecting that the extension has connected (the host runs in the browser's process,
+  so it needs a shared flag; not worth it for a one-time window).
+- **Status:** Done. Checked by rendering the view offscreen (light); after installing, the app set `welcomeShown` at launch
+  (the window was asked to open). Not yet seen on screen by Claude.

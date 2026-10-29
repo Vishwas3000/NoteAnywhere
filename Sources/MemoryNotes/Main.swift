@@ -62,6 +62,12 @@ struct MemoryNotesApp: App {
         }
         .defaultSize(width: 480, height: 560)
 
+        Window("Welcome to NoteAnywhere", id: "welcome") {
+            WelcomeView()
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
         MenuBarExtra("NoteAnywhere", systemImage: "note.text") {
             MenuContent(overlay: delegate.overlay)
         }
@@ -102,6 +108,7 @@ private struct NotesCommands: Commands {
             Divider()
         }
         CommandGroup(replacing: .help) {
+            Button("Welcome to NoteAnywhere") { openWindow(id: "welcome") }
             Button("Keyboard Shortcuts") { openWindow(id: "shortcuts") }
                 .keyboardShortcut("/", modifiers: [.command, .shift])
         }
