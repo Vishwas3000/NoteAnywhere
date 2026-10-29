@@ -44,7 +44,15 @@ struct MemoryNotesApp: App {
         .defaultSize(width: 640, height: 720)
 
         Settings {
-            SyncSettingsView().frame(width: 460).fixedSize(horizontal: false, vertical: true)
+            TabView {
+                Form { DateFormatPicker() }
+                    .formStyle(.grouped)
+                    .tabItem { Label("General", systemImage: "gearshape") }
+                SyncSettingsView()
+                    .tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
+            }
+            .frame(width: 460)
+            .fixedSize(horizontal: false, vertical: true)
         }
 
         Window("Keyboard Shortcuts", id: "shortcuts") {
@@ -115,7 +123,7 @@ private struct MenuContent: View {
             openWindow(id: "shortcuts")
             NSApp.activate()
         }
-        SettingsLink { Text("Sync Settings…") }
+        SettingsLink { Text("Settings…") }
             .simultaneousGesture(TapGesture().onEnded { NSApp.activate() })
         Divider()
         Button("Quit NoteAnywhere") { NSApp.terminate(nil) }.keyboardShortcut("q")

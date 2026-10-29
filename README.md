@@ -36,8 +36,9 @@ by default.
 - **A knowledge graph.** Each note is a dot joined to its app or site, the notes it links to, its #tags (a hub per
   tag), and notes with a similar meaning. Drag, zoom, and switch each kind of link on or off.
 - **Dates and tasks.** Type `@` for a Notion-style date menu (Today, Tomorrow, the coming week, Pick a date…), or
-  `@today` / `@fri` + Space, or pick a day from 📅 in the toolbar. Dated lines show as chips; ⌘-click one to open that
-  day.
+  `@today` / `@fri` + Space, or pick a day from 📅 in the toolbar's calendar. Dated lines show as chips, in your
+  date format (Settings ▸ General: your region's, day/month/year, month/day/year or year-month-day); ⌘-click one to
+  open that day. The note itself stores `@2026-10-30`, which Obsidian reads too.
 - **A calendar.** Month, week and day views. Dated lines and checklist tasks appear under "Planned", with a circle that
   ticks the task in the note itself. Below them, what you edited that day, with each note as it was then.
 - **A real Markdown editor**, shared by the app and the extension: headings, lists that continue, checklists,

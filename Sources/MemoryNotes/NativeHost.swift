@@ -22,6 +22,7 @@ enum NativeHost {
         var text: String?
         var event: String?
         var error: String?
+        var datePattern: String?  // with "list": how the extension's editor shows dates (Settings ▸ General)
     }
 
     private static let writeLock = NSLock()  // replies (main loop) and change events (notify queue) share stdout
@@ -66,7 +67,7 @@ enum NativeHost {
             switch req.op {
             case "list":
                 let url = req.url ?? ""
-                return Reply(notes: NoteStore.notes(under: url))
+                return Reply(notes: NoteStore.notes(under: url), datePattern: DateStyle.pattern)
             case "save":
                 // The browser may only write website notes, never app notes.
                 guard var note = req.note, note.kind == .url, !note.target.isEmpty else {

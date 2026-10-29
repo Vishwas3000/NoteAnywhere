@@ -7,6 +7,7 @@ struct NoteEditor: View {
     let noteID: String
     var openNote: (String) -> Void = { _ in }
     @ObservedObject private var model = NotesModel.shared
+    @AppStorage(DateStyle.key) private var dateFormat = ""
 
     static let editorDir = Bundle.main.resourceURL?.appendingPathComponent("editor")
 
@@ -15,8 +16,9 @@ struct NoteEditor: View {
             // Body text follows Dynamic Type, starting from the iPhone's 17 pt.
             let fontSize = Int(UIFontMetrics(forTextStyle: .body).scaledValue(for: 17).rounded())
             EditorWebView(dir: dir, markdown: model.binding(noteID, \.text),
-                          options: ["toolbar": true, "fontSize": fontSize, "titleLine": true], openNote: openNote)
-                .id(noteID)  // a fresh editor per note keeps undo history per note
+                          options: ["toolbar": true, "fontSize": fontSize, "titleLine": true, "datePattern": DateStyle.pattern],
+                          openNote: openNote)
+                .id("\(noteID)/\(dateFormat)")  // a fresh editor per note keeps undo history per note; new date format redraws
         } else {
             TextEditor(text: model.binding(noteID, \.text)).font(.body).padding(.horizontal)
         }

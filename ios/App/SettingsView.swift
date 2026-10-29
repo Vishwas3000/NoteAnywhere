@@ -22,6 +22,8 @@ struct SettingsView: View {
                     Text("Keep notes in step with NoteAnywhere on your Mac.")
                 }
 
+                Section("Notes") { DateFormatPicker() }
+
                 Section {
                     LabeledContent("Search Model", value: SearchIndex.hasModel ? "Downloaded" : "Not Yet Downloaded")
                     LabeledContent("Apple Intelligence", value: Assistant.unavailableReason == nil ? "Ready" : "Not Available")

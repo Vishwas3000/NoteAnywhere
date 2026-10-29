@@ -117,7 +117,7 @@ extension Note {
     /// One line of Markdown as plain text: no heading/list/quote/checkbox markers, emphasis, code ticks or link targets.
     static func plain(_ line: Substring) -> String {
         // Every pattern below needs one of these, or a list number; plain prose skips the (slow) regexes.
-        guard line.contains(where: { "#>-*+_~`[|".contains($0) }) || line.drop(while: \.isWhitespace).first?.isNumber == true
+        guard line.contains(where: { "#>-*+_~`[|@📅".contains($0) }) || line.drop(while: \.isWhitespace).first?.isNumber == true
         else { return line.trimmingCharacters(in: .whitespaces) }
         return line.replacing(#/^\s*(#{1,6}\s+|>\s*|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)*/#, with: "")
             .replacing(#/^\s*(-{3,}|\*{3,}|_{3,}|\|?[\s:|-]+\|[\s:|-]*)\s*$/#, with: "")  // rules, table separators
@@ -125,6 +125,7 @@ extension Note {
             .replacing(#/\*\*|__|~~|`/#, with: "")
             .replacing(#/\*(\S|\S[^*]*\S)\*/#) { $0.1 }  // *italic*, but not "2 * 3"
             .replacing(#/\s*\|\s*/#, with: "  ")
+            .replacing(#/(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?![\w-])/#) { DatedLine.isDay(String($0.1)) ? DateStyle.format(String($0.1)) : String($0.0) }
             .trimmingCharacters(in: .whitespaces)
     }
 }
@@ -162,6 +163,30 @@ struct DatedLine: Hashable, Identifiable {
 
     /// "2026-02-30" looks like a date but isn't one.
     static func isDay(_ day: String) -> Bool { parser.date(from: day).map { parser.string(from: $0) == day } ?? false }
+}
+
+/// How dates in notes read. Notes keep "@2026-10-30" (the calendar, sync and Obsidian rely on it); the editor's chips
+/// and the note previews show it in the pattern chosen in Settings, or the region's (30/10/2026 for en_IN).
+enum DateStyle {
+    static let key = "dateFormat"  // "" = Automatic
+    static let choices = ["", "dd/MM/yyyy", "MM/dd/yyyy", "yyyy-MM-dd"]
+
+    static var pattern: String {
+        let chosen = UserDefaults.standard.string(forKey: key) ?? ""
+        return chosen.isEmpty ? region : chosen
+    }
+
+    /// The region's numeric date with a 4-digit year: "dd/MM/yyyy" (India, UK), "MM/dd/yyyy" (US), "dd.MM.yyyy" (Germany).
+    static var region: String { DateFormatter.dateFormat(fromTemplate: "ddMMyyyy", options: 0, locale: .current) ?? "yyyy-MM-dd" }
+
+    /// "2026-10-30" in `pattern`; the same rule as the editor's formatDay.
+    static func format(_ day: String, _ pattern: String = pattern) -> String {
+        let parts = day.split(separator: "-").map(String.init)
+        guard parts.count == 3 else { return day }
+        return pattern.replacing(#/d+|M+|y+/#) { match in
+            switch match.output.first { case "d": parts[2]; case "M": parts[1]; default: parts[0] }
+        }
+    }
 }
 
 /// Apple Intelligence's title and tags for one version of a note.

@@ -15,6 +15,7 @@ struct NoteEditor: View {
     @ObservedObject private var model = NotesModel.shared
     @ObservedObject private var lock = LockSession.shared
     @State private var contentHeight: CGFloat = 0
+    @AppStorage(DateStyle.key) private var dateFormat = ""
 
     static let editorDir = Bundle.main.resourceURL?.appendingPathComponent("editor")
 
@@ -24,10 +25,10 @@ struct NoteEditor: View {
         } else if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
             EditorWebView(dir: dir, markdown: model.textBinding(noteID),
                           options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine,
-                                    "page": fit == nil], showMainWindow: showMainWindow,
+                                    "page": fit == nil, "datePattern": DateStyle.pattern], showMainWindow: showMainWindow,
                           focusIfEmpty: focusIfEmpty,
                           passesScroll: fit.map { contentHeight <= $0.upperBound } ?? false) { contentHeight = $0 }
-                .id(noteID)  // a fresh editor per note keeps undo history per note
+                .id("\(noteID)/\(dateFormat)")  // a fresh editor per note keeps undo history per note; new date format redraws
                 .frame(height: fit.map { min(max(contentHeight, $0.lowerBound), $0.upperBound) })
         } else {
             TextEditor(text: model.textBinding(noteID)).font(.body)

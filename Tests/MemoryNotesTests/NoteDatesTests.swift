@@ -44,3 +44,15 @@ private let now = day(2026, 10, 28, 14)  // a Wednesday
     let alone = Note(kind: .url, target: "", label: "")  // a note without a source shows no source line
     #expect(alone.shortSource == "" && !alone.hasSource)
 }
+
+@Test func datesInNotesShowInTheChosenFormat() {
+    #expect(DateStyle.format("2026-10-30", "dd/MM/yyyy") == "30/10/2026")
+    #expect(DateStyle.format("2026-10-30", "MM/dd/yyyy") == "10/30/2026")
+    #expect(DateStyle.format("2026-10-30", "dd.MM.y") == "30.10.2026")
+    UserDefaults.standard.set("dd/MM/yyyy", forKey: DateStyle.key)
+    defer { UserDefaults.standard.removeObject(forKey: DateStyle.key) }
+    var note = edited(now)
+    note.text = "Printer\nCall them @2026-10-30, not @2026-02-30"
+    #expect(note.preview == "Call them 30/10/2026, not @2026-02-30")
+    #expect(note.dates.map(\.day) == ["2026-10-30"])  // the text itself keeps the ISO day
+}

@@ -401,3 +401,16 @@ Made by the subagent that wrote the extension:
   capsule in the row's leading margin, like the floating panel's cards and Chrome's tab groups; VoiceOver still reads
   "<Color> label".
 - **Status:** Decided (user asked).
+
+## D48 — Dates in notes in the user's format (2026-10-29)
+- **Why:** user: "change the date format to day, month, year, or in settings I should be able to choose".
+- Notes keep storing `@2026-10-30` (the calendar, sync, Obsidian and sorting depend on it). Only the display changes:
+  the editor's chips (Mac, panel, extension, iPhone) and note previews show the day in Settings ▸ General ▸ "Dates in
+  notes": Automatic (the region's numeric date with a 4-digit year; 30/10/2026 for en_IN), Day/Month/Year,
+  Month/Day/Year or Year-Month-Day.
+- A chip is a widget over the source text, which is shrunk to nothing; with the caret inside, the chip shows
+  `@2026-10-30` for editing, like Obsidian's live preview. The extension gets the pattern with each `list` reply.
+- **Rejected:** storing dates in the chosen format (breaks parsing, sync between differently set devices, Obsidian);
+  an atomic date node in the editor (a custom Markdown node for little gain).
+- Not done: typing `@30/10/2026` isn't recognised; `@today`, the @ menu and the calendar pop-up are the ways in.
+- **Status:** Decided (user asked). Mac Settings gained a General tab; the menu's "Sync Settings…" is now "Settings…".

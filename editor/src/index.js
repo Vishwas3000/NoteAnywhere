@@ -301,8 +301,18 @@ export function dayFor(word, now = new Date()) {
 const DATE = /(^|[\s(\[])((?:@|📅\s?)(\d{4}-\d{2}-\d{2}))(?![\w-])/gu;
 const SHORTHAND = /(?:^|\s)(@(today|tomorrow|yesterday|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?))\s$/i;
 
-/** Date chips (⌘-click opens the day via onDate), "@today " / "@fri " typed into real dates, and an "@" menu. */
-function dates(onDate, pickDate) {
+/** "2026-10-30" in a date pattern from the host ("dd/MM/yyyy", "MM/dd/yyyy", "dd.MM.yyyy", …). */
+export const formatDay = (iso, pattern) => {
+  const [y, m, d] = iso.split("-");
+  return pattern.replace(/d+|M+|y+/g, (t) => (t[0] === "d" ? d : t[0] === "M" ? m : y));
+};
+
+/**
+ * Date chips (⌘-click opens the day via onDate), "@today " / "@fri " typed into real dates, and an "@" menu.
+ * With a datePattern, a chip shows its day that way ("30/10/2026"); the note keeps "@2026-10-30", and the caret
+ * inside a chip shows that source for editing, like Obsidian's live preview.
+ */
+function dates(onDate, pickDate, datePattern) {
   return Extension.create({
     name: "mnDates",
     addInputRules: () => [new InputRule({
@@ -321,12 +331,21 @@ function dates(onDate, pickDate) {
             for (const m of node.text.matchAll(DATE)) {
               const day = new Date(`${m[3]}T00:00`);
               if (Number.isNaN(day.getTime()) || isoDay(day) !== m[3]) continue; // 2026-02-30 isn't a day
-              const from = pos + m.index + m[1].length;
-              found.push(Decoration.inline(from, from + m[2].length, {
-                class: "mn-date", "data-day": m[3],
-                title: day.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })
-                  + (onDate ? " · ⌘-click to open this day" : ""),
-              }));
+              const from = pos + m.index + m[1].length, to = from + m[2].length;
+              const title = day.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+                + (onDate ? " · ⌘-click to open this day" : "");
+              const { selection } = state;
+              if (!datePattern || (selection.from < to && selection.to > from)) {
+                found.push(Decoration.inline(from, to, { class: "mn-date", "data-day": m[3], title }));
+                continue;
+              }
+              // The source stays in the text (shrunk to nothing, so the caret can still enter it); a widget shows the day.
+              const label = m[2].replace(m[3], formatDay(m[3], datePattern)).replace(/^@/, "");
+              found.push(Decoration.inline(from, to, { class: "mn-date-src" }), Decoration.widget(from, () => {
+                const chip = Object.assign(document.createElement("span"), { className: "mn-date", textContent: label, title });
+                chip.dataset.day = m[3];
+                return chip;
+              }, { side: 1, key: `${m[3]}|${label}` }));
             }
           });
           return DecorationSet.create(state.doc, found);
@@ -556,9 +575,10 @@ const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.0
  * fontSize is in px; titleLine styles the first block as the note's title (Apple Notes); onHeight(px) reports the
  * content height so a host can size the editor to fit. onAI(action, markdown) => Promise<string> adds a ✨ menu of
  * Apple Intelligence edits (see AI_ACTIONS); the host runs the model, the editor applies the result as one undoable step.
+ * datePattern ("dd/MM/yyyy", …) shows date chips that way; the Markdown keeps "@yyyy-mm-dd".
  */
 export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
-  fontSize, titleLine = false, onHeight, onAI, onTag, onDate } = {}) {
+  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern } = {}) {
   const root = document.createElement("div");
   root.className = "mn-editor" + (titleLine ? " mn-title-line" : "");
   if (fontSize) root.style.setProperty("--mn-font-size", `${fontSize}px`);
@@ -617,7 +637,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     element: body,
     extensions: [
       tagHighlighter(onTag),
-      dates(onDate, () => pickDate?.()),
+      dates(onDate, () => pickDate?.(), datePattern),
       dragHandle(),
       StarterKit.configure({ link: { openOnClick: false, protocols: ["note"], autolink: true },
         dropcursor: false }), // the drag handle draws its own line between blocks

@@ -114,6 +114,7 @@
 /* Dates: a chip the calendar knows about. */
 .mn-content .mn-date { color: var(--mn-fg); background: var(--mn-code-bg); border: 1px solid var(--mn-line); border-radius: 5px; padding: 0 4px;
   font-variant-numeric: tabular-nums; }
+.mn-content .mn-date-src { font-size: 0; }  /* "@2026-10-30" behind a chip that shows it in the chosen format */
 /* The date picker that pops up from 📅 and "Pick a date…". */
 .mn-cal { position: absolute; z-index: 3; padding: 8px; border-radius: 12px; border: 1px solid var(--mn-line);
   background: var(--mn-menu-bg); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); -webkit-backdrop-filter: blur(20px);

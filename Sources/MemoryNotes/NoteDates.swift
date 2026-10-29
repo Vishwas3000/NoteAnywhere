@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 extension Note {
     /// "Slack · Alex Rivera (DM)" or "chatgpt.com": the app with its narrowest place, or the site's host.
@@ -54,4 +55,20 @@ enum NoteDates {
     private static func style(_ calendar: Calendar) -> Date.FormatStyle {
         Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone)
     }
+}
+
+/// Settings ▸ "Dates in notes" (Mac and iPhone).
+struct DateFormatPicker: View {
+    @AppStorage(DateStyle.key) private var choice = ""
+
+    var body: some View {
+        Picker("Dates in notes", selection: $choice) {
+            ForEach(DateStyle.choices, id: \.self) { pattern in
+                let example = DateStyle.format("2026-10-30", pattern.isEmpty ? DateStyle.region : pattern)
+                Text(pattern.isEmpty ? "Automatic (\(example))" : "\(example)  ·  \(Self.order[pattern] ?? "")").tag(pattern)
+            }
+        }
+    }
+
+    private static let order = ["dd/MM/yyyy": "Day/Month/Year", "MM/dd/yyyy": "Month/Day/Year", "yyyy-MM-dd": "Year-Month-Day"]
 }

@@ -192,6 +192,16 @@ check("Pick a date… pops up a calendar; arrows and Return put that day in, Esc
   key(cal().querySelector("[role=grid]"), "Escape");
   assert.equal(cal(), null);
 });
+check("datePattern shows chips as 30/10/2026, keeps @2026-10-30, and shows the source while the caret is in it", () => {
+  const ed = mount("Call @2026-10-30 and 📅 2026-11-02", { datePattern: "dd/MM/yyyy" });
+  const chips = () => [...ed.editor.view.dom.querySelectorAll(".mn-date")].map((c) => c.textContent);
+  assert.deepEqual(chips(), ["30/10/2026", "📅 02/11/2026"]);
+  assert.equal(ed.getMarkdown().trim(), "Call @2026-10-30 and 📅 2026-11-02");
+  ed.editor.commands.setTextSelection(9);  // inside "@2026-10-30"
+  assert.deepEqual(chips(), ["@2026-10-30", "📅 02/11/2026"]);
+  assert.equal(MNEditor.formatDay("2026-10-30", "MM/dd/yyyy"), "10/30/2026");
+  assert.equal(MNEditor.formatDay("2026-10-30", "dd.MM.y"), "30.10.2026");
+});
 check("shortcuts list is exported", () => assert.ok(MNEditor.shortcuts.length >= 20));
 
 // ✨ menu: the host's reply replaces the whole note (or the selection) as one undoable step; titles go on top.

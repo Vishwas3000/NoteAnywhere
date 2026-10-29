@@ -7,6 +7,7 @@ let tabId, page = {};
 let notes = [], visible = false, dismissed = false, collapsed = false, forced = false, error = "";
 let query = "", results = [], searchSeq = 0, searchTimer, changeTimer;
 let editors = [], stamps = [], toolbarOn = false, expanded = false, watching = false, hostH;
+let datePattern; // the Mac app's Settings ▸ "Dates in notes", sent with each list
 
 const $ = (s) => document.querySelector(s);
 const [panel, count, body, list, empty, errBox] = [".panel", ".count", ".body", ".notes", ".empty", ".error"].map($);
@@ -245,6 +246,7 @@ function noteRow(note) {
     markdown: note.text,
     placeholder: "Write a note…",
     toolbar: toolbarOn,
+    datePattern,
     // Apple Notes' first-line title, unless that line is a long paragraph that would become a wall of bold text.
     titleLine: (plainLines(note.text)[0] ?? "").length <= 60,
     onChange: (md) => {
@@ -298,6 +300,7 @@ async function load(nav) {
   const r = await send({ op: "list", url: page.url });
   if (typing()) return; // focus may have moved into an editor while the Mac app answered
   error = r.ok ? "" : r.error;
+  if (r.datePattern) datePattern = r.datePattern;
   const fresh = r.ok ? r.notes : nav ? [] : notes;
   // forced: opened by toggle on this page, so a slower first load mustn't hide it again.
   if (nav) { dismissed = false; visible = forced || fresh.length > 0; }
