@@ -509,7 +509,8 @@ Made by the subagent that wrote the extension:
 - **Status:** Decided (user). Editor tests, host test (pieces under 1 MB, bad types and ids refused), Swift store and
   vault tests, and a headless Chromium run with the real host: a note's image shows, a pasted screenshot is kept.
   WebKit loads `noteimage:` from the editor's file page. The Supabase migration is written and was checked in a local
-  Postgres; it is **not applied** to the hosted project yet, and the Storage calls haven't run against a real server.
+  Postgres, and applied to the hosted project on 2026-10-29 (user approved, with 0.1.1); the Storage calls haven't
+  run against a real server yet.
 
 ## D54 — First release: NoteAnywhere 0.1.0 on GitHub (2026-10-29)
 

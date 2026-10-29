@@ -77,7 +77,7 @@ notes link up.
   tables, code, quotes, links between notes and maths: `$…$` or `\(…\)` inline, `$$…$$` or `\[…\]` on its own line
   (what ChatGPT and Claude give you when you copy an answer), drawn as real formulas; click one to edit it. A Notion-style ⋮⋮ handle drags any block or list item between
   blocks, and ⌘⇧↑/↓ moves the current one.
-- **Images** (in the next release). Paste a screenshot or a copied image, or drop an image file, into any note: in the app, the browser panel
+- **Images.** Paste a screenshot or a copied image, or drop an image file, into any note: in the app, the browser panel
   or on iPhone. NoteAnywhere keeps a copy (so a web image still shows when the site goes away) and syncs it end-to-end
   encrypted like the notes.
 - **Organized like Apple Notes.** Right-click a note to open it in its own window, pin it, duplicate it, share it,
