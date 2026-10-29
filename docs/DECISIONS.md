@@ -359,3 +359,13 @@ Made by the subagent that wrote the extension:
 - Client id/secret live in the Supabase dashboard (and env vars for `config push`), never in the repo.
 - End-to-end encryption is unchanged: Google only proves who you are; the sync passphrase still unlocks the notes.
 - **Status:** Decided (user asked). Needs a Google OAuth client and the provider enabled by the user.
+
+## D43 — A calendar pop-up for "Pick a date…" and 📅 (2026-10-29)
+- **Why:** user asked that "Pick a date…" open a pop-up to choose the date; it showed a plain date field above the note.
+- The shared editor draws its own month calendar at the cursor (below the line, above it near the window's end):
+  arrows move a day or week, PageUp/PageDown a month, Return or a click picks, Esc closes. One version for the Mac
+  app, the browser panel and iPhone; an ARIA grid for VoiceOver.
+- Weeks start on Sunday in every locale for now.
+- **Rejected:** `<input type="date">` with `showPicker()` (it showed a field, not a calendar, in the app's WebView);
+  a native NSDatePicker over the bridge (the browser panel and iPhone would each need their own).
+- **Status:** Decided (user asked). Editor test covers open, keys, pick and Esc.

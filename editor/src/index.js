@@ -442,6 +442,112 @@ function atMenuView(view, pickDate) {
   };
 }
 
+let calendars = 0; // keeps day ids unique when one page has several editors (the browser panel)
+
+/**
+ * 📅 and "Pick a date…": a month calendar that pops up at the cursor. Arrows move a day or a week, PageUp/PageDown a
+ * month, Return picks, Esc closes; the day goes in as "@yyyy-mm-dd ". Returns the function that opens it.
+ */
+function datePopover(editor, root, body) {
+  const id = `mn-cal${++calendars}`;
+  const pop = Object.assign(document.createElement("div"), { className: "mn-cal" });
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", "Pick a date");
+  const title = Object.assign(document.createElement("span"), { className: "mn-cal-title" });
+  title.setAttribute("aria-live", "polite");
+  const step = (label, text, months) => {
+    const b = Object.assign(document.createElement("button"), { type: "button", textContent: text, title: label });
+    b.setAttribute("aria-label", label);
+    b.onmousedown = (e) => e.preventDefault(); // keep focus on the grid
+    b.onclick = () => move(0, months);
+    return b;
+  };
+  const head = Object.assign(document.createElement("div"), { className: "mn-cal-head" });
+  head.append(step("Previous month", "‹", -1), title, step("Next month", "›", 1));
+  const grid = Object.assign(document.createElement("div"), { className: "mn-cal-grid", tabIndex: 0 });
+  grid.setAttribute("role", "grid");
+  pop.append(head, grid);
+  let day; // the highlighted day
+
+  const close = (refocus) => { pop.remove(); root.style.minHeight = ""; if (refocus) editor.commands.focus(); };
+  const pick = (d) => { close(false); editor.chain().focus().insertContent(`@${isoDay(d)} `).run(); };
+  const move = (days, months = 0) => {
+    const y = day.getFullYear(), m = day.getMonth() + months;
+    day = new Date(y, m, Math.min(day.getDate(), new Date(y, m + 1, 0).getDate()) + days); // Jan 31 + 1 month = Feb 28
+    render();
+  };
+  const cell = (role, text, label) => {
+    const c = Object.assign(document.createElement("div"), { textContent: text });
+    c.setAttribute("role", role);
+    c.setAttribute("aria-label", label);
+    return c;
+  };
+  const row = (cells) => {
+    const r = Object.assign(document.createElement("div"), { className: "mn-cal-row" });
+    r.setAttribute("role", "row");
+    r.append(...cells);
+    return r;
+  };
+  const render = () => {
+    const today = isoDay(new Date()), chosen = isoDay(day);
+    title.textContent = day.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    // shortcut: weeks start on Sunday in every locale; read Intl.Locale weekInfo if someone asks for Monday.
+    const start = new Date(day.getFullYear(), day.getMonth(), 1 - new Date(day.getFullYear(), day.getMonth(), 1).getDay());
+    const at = (i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const names = [0, 1, 2, 3, 4, 5, 6].map((i) => cell("columnheader",
+      at(i).toLocaleDateString(undefined, { weekday: "narrow" }), at(i).toLocaleDateString(undefined, { weekday: "long" })));
+    const weeks = [0, 1, 2, 3, 4, 5].map((w) => row([0, 1, 2, 3, 4, 5, 6].map((i) => {
+      const d = at(w * 7 + i), iso = isoDay(d);
+      const c = cell("gridcell", String(d.getDate()),
+        d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
+      c.id = `${id}-${iso}`;
+      c.className = "mn-cal-day" + (d.getMonth() !== day.getMonth() ? " out" : "") + (iso === today ? " today" : "")
+        + (iso === chosen ? " active" : "");
+      c.setAttribute("aria-selected", String(iso === chosen));
+      if (iso === today) c.setAttribute("aria-current", "date");
+      c.onmousedown = (e) => e.preventDefault();
+      c.onclick = () => pick(d);
+      return c;
+    })));
+    grid.replaceChildren(row(names), ...weeks);
+    grid.setAttribute("aria-activedescendant", `${id}-${chosen}`);
+  };
+
+  grid.onkeydown = (e) => {
+    const days = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+    if (days) move(days);
+    else if (e.key === "PageUp" || e.key === "PageDown") move(0, e.key === "PageUp" ? -1 : 1);
+    else if (e.key === "Enter" || e.key === " ") pick(day);
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  pop.onkeydown = (e) => {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopPropagation(); // Esc closes the calendar, not the panel around the editor
+    close(true);
+  };
+  pop.addEventListener("focusout", (e) => { if (!pop.contains(e.relatedTarget)) close(false); });
+
+  return () => {
+    const now = new Date();
+    day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    render();
+    body.append(pop);
+    const coords = editor.view.coordsAtPos(editor.state.selection.from), frame = body.getBoundingClientRect();
+    const h = pop.offsetHeight;
+    // Below the line, or above it when the window ends first (a long note in the main window).
+    const above = coords.bottom + h + 8 > window.innerHeight && coords.top - h - 4 >= 0;
+    pop.style.top = `${above ? coords.top - frame.top - h - 4 : coords.bottom - frame.top + 4}px`;
+    pop.style.left = `${Math.max(0, Math.min(coords.left - frame.left, body.clientWidth - pop.offsetWidth))}px`;
+    // An editor sized to its content (onHeight) grows so the calendar isn't cut off below a short note.
+    if (!above) root.style.minHeight = `${body.offsetTop + pop.offsetTop + h + 8}px`;
+    grid.focus();
+    return true;
+  };
+}
+
 const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>');
 
 /**
@@ -461,7 +567,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   bar.setAttribute("role", "toolbar");
   bar.setAttribute("aria-label", "Formatting");
   bar.hidden = !toolbar;
-  let pickDate; // set once the date form exists; the "@" menu's "Pick a date…" uses it
+  let pickDate; // set once the editor exists; the "@" menu's "Pick a date…" uses it
   const linkForm = document.createElement("form");
   linkForm.className = "mn-link";
   linkForm.hidden = true;
@@ -470,13 +576,9 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   linkInput.placeholder = "https://… or note://id — empty removes";
   linkInput.setAttribute("aria-label", "Link address");
   linkForm.append(linkInput);
-  const dateForm = Object.assign(document.createElement("form"), { className: "mn-link mn-date-form", hidden: true });
-  const dateInput = Object.assign(document.createElement("input"), { type: "date" });
-  dateInput.setAttribute("aria-label", "Date for this line");
-  dateForm.append(dateInput);
   const body = document.createElement("div");
   body.className = "mn-body";
-  root.append(bar, linkForm, dateForm, body);
+  root.append(bar, linkForm, body);
   element.append(root);
 
   const openLink = () => {
@@ -566,20 +668,8 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     return [b, active];
   }).filter(Boolean);
   // 📅: pick a day, insert "@yyyy-mm-dd" at the cursor; the calendar then shows this line on that day.
-  const openDate = () => {
-    dateInput.value = isoDay(new Date());
-    dateForm.hidden = false;
-    dateInput.focus();
-    dateInput.showPicker?.();
-    return true;
-  };
-  const insertDate = () => {
-    if (dateInput.value) editor.chain().focus().insertContent(`@${dateInput.value} `).run();
-    dateForm.hidden = true;
-  };
-  dateForm.onsubmit = (e) => { e.preventDefault(); insertDate(); };
+  const openDate = datePopover(editor, root, body);
   pickDate = openDate;
-  dateInput.onkeydown = (e) => { if (e.key === "Escape") { dateForm.hidden = true; editor.commands.focus(); } };
   const dateButton = Object.assign(document.createElement("button"), { type: "button", innerHTML: CALENDAR_ICON, title: "Add a date" });
   dateButton.setAttribute("aria-label", "Add a date");
   dateButton.onmousedown = (e) => e.preventDefault();

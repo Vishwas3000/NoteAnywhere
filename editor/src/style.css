@@ -114,7 +114,26 @@
 /* Dates: a chip the calendar knows about. */
 .mn-content .mn-date { color: var(--mn-fg); background: var(--mn-code-bg); border: 1px solid var(--mn-line); border-radius: 5px; padding: 0 4px;
   font-variant-numeric: tabular-nums; }
-.mn-date-form input { width: auto; }
+/* The date picker that pops up from 📅 and "Pick a date…". */
+.mn-cal { position: absolute; z-index: 3; padding: 8px; border-radius: 12px; border: 1px solid var(--mn-line);
+  background: var(--mn-menu-bg); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px); font: 13px -apple-system, system-ui, sans-serif; color: var(--mn-fg); user-select: none;
+  -webkit-user-select: none; }
+.mn-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.mn-cal-title { font-weight: 600; }
+.mn-cal-head button { width: 26px; height: 26px; padding: 0; font: 18px/1 -apple-system, system-ui, sans-serif; color: var(--mn-fg);
+  background: none; border: none; border-radius: 6px; cursor: default; }
+.mn-cal-head button:hover { background: var(--mn-hover); }
+.mn-cal-head button:focus-visible, .mn-cal-grid:focus-visible { outline: 2px solid var(--mn-accent); outline-offset: 1px; }
+.mn-cal-grid { border-radius: 6px; outline: none; }
+.mn-cal-row { display: grid; grid-template-columns: repeat(7, 30px); }
+.mn-cal-row [role="columnheader"] { padding: 2px 0; text-align: center; font-size: 11px; color: var(--mn-muted); }
+.mn-cal-day { height: 28px; line-height: 28px; margin: 1px; border-radius: 50%; text-align: center; cursor: default;
+  font-variant-numeric: tabular-nums; }
+.mn-cal-day:hover { background: var(--mn-hover); }
+.mn-cal-day.out { color: var(--mn-muted); }
+.mn-cal-day.today { color: var(--mn-accent); font-weight: 600; }
+.mn-cal-day.active { background: var(--mn-check); color: #1d1d1f; }  /* dark on yellow: legible in both modes */
 /* The "@" date menu. */
 .mn-at-menu { position: absolute; z-index: 3; min-width: 220px; max-height: 260px; overflow-y: auto; padding: 4px;
   border-radius: 10px; border: 1px solid var(--mn-line); background: var(--mn-menu-bg); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);

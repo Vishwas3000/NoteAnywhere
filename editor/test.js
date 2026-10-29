@@ -169,6 +169,29 @@ check("typing @ opens the date menu; Return picks Today, typing filters, Esc clo
   assert.equal(menu(), null);
   assert.match(ed.getMarkdown(), /@tom$/);
 });
+check("Pick a date… pops up a calendar; arrows and Return put that day in, Esc closes it", () => {
+  const ed = mount("Call ");
+  const key = (target, key) => target.dispatchEvent(new window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+  const cal = () => ed.editor.view.dom.parentElement.querySelector(".mn-cal");
+  ed.editor.commands.focus("end");
+  ed.editor.commands.insertContent("@pick");
+  key(ed.editor.view.dom, "Enter");
+  assert.ok(cal(), "calendar shows");
+  assert.equal(cal().querySelector(".mn-cal-day.active").getAttribute("aria-current"), "date", "today is highlighted");
+  const grid = cal().querySelector("[role=grid]");
+  key(grid, "ArrowDown");
+  key(grid, "ArrowRight");
+  key(grid, "Enter");
+  const now = new Date();
+  assert.equal(ed.getMarkdown().trim(), `Call @${MNEditor.dayFor("today", new Date(now.getFullYear(), now.getMonth(), now.getDate() + 8))}`);
+  assert.equal(cal(), null);
+  ed.editor.options.element.closest(".mn-editor").querySelector('button[aria-label="Add a date"]').click();
+  key(cal().querySelector("[role=grid]"), "PageDown");
+  assert.equal(cal().querySelector(".mn-cal-title").textContent,
+    new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" }));
+  key(cal().querySelector("[role=grid]"), "Escape");
+  assert.equal(cal(), null);
+});
 check("shortcuts list is exported", () => assert.ok(MNEditor.shortcuts.length >= 20));
 
 // ✨ menu: the host's reply replaces the whole note (or the selection) as one undoable step; titles go on top.
