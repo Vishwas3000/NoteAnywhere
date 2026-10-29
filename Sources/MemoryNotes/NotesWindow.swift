@@ -33,6 +33,7 @@ struct NotesWindow: View {
     @State private var folderPrompt: FolderPrompt?
     @State private var folderName = ""
     @State private var lockPrompt: LockPrompt?
+    @State private var peekID: String?  // a linked page open beside the note (side peek)
     @ObservedObject private var lockSession = LockSession.shared
 
     /// Locking a note may first need a notes password (first time) or unlocking (later).
@@ -200,7 +201,10 @@ struct NotesWindow: View {
             model.searchRequest = nil
         }
         .onChange(of: model.calendarRequest) { _, day in if day != nil { switchTo(.calendar) } }  // CalendarView takes it from there
-        .onChange(of: selection) { _, id in if id != nil { switchTo(.notes) } }
+        .onChange(of: selection) { _, id in
+            if id != nil { switchTo(.notes) }
+            peekID = nil  // a peek belongs to the note it was opened from
+        }
         .navigationSplitViewColumnWidth(min: 240, ideal: 290)
     }
 
@@ -352,27 +356,53 @@ struct NotesWindow: View {
     @ViewBuilder
     private var detail: some View {
         if let note = selectedNote {
-            VStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 10) {
-                    header(note)
-                    Text("Edited \(note.edited.formatted(date: .long, time: .shortened))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
+            HSplitView {
+                VStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        header(note)
+                        Text("Edited \(note.edited.formatted(date: .long, time: .shortened))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .frame(maxWidth: 720)
+                    .padding(.horizontal, 40)
+                    // Full width, so its scroll bar is at the window's edge; the page keeps the text in the same column.
+                    NoteEditor(noteID: note.id, fontSize: 15, titleLine: true, focusIfEmpty: !editingAddress,
+                               openLink: { peekID = $0 })
                 }
-                .frame(maxWidth: 720)
-                .padding(.horizontal, 40)
-                // Full width, so its scroll bar is at the window's edge; the page keeps the text in the same column.
-                NoteEditor(noteID: note.id, fontSize: 15, titleLine: true, focusIfEmpty: !editingAddress)
+                .padding(.top, 16)
+                .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
+                if let peekID, model.notes.contains(where: { $0.id == peekID }) { peek(peekID) }
             }
-            .padding(.top, 16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .textBackgroundColor))
             .onChange(of: targetFocused) { _, focused in editingAddress = focused }
         } else {
             ContentUnavailableView("No Note Selected", systemImage: "note.text",
                                    description: Text("Pick a note in the sidebar, or press ⌘N to start one."))
         }
+    }
+
+    /// A linked page beside the note it's linked from, like Notion's side peek: the answer next to the question.
+    private func peek(_ id: String) -> some View {
+        VStack(spacing: 4) {
+            HStack {
+                Button { peekID = nil } label: { Label("Close Peek", systemImage: "xmark") }
+                    .help("Close the peek")
+                Spacer()
+                Button { selection = id } label: { Label("Open as Main Note", systemImage: "arrow.up.left.and.arrow.down.right") }
+                    .help("Open this page in the main view")
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            NoteEditor(noteID: id, toolbar: false, fontSize: 14, titleLine: true, focusIfEmpty: false, openLink: { peekID = $0 })
+        }
+        .frame(minWidth: 280, idealWidth: 380, maxWidth: 560, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Linked page")
     }
 
     /// The source chip; for a note without one, a quiet "Add Website" button; the address field while editing it.

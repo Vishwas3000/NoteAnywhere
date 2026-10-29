@@ -443,3 +443,22 @@ Made by the subagent that wrote the extension:
   stamps.
 - **Status:** Decided (user chose the access level and clients). Tested over stdio (scripts/test_mcp.py) and
   `claude mcp list` shows it connected; not yet used in a real conversation.
+
+## D51 — Pages from highlighted text, hover previews and a side peek (2026-10-29)
+- **Why:** user: highlight a question, "add a page" for the answer found later; hover shows a quick description and
+  opening shows the details, like VS Code's hover and go-to-definition.
+- On highlighted text (one line), a small menu offers **Add page** (⌘⌥P): a plain note titled with the highlight, in
+  the same folder, with a ↖ link back; the highlight becomes a `note://` link to it. **Link to a note…** (⌘⇧K)
+  searches titles and first lines and links the highlight to the pick. Apple Intelligence's Writing Tools stay as they
+  were.
+- Hovering a `note://` link shows its title and first lines (after 350 ms); clicking it opens the page in a resizable
+  side peek beside the note (main window), with Open as Main Note and Close. Links in the peek replace the peek.
+  Elsewhere (floating panel, own window) a click opens it in the main window as before.
+- Pages are ordinary notes (user's choice): in the list, search and graph, linked both ways.
+- The editor bridge's request/reply became generic (`ask`/`reply`); `aiDone` stays as an alias for the iPhone app.
+- **Not done:** the browser extension and iPhone don't get the menu or hover cards yet (their hosts would need the
+  same three requests).
+- **Rejected:** opening pages by navigating away or in a new window (user chose the side peek); nested sub-pages
+  hidden from the list (user chose normal notes).
+- **Status:** Decided (user chose the peek, menu items and visibility). Editor tests cover add, link and hover; a
+  Swift test covers the page text.

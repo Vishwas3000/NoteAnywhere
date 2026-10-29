@@ -33,6 +33,9 @@ by default.
   note can gain or lose its website later (Add Website / Remove Website).
 - **#tags, Obsidian-style.** Type `#tag` anywhere and nest with `#area/topic`. ⌘-click a tag or search `#tag` to see
   its notes; the sidebar lists every tag with its count.
+- **Pages from a highlight.** Highlight a question and choose **Add page**: a new note titled with it, linked from
+  the highlight and linking back. Or **Link to a note…** to point it at an answer you already wrote. Hover a link to a
+  note for a quick look, like VS Code's hover; click it and the page opens in a side peek next to the note.
 - **A knowledge graph.** Each note is a dot joined to its app or site, the notes it links to, its #tags (a hub per
   tag), and notes with a similar meaning. Drag, zoom, and switch each kind of link on or off.
 - **Dates and tasks.** Type `@` for a Notion-style date menu (Today, Tomorrow, the coming week, Pick a date…), or
@@ -119,6 +122,7 @@ Tools: `search_notes`, `list_notes`, `get_note`, `list_tasks`, `list_tags`, `lis
 | ⌘⌫ | Delete the selected note (asks first) |
 | ⌘⇧↑ / ⌘⇧↓ | Move the current block or list item |
 | ⌘⇧9 | Checklist |
+| ⌘⌥P / ⌘⇧K | Highlighted text: add a page from it / link it to a note |
 | `/` | Block menu: headings, lists, to-do, quote, code, table, date; `/break page` draws a divider |
 | `@` | Date menu: Today, Tomorrow, the coming week, Pick a date… |
 | `@today`, `@fri` + Space | Put this line on a day in the calendar |

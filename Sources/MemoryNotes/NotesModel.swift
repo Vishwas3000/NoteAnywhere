@@ -100,6 +100,20 @@ final class NotesModel: ObservableObject {
         return note
     }
 
+    /// "Add page" on highlighted text: a plain note titled with it, in the same folder, with a ↖ link back to the note
+    /// it came from (the highlight there links here), so a question can point to the answer found later.
+    func addPage(titled title: String, from parentID: String) -> Note {
+        let parent = notes.first { $0.id == parentID }
+        return add(kind: .url, target: "", label: "", folderID: parent?.folderID, text: Self.pageText(title, backTo: parent))
+    }
+
+    /// "Why does sync lag?\n\n↖ [Sync notes](note://ID)\n\n": the highlight on one line as the title, then the way back.
+    static func pageText(_ title: String, backTo parent: Note?) -> String {
+        let line = title.split(whereSeparator: \.isNewline).joined(separator: " ")
+        let back = parent.map { "\n\n↖ [\($0.title.replacingOccurrences(of: "]", with: "\\]"))](note://\($0.id))" } ?? ""
+        return line + back + "\n\n"
+    }
+
     /// A copy with the same text, place, folder and colour (unpinned), like Apple Notes' Duplicate.
     @discardableResult
     func duplicate(_ note: Note) -> Note {

@@ -513,6 +513,157 @@ function suggestMenuView(view, find, label, choices, apply) {
   };
 }
 
+const el = (tag, className, text) => Object.assign(document.createElement(tag), { className, textContent: text ?? "" });
+
+/**
+ * On highlighted text (one line): "Add page" makes a note titled with it and links the highlight to it; "Link to a
+ * note…" searches the notes and links to the one picked. For questions that point to the answers found later.
+ * onAddPage(text) => Promise<id>; onFindNotes(query) => Promise<[{id, title, preview}]>. Returns the two actions
+ * for their shortcuts.
+ */
+function selectionMenu(editor, body, { onAddPage, onFindNotes, onLinkNote }) {
+  const bar = el("div", "mn-bubble");
+  bar.setAttribute("role", "toolbar");
+  bar.setAttribute("aria-label", "Highlighted text");
+  let range = null, results = [], active = 0, searchTimer;
+
+  const hide = () => { bar.remove(); range = null; clearTimeout(searchTimer); };
+  const link = (id) => editor.chain().focus().setTextSelection(range).setLink({ href: `note://${id}` }).run();
+  const button = (label, svg, run) => {
+    const b = el("button");
+    b.type = "button";
+    b.innerHTML = svg; // our own constant markup
+    b.append(el("span", "", label));
+    b.onmousedown = (e) => e.preventDefault(); // keep the highlight
+    b.onclick = run;
+    return b;
+  };
+  const fail = (message) => { bar.replaceChildren(el("span", "mn-bubble-error", message)); setTimeout(hide, 4000); };
+
+  const addPage = async () => {
+    if (!range || !onAddPage) return false;
+    const text = editor.state.doc.textBetween(range.from, range.to, " ").trim();
+    if (!text) return false;
+    try {
+      const id = await onAddPage(text);
+      link(id);
+      hide();
+      onLinkNote?.(id); // the host shows the new page (the main window: in a side peek)
+    } catch (err) {
+      fail(`Couldn't add the page: ${err.message}`);
+    }
+    return true;
+  };
+
+  const input = el("input", "mn-bubble-search");
+  input.type = "search";
+  input.placeholder = "Link to a note…";
+  input.setAttribute("aria-label", "Find a note to link to");
+  const list = el("div", "mn-bubble-results");
+  list.setAttribute("role", "listbox");
+  const renderResults = () => {
+    list.replaceChildren(...results.map((note, i) => {
+      const item = el("div", "mn-at-item mn-bubble-result" + (i === active ? " active" : ""));
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", String(i === active));
+      item.append(el("span", "", note.title), el("span", "mn-at-hint", note.preview));
+      item.onmousedown = (e) => { e.preventDefault(); link(note.id); hide(); };
+      return item;
+    }));
+    if (!results.length) list.append(el("div", "mn-bubble-empty", input.value ? "No notes match" : "No other notes yet"));
+  };
+  const search = () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(async () => {
+      try { results = await onFindNotes(input.value.trim()); } catch (err) { results = []; }
+      active = 0;
+      renderResults();
+    }, 80);
+  };
+  input.oninput = search;
+  input.onkeydown = (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      active = (active + (e.key === "ArrowDown" ? 1 : results.length - 1)) % Math.max(results.length, 1);
+      renderResults();
+    } else if (e.key === "Enter" && results[active]) {
+      link(results[active].id);
+      hide();
+    } else if (e.key === "Escape") {
+      hide();
+      editor.commands.focus();
+    } else {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const findNote = () => {
+    if (!range || !onFindNotes) return false;
+    input.value = "";
+    results = [];
+    bar.replaceChildren(input, list);
+    input.focus();
+    search();
+    return true;
+  };
+  // Hide once focus has really left both the editor and the menu (checked after it lands; relatedTarget isn't always set).
+  const hideIfAway = () => setTimeout(() => {
+    const now = document.activeElement;
+    if (!bar.contains(now) && !editor.view.dom.contains(now)) hide();
+  });
+  bar.addEventListener("focusout", hideIfAway);
+
+  const place = () => {
+    const sel = editor.state.selection;
+    if (sel.empty || !(sel instanceof TextSelection) || sel.$from.parent !== sel.$to.parent || editor.isActive("codeBlock")) return hide();
+    range = { from: sel.from, to: sel.to };
+    bar.replaceChildren(...[onAddPage && button("Add page", PAGE_ICON, addPage),
+      onFindNotes && button("Link to a note…", NOTE_LINK_ICON, findNote)].filter(Boolean));
+    if (!bar.isConnected) body.append(bar);
+    const start = editor.view.coordsAtPos(sel.from), end = editor.view.coordsAtPos(sel.to), frame = body.getBoundingClientRect();
+    const above = start.top - frame.top - bar.offsetHeight - 6;
+    bar.style.top = `${above >= 0 ? above : end.bottom - frame.top + 6}px`;
+    bar.style.left = `${Math.max(0, Math.min(start.left - frame.left, body.clientWidth - bar.offsetWidth))}px`;
+  };
+  editor.on("selectionUpdate", place);
+  editor.on("blur", hideIfAway);
+  // From the keyboard: the shortcuts work on the current highlight even before the menu is placed.
+  const withRange = (run) => () => { const sel = editor.state.selection; if (sel.empty) return false; range = { from: sel.from, to: sel.to }; if (!bar.isConnected) place(); return run(); };
+  return { addPage: withRange(addPage), findNote: withRange(findNote) };
+}
+
+/** Hovering a link to a note shows a quick look at it (title and first lines), like VS Code's hover; a click opens it. */
+function noteHover(view, root, body, onNotePreview) {
+  const card = el("div", "mn-hover");
+  card.setAttribute("role", "tooltip");
+  let timer, current = null;
+  const hide = () => { clearTimeout(timer); current = null; card.remove(); root.style.minHeight = ""; };
+  view.dom.addEventListener("mouseover", (e) => {
+    const a = e.target.closest?.('a[href^="note://"]');
+    if (!a || a === current) return;
+    hide();
+    current = a;
+    timer = setTimeout(async () => {
+      let note;
+      try { note = await onNotePreview(a.getAttribute("href").slice("note://".length)); }
+      catch (err) { note = { title: "Can't show this note", preview: err.message }; }
+      if (current !== a) return;
+      card.replaceChildren(el("strong", "", note.title), el("p", "", note.preview || "No additional text"), el("small", "", "Click to open"));
+      body.append(card);
+      const rect = a.getBoundingClientRect(), frame = body.getBoundingClientRect();
+      card.style.top = `${rect.bottom - frame.top + 4}px`;
+      card.style.left = `${Math.max(0, Math.min(rect.left - frame.left, body.clientWidth - card.offsetWidth))}px`;
+      root.style.minHeight = `${body.offsetTop + card.offsetTop + card.offsetHeight + 8}px`; // a short note's editor grows to fit it
+    }, 350);
+  });
+  view.dom.addEventListener("mouseout", (e) => {
+    const a = e.target.closest?.('a[href^="note://"]');
+    if (a && !a.contains(e.relatedTarget)) hide();
+  });
+  view.dom.addEventListener("keydown", hide);
+  view.dom.addEventListener("mousedown", hide);
+}
+
 let calendars = 0; // keeps day ids unique when one page has several editors (the browser panel)
 
 /**
@@ -619,6 +770,8 @@ function datePopover(editor, root, body) {
   };
 }
 
+const PAGE_ICON = icon('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15h6"/>');
+const NOTE_LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>');
 const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>');
 
 /**
@@ -628,9 +781,11 @@ const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.0
  * content height so a host can size the editor to fit. onAI(action, markdown) => Promise<string> adds a ✨ menu of
  * Apple Intelligence edits (see AI_ACTIONS); the host runs the model, the editor applies the result as one undoable step.
  * datePattern ("dd/MM/yyyy", …) shows date chips that way; the Markdown keeps "@yyyy-mm-dd".
+ * onAddPage / onFindNotes add "Add page" and "Link to a note…" on highlighted text (see selectionMenu); onNotePreview(id)
+ * => Promise<{title, preview}> shows a card when hovering a note link.
  */
 export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
-  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern } = {}) {
+  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview } = {}) {
   const root = document.createElement("div");
   root.className = "mn-editor" + (titleLine ? " mn-title-line" : "");
   if (fontSize) root.style.setProperty("--mn-font-size", `${fontSize}px`);
@@ -639,6 +794,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   bar.setAttribute("role", "toolbar");
   bar.setAttribute("aria-label", "Formatting");
   bar.hidden = !toolbar;
+  let pages; // "Add page" / "Link to a note…" on highlighted text, when the host supports them
   let pickDate; // set once the editor exists; the "@" menu's "Pick a date…" uses it
   const linkForm = document.createElement("form");
   linkForm.className = "mn-link";
@@ -680,6 +836,8 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
       "Shift-Enter": () => editor.isActive("codeBlock") && editor.commands.newlineInCode(),
       "Mod-Shift-x": () => editor.commands.toggleStrike(),
       "Mod-k": openLink,
+      "Mod-Alt-p": () => pages?.addPage() ?? false,
+      "Mod-Shift-k": () => pages?.findNote() ?? false,
       "Mod-Shift-ArrowUp": () => moveBlock(editor, -1),
       "Mod-Shift-ArrowDown": () => moveBlock(editor, 1),
     }),
@@ -763,6 +921,8 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   editor.on("transaction", refreshToolbar);
   refreshToolbar();
   if (onAI) root.append(aiMenu(editor, onAI));
+  if (onAddPage || onFindNotes) pages = selectionMenu(editor, body, { onAddPage, onFindNotes, onLinkNote });
+  if (onNotePreview) noteHover(editor.view, root, body, onNotePreview);
   let observer;
   if (onHeight && typeof ResizeObserver !== "undefined") {
     observer = new ResizeObserver(() => onHeight(Math.ceil(root.getBoundingClientRect().height)));

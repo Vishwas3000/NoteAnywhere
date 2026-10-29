@@ -143,3 +143,28 @@
 .mn-at-item.active { background: var(--mn-check); color: #1d1d1f; }
 .mn-at-hint { color: var(--mn-muted); font-variant-numeric: tabular-nums; }
 .mn-at-item.active .mn-at-hint { color: #1d1d1f; opacity: 0.7; }
+/* On highlighted text: Add page, Link to a note… */
+.mn-bubble { position: absolute; z-index: 4; display: flex; flex-direction: column; gap: 2px; padding: 3px; border-radius: 9px;
+  border: 1px solid var(--mn-line); background: var(--mn-menu-bg); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); font: 12.5px -apple-system, system-ui, sans-serif; }
+.mn-bubble:has(> button) { flex-direction: row; }
+.mn-bubble > button { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; color: var(--mn-fg);
+  font: inherit; background: none; border: none; border-radius: 6px; cursor: default; white-space: nowrap; }
+.mn-bubble > button svg { width: 15px; height: 15px; color: var(--mn-muted); }
+.mn-bubble > button:hover { background: var(--mn-hover); }
+.mn-bubble > button:focus-visible { outline: 2px solid var(--mn-accent); outline-offset: -2px; }
+.mn-bubble-search { width: 260px; box-sizing: border-box; padding: 5px 8px; font: inherit; color: var(--mn-fg); background: var(--mn-code-bg);
+  border: 1px solid var(--mn-line); border-radius: 6px; outline: none; }
+.mn-bubble-search:focus { border-color: var(--mn-accent); }
+.mn-bubble-results { max-height: 220px; overflow-y: auto; }
+.mn-bubble-result { flex-direction: column; gap: 1px; max-width: 260px; }
+.mn-bubble-result span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mn-bubble-empty, .mn-bubble-error { padding: 5px 8px; color: var(--mn-muted); }
+.mn-bubble-error { color: #d70015; }
+/* Hovering a link to a note: a quick look at it. */
+.mn-hover { position: absolute; z-index: 4; width: 300px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--mn-line);
+  background: var(--mn-menu-bg); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  font: 12.5px/1.45 -apple-system, system-ui, sans-serif; color: var(--mn-fg); pointer-events: none; }
+.mn-hover strong { display: block; margin-bottom: 4px; font-size: 13px; }
+.mn-hover p { margin: 0 0 6px; color: var(--mn-muted); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.mn-hover small { color: var(--mn-muted); font-size: 11px; }

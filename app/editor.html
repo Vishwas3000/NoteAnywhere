@@ -16,11 +16,16 @@
 <script src="mn-editor.js"></script>
 <script>
   // Bridge for EditorView.swift. Every edit goes straight to Swift, which saves it, so switching notes loses nothing.
-  let editor, aiCount = 0;
-  const aiPending = new Map();  // ✨ requests waiting for Swift to run the on-device model
+  let editor, asked = 0;
+  const pending = new Map();  // requests waiting for Swift: ✨ (the on-device model), pages, note search and previews
   const post = (msg) => webkit.messageHandlers.mn.postMessage(msg);
+  const ask = (type, fields) => new Promise((resolve, reject) => {
+    const id = ++asked;
+    pending.set(id, { resolve, reject });
+    post({ type, id, ...fields });
+  });
   window.MNHost = {
-    // options: { toolbar, fontSize, titleLine, page }
+    // options: { toolbar, fontSize, titleLine, page, datePattern, pages }
     load(markdown, options) {
       editor?.destroy();
       document.body.classList.toggle("page", !!options.page);
@@ -31,18 +36,21 @@
         onTag: (tag) => post({ type: "tag", tag }),
         onDate: (day) => post({ type: "date", day }),
         onHeight: (px) => post({ type: "height", value: px }),
-        onAI: (action, text) => new Promise((resolve, reject) => {
-          const id = ++aiCount;
-          aiPending.set(id, { resolve, reject });
-          post({ type: "ai", id, action, text });
-        }),
+        onAI: (action, text) => ask("ai", { action, text }),
+        // The Mac app makes pages from highlighted text, finds notes to link and previews them on hover.
+        ...(options.pages ? {
+          onAddPage: (text) => ask("addPage", { text }),
+          onFindNotes: (query) => ask("findNotes", { query }),
+          onNotePreview: (id) => ask("notePreview", { note: id }),
+        } : {}),
       });
     },
-    aiDone(id, text, error) {
-      const p = aiPending.get(id);
-      aiPending.delete(id);
-      error == null ? p?.resolve(text) : p?.reject(new Error(error));
+    reply(id, value, error) {
+      const p = pending.get(id);
+      pending.delete(id);
+      error == null ? p?.resolve(value) : p?.reject(new Error(error));
     },
+    aiDone(id, text, error) { this.reply(id, text, error); },  // the iPhone app's name for reply
     set(markdown) { if (editor && editor.getMarkdown() !== markdown) editor.setMarkdown(markdown); },
     focus() { editor?.focus(); },
   };

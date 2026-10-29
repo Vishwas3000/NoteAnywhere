@@ -66,3 +66,14 @@ func pageTargets(url: String, expected: String) {
     #expect(note.dates.map(\.done) == [false, true, false])
     #expect(note.dates.map(\.line) == [1, 2, 3])
 }
+
+@Test func pageFromHighlightLinksBack() {
+    var parent = Note(kind: .url, target: "", label: "", updatedAt: 0)
+    parent.text = "Sync [notes]\nWhy does sync lag?"
+    let text = NotesModel.pageText("Why does\nsync lag?", backTo: parent)
+    #expect(text == "Why does sync lag?\n\n↖ [Sync [notes\\]](note://\(parent.id))\n\n")
+    var page = Note(kind: .url, target: "", label: "", updatedAt: 0)
+    page.text = text
+    #expect(page.title == "Why does sync lag?")
+    #expect(NotesModel.pageText("Alone", backTo: nil) == "Alone\n\n")
+}

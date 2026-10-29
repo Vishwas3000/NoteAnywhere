@@ -12,6 +12,8 @@ struct NoteEditor: View {
     /// After ⌘-clicking a #tag or a date, which ask the main window to search for it or show its day.
     var showMainWindow: (() -> Void)?
     var focusIfEmpty = true  // a new note takes the cursor; off while something else (an address field) should have it
+    /// Where a link to another note opens (the main window: a side peek). Without it, the main window selects that note.
+    var openLink: ((String) -> Void)?
     @ObservedObject private var model = NotesModel.shared
     @ObservedObject private var lock = LockSession.shared
     @State private var contentHeight: CGFloat = 0
@@ -23,9 +25,10 @@ struct NoteEditor: View {
         if model.notes.first(where: { $0.id == noteID })?.locked == true, !lock.isUnlocked {
             LockedNoteView(compact: fit != nil)
         } else if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
-            EditorWebView(dir: dir, markdown: model.textBinding(noteID),
+            EditorWebView(dir: dir, noteID: noteID, markdown: model.textBinding(noteID),
                           options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine,
-                                    "page": fit == nil, "datePattern": DateStyle.pattern], showMainWindow: showMainWindow,
+                                    "page": fit == nil, "datePattern": DateStyle.pattern, "pages": true],
+                          showMainWindow: showMainWindow, openLink: openLink,
                           focusIfEmpty: focusIfEmpty,
                           passesScroll: fit.map { contentHeight <= $0.upperBound } ?? false) { contentHeight = $0 }
                 .id("\(noteID)/\(dateFormat)")  // a fresh editor per note keeps undo history per note; new date format redraws
@@ -38,9 +41,11 @@ struct NoteEditor: View {
 
 private struct EditorWebView: NSViewRepresentable {
     let dir: URL
+    let noteID: String
     @Binding var markdown: String
     let options: [String: Any]
     let showMainWindow: (() -> Void)?
+    let openLink: ((String) -> Void)?
     let focusIfEmpty: Bool
     let passesScroll: Bool
     let onHeight: (CGFloat) -> Void
@@ -119,11 +124,31 @@ private struct EditorWebView: NSViewRepresentable {
                 Task { @MainActor in
                     do {
                         guard let action else { throw Assistant.Failure(errorDescription: "Unknown action.") }
-                        call("aiDone", id, try await Assistant.run(action, on: text), NSNull())
+                        call("reply", id, try await Assistant.run(action, on: text), NSNull())
                     } catch {
-                        call("aiDone", id, NSNull(), error.localizedDescription)
+                        call("reply", id, NSNull(), error.localizedDescription)
                     }
                 }
+            case "addPage":
+                guard let id = body["id"] as? Int, let text = body["text"] as? String else { return }
+                call("reply", id, NotesModel.shared.addPage(titled: text, from: parent.noteID).id, NSNull())
+            case "findNotes":
+                // Notes to link highlighted text to: titles and first lines that contain the words, newest first.
+                guard let id = body["id"] as? Int else { return }
+                let query = (body["query"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+                let found = NotesModel.shared.notes
+                    .filter { $0.id != parent.noteID && !$0.locked }
+                    .filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) || $0.preview.localizedCaseInsensitiveContains(query) }
+                    .sorted { $0.updatedAt > $1.updatedAt }
+                    .prefix(8)
+                call("reply", id, found.map { ["id": $0.id, "title": $0.title, "preview": $0.preview] }, NSNull())
+            case "notePreview":
+                guard let id = body["id"] as? Int, let noteID = body["note"] as? String else { return }
+                guard let note = NotesModel.shared.notes.first(where: { $0.id == noteID }) else {
+                    return call("reply", id, NSNull(), "This note was deleted.")
+                }
+                let preview = note.locked ? "Unlock it to read it." : String(note.preview.prefix(320))
+                call("reply", id, ["title": note.title, "preview": preview], NSNull())
             case "height":
                 if let value = body["value"] as? Double { parent.onHeight(value) }
             case "tag":
@@ -135,7 +160,8 @@ private struct EditorWebView: NSViewRepresentable {
                 NotesModel.shared.calendarRequest = day
                 parent.showMainWindow?()
             case "openNote":
-                if let id = body["id"] as? String { NotesModel.shared.openRequest = id }
+                guard let id = body["id"] as? String else { return }
+                if let openLink = parent.openLink { openLink(id) } else { NotesModel.shared.openRequest = id }
             default:
                 break
             }

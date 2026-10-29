@@ -247,6 +247,51 @@ async function checkAsync(name, fn) {
 const ai = (ed, action) => [...ed.editor.options.element.closest(".mn-editor").querySelectorAll(".mn-ai-menu button")]
   .find((b) => b.textContent === Object.fromEntries(MNEditor.AI_ACTIONS)[action]).click();
 const settle = () => new Promise((r) => setTimeout(r, 0));
+await checkAsync("highlighting text offers Add page: a new note, the highlight links to it, the host opens it", async () => {
+  const opened = [], asked = [];
+  const ed = mount("Why does sync lag? Look later.", {
+    onAddPage: async (text) => { asked.push(text); return "PAGE-1"; }, onFindNotes: async () => [], onLinkNote: (id) => opened.push(id) });
+  ed.editor.commands.focus();
+  ed.editor.commands.setTextSelection({ from: 1, to: 19 });
+  const bubble = () => ed.editor.view.dom.parentElement.querySelector(".mn-bubble");
+  assert.ok(bubble(), "menu shows on the highlight");
+  assert.deepEqual([...bubble().querySelectorAll("button")].map((b) => b.textContent), ["Add page", "Link to a note…"]);
+  bubble().querySelector("button").click();
+  await settle();
+  assert.deepEqual(asked, ["Why does sync lag?"]);
+  assert.equal(ed.getMarkdown().trim(), "[Why does sync lag?](note://PAGE-1) Look later.");
+  assert.deepEqual(opened, ["PAGE-1"]);
+  assert.equal(bubble(), null);
+});
+await checkAsync("Link to a note… searches as you type and links the pick", async () => {
+  const queries = [];
+  const ed = mount("See the answer here", { onAddPage: async () => "X",
+    onFindNotes: async (q) => { queries.push(q); return [{ id: "ANS", title: "Sync answer", preview: "Supabase closes idle sockets" }]; } });
+  ed.editor.commands.focus();
+  ed.editor.commands.setTextSelection({ from: 9, to: 15 });  // "answer"
+  const bubble = ed.editor.view.dom.parentElement.querySelector(".mn-bubble");
+  bubble.querySelectorAll("button")[1].click();
+  const input = bubble.querySelector("input");
+  input.value = "sync";
+  input.dispatchEvent(new window.Event("input"));
+  for (let i = 0; i < 100 && queries.at(-1) !== "sync"; i++) await new Promise((r) => setTimeout(r, 10));  // debounced
+  await settle();
+  assert.equal(queries.at(-1), "sync");
+  assert.equal(bubble.querySelector(".mn-bubble-result").textContent.startsWith("Sync answer"), true);
+  input.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+  assert.equal(ed.getMarkdown().trim(), "See the [answer](note://ANS) here");
+});
+await checkAsync("hovering a note link shows its title and first lines", async () => {
+  const ed = mount("Question: [why?](note://ANS)", { onNotePreview: async (id) => ({ title: `Answer ${id}`, preview: "Because sockets idle out." }) });
+  const a = ed.editor.view.dom.querySelector('a[href="note://ANS"]');
+  a.dispatchEvent(new window.MouseEvent("mouseover", { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 400));
+  const card = ed.editor.view.dom.parentElement.querySelector(".mn-hover");
+  assert.ok(card, "card shows");
+  assert.equal(card.querySelector("strong").textContent, "Answer ANS");
+  a.dispatchEvent(new window.MouseEvent("mouseout", { bubbles: true, relatedTarget: document.body }));
+  assert.equal(ed.editor.view.dom.parentElement.querySelector(".mn-hover"), null);
+});
 await checkAsync("✨ rewrites the whole note and Undo restores it", async () => {
   const seen = [];
   const ed = mount("teh note", { onAI: async (action, md) => { seen.push([action, md]); return "- [ ] the note"; } });

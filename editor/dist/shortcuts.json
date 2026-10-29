@@ -31,6 +31,16 @@
   },
   {
     "group": "Text",
+    "keys": "⌘⌥P",
+    "action": "Add a page from the highlighted text (it links to the new note)"
+  },
+  {
+    "group": "Text",
+    "keys": "⌘⇧K",
+    "action": "Link the highlighted text to one of your notes"
+  },
+  {
+    "group": "Text",
     "keys": "⌘Z / ⌘⇧Z",
     "action": "Undo / redo"
   },
