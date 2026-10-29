@@ -49,6 +49,10 @@ private let now = day(2026, 10, 28, 14)  // a Wednesday
     #expect(DateStyle.format("2026-10-30", "dd/MM/yyyy") == "30/10/2026")
     #expect(DateStyle.format("2026-10-30", "MM/dd/yyyy") == "10/30/2026")
     #expect(DateStyle.format("2026-10-30", "dd.MM.y") == "30.10.2026")
+    #expect(DateStyle.format("2026-10-30", "EEE, d MMM yyyy") == "Fri, 30 Oct 2026")
+    #expect(DateStyle.format("2026-10-30", "d MMMM yyyy") == "30 October 2026")
+    #expect(DateStyle.format("2026-10-30", "EEEE, d MMMM", thisYear: 2026) == "Friday, 30 October")
+    #expect(DateStyle.format("2027-01-05", "EEEE, d MMMM", thisYear: 2026) == "Tuesday, 5 January 2027")
     UserDefaults.standard.set("dd/MM/yyyy", forKey: DateStyle.key)
     defer { UserDefaults.standard.removeObject(forKey: DateStyle.key) }
     var note = edited(now)

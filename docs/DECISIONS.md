@@ -540,3 +540,13 @@ Made by the subagent that wrote the extension:
   so it needs a shared flag; not worth it for a one-time window).
 - **Status:** Done. Checked by rendering the view offscreen (light); after installing, the app set `welcomeShown` at launch
   (the window was asked to open). Not yet seen on screen by Claude.
+
+## D56 — Dates with the day and month by name (2026-10-29)
+
+- **Asked by the user:** a section in the date format setting that shows the date, day and month.
+- **Chosen by the user:** three more formats in Settings ▸ "Dates in notes", grouped as "With day and month names":
+  "Friday, 30 October" (`EEEE, d MMMM`, which adds the year only for other years), "30 October 2026" and
+  "Fri, 30 Oct 2026". Notes still store `@2026-10-30`; only the chips change.
+- Swift (`DateStyle.format`) and the editor (`formatDay`) share one token rule (E, d, M, y); names are English, like
+  the rest of the app.
+- **Status:** Done. Swift and editor tests cover each format and the other-year case.

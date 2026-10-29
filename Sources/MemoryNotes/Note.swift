@@ -170,7 +170,10 @@ struct DatedLine: Hashable, Identifiable {
 /// and the note previews show it in the pattern chosen in Settings, or the region's (30/10/2026 for en_IN).
 enum DateStyle {
     static let key = "dateFormat"  // "" = Automatic
-    static let choices = ["", "dd/MM/yyyy", "MM/dd/yyyy", "yyyy-MM-dd"]
+    static let numeric = ["", "dd/MM/yyyy", "MM/dd/yyyy", "yyyy-MM-dd"]
+    /// With the day and month by name; a pattern without a year shows it only for other years.
+    static let named = ["EEEE, d MMMM", "d MMMM yyyy", "EEE, d MMM yyyy"]
+    static var choices: [String] { numeric + named }
 
     static var pattern: String {
         let chosen = UserDefaults.standard.string(forKey: key) ?? ""
@@ -180,14 +183,32 @@ enum DateStyle {
     /// The region's numeric date with a 4-digit year: "dd/MM/yyyy" (India, UK), "MM/dd/yyyy" (US), "dd.MM.yyyy" (Germany).
     static var region: String { DateFormatter.dateFormat(fromTemplate: "ddMMyyyy", options: 0, locale: .current) ?? "yyyy-MM-dd" }
 
-    /// "2026-10-30" in `pattern`; the same rule as the editor's formatDay.
-    static func format(_ day: String, _ pattern: String = pattern) -> String {
+    /// "2026-10-30" in `pattern`; the same rule as the editor's formatDay. Names are English, like the app.
+    static func format(_ day: String, _ pattern: String = pattern,
+                       thisYear: Int = Calendar.current.component(.year, from: .now)) -> String {
         let parts = day.split(separator: "-").map(String.init)
-        guard parts.count == 3 else { return day }
-        return pattern.replacing(#/d+|M+|y+/#) { match in
-            switch match.output.first { case "d": parts[2]; case "M": parts[1]; default: parts[0] }
+        guard parts.count == 3, let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2]), (1...12).contains(m) else { return day }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .gmt
+        let weekday = calendar.date(from: DateComponents(year: y, month: m, day: d)).map { calendar.component(.weekday, from: $0) } ?? 1
+        let out = pattern.replacing(#/E+|d+|M+|y+/#) { match in
+            let token = match.output
+            switch token.first {
+            case "E": return token.count > 3 ? names.weekdaySymbols[weekday - 1] : names.shortWeekdaySymbols[weekday - 1]
+            case "d": return token.count > 1 ? parts[2] : String(d)
+            case "M": return token.count > 3 ? names.monthSymbols[m - 1] : token.count == 3 ? names.shortMonthSymbols[m - 1]
+                : token.count == 2 ? parts[1] : String(m)
+            default: return parts[0]
+            }
         }
+        return pattern.contains("y") || y == thisYear ? out : "\(out) \(y)"
     }
+
+    private static let names: DateFormatter = {
+        let names = DateFormatter()
+        names.locale = Locale(identifier: "en_US_POSIX")
+        return names
+    }()
 }
 
 /// Apple Intelligence's title and tags for one version of a note.

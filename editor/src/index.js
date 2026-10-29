@@ -302,10 +302,23 @@ export function dayFor(word, now = new Date()) {
 const DATE = /(^|[\s(\[])((?:@|📅\s?)(\d{4}-\d{2}-\d{2}))(?![\w-])/gu;
 const SHORTHAND = /(?:^|\s)(@(today|tomorrow|yesterday|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?))\s$/i;
 
-/** "2026-10-30" in a date pattern from the host ("dd/MM/yyyy", "MM/dd/yyyy", "dd.MM.yyyy", …). */
-export const formatDay = (iso, pattern) => {
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+  "November", "December"];
+
+/**
+ * "2026-10-30" in a date pattern from the host ("dd/MM/yyyy", "EEE, d MMM yyyy", …): the same rule as DateStyle.format
+ * in Swift. A pattern without a year ("EEEE, d MMMM") shows it only for other years.
+ */
+export const formatDay = (iso, pattern, thisYear = new Date().getFullYear()) => {
   const [y, m, d] = iso.split("-");
-  return pattern.replace(/d+|M+|y+/g, (t) => (t[0] === "d" ? d : t[0] === "M" ? m : y));
+  const weekday = DAY_NAMES[new Date(Date.UTC(+y, m - 1, +d)).getUTCDay()], month = MONTH_NAMES[m - 1] ?? m;
+  const out = pattern.replace(/E+|d+|M+|y+/g, (t) => {
+    if (t[0] === "E") return t.length > 3 ? weekday : weekday.slice(0, 3);
+    if (t[0] === "d") return t.length > 1 ? d : String(+d);
+    if (t[0] === "M") return t.length > 3 ? month : t.length === 3 ? month.slice(0, 3) : t.length === 2 ? m : String(+m);
+    return y;
+  });
+  return pattern.includes("y") || +y === thisYear ? out : `${out} ${y}`;
 };
 
 /**

@@ -203,6 +203,10 @@ check("datePattern shows chips as 30/10/2026, keeps @2026-10-30, and shows the s
   assert.deepEqual(chips(), ["@2026-10-30", "📅 02/11/2026"]);
   assert.equal(MNEditor.formatDay("2026-10-30", "MM/dd/yyyy"), "10/30/2026");
   assert.equal(MNEditor.formatDay("2026-10-30", "dd.MM.y"), "30.10.2026");
+  assert.equal(MNEditor.formatDay("2026-10-30", "EEE, d MMM yyyy"), "Fri, 30 Oct 2026");
+  assert.equal(MNEditor.formatDay("2026-10-30", "d MMMM yyyy"), "30 October 2026");
+  assert.equal(MNEditor.formatDay("2026-10-30", "EEEE, d MMMM", 2026), "Friday, 30 October");
+  assert.equal(MNEditor.formatDay("2027-01-05", "EEEE, d MMMM", 2026), "Tuesday, 5 January 2027");
 });
 check("/ opens the block menu; typing filters it, Return applies the block and removes the /query", () => {
   const key = (k) => ed.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));

@@ -63,9 +63,16 @@ struct DateFormatPicker: View {
 
     var body: some View {
         Picker("Dates in notes", selection: $choice) {
-            ForEach(DateStyle.choices, id: \.self) { pattern in
-                let example = DateStyle.format("2026-10-30", pattern.isEmpty ? DateStyle.region : pattern)
-                Text(pattern.isEmpty ? "Automatic (\(example))" : "\(example)  ·  \(Self.order[pattern] ?? "")").tag(pattern)
+            Section {
+                ForEach(DateStyle.numeric, id: \.self) { pattern in
+                    let example = DateStyle.format("2026-10-30", pattern.isEmpty ? DateStyle.region : pattern)
+                    Text(pattern.isEmpty ? "Automatic (\(example))" : "\(example)  ·  \(Self.order[pattern] ?? "")").tag(pattern)
+                }
+            }
+            Section("With day and month names") {
+                ForEach(DateStyle.named, id: \.self) { pattern in
+                    Text(DateStyle.format("2026-10-30", pattern, thisYear: 2026)).tag(pattern)
+                }
             }
         }
     }
