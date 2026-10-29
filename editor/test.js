@@ -6,6 +6,8 @@ import { Window } from "happy-dom";
 // Only our own build is evaluated; `npm test` runs node with --disallow-code-generation-from-strings, which also
 // proves the bundle needs no eval (CSP-safe for the extension and the app's WebView).
 const window = new Window({ settings: { enableJavaScriptEvaluation: true, suppressInsecureJavaScriptEnvironmentWarning: true } });
+// happy-dom has no compatMode; the real pages declare <!doctype html> (standards mode), which KaTeX requires.
+Object.defineProperty(window.document, "compatMode", { value: "CSS1Compat" });
 window.eval(readFileSync("dist/mn-editor.js", "utf8"));
 const { MNEditor, document } = window;
 assert.ok(MNEditor?.mount, "bundle exposes window.MNEditor.mount");
@@ -237,6 +239,35 @@ check("/divider and /h2 find their blocks", () => {
   ed.editor.commands.insertContent(" /h2");
   ed.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
   assert.match(ed.getMarkdown().trim(), /^## /);
+});
+const maths = (ed) => { const out = []; ed.editor.state.doc.descendants((n) => { if (n.type.name.endsWith("Math")) out.push(`${n.type.name}:${n.attrs.latex}`); }); return out; };
+check("maths: \\(…\\), $…$, $$…$$ and \\[…\\] render and save as $…$ / $$…$$; prices stay text", () => {
+  let ed = mount("Query (\\(Q = XW_Q\\)): what it looks for; costs $5 and $10");
+  assert.deepEqual(maths(ed), ["inlineMath:Q = XW_Q"]);
+  assert.equal(ed.getMarkdown().trim(), "Query ($Q = XW_Q$): what it looks for; costs $5 and $10");
+  assert.ok(ed.editor.view.dom.querySelector('[data-type="inline-math"] math'), "drawn as MathML");
+  ed = mount("\\[\n\\text{softmax}(x_i)\n\\]");
+  assert.deepEqual(maths(ed), ["blockMath:\\text{softmax}(x_i)"]);
+  assert.equal(ed.getMarkdown().trim(), "$$\n\\text{softmax}(x_i)\n$$");
+  ed = mount("$$\n\\frac{QK^T}{\\sqrt{d_k}}\n$$");
+  assert.equal(ed.getMarkdown().trim(), "$$\n\\frac{QK^T}{\\sqrt{d_k}}\n$$");
+});
+check("maths saved as text before (escaped) becomes a formula; typed maths renders once the caret leaves it", () => {
+  const ed = mount("Key (\\\\(K = XW\\_K\\\\)) and more");
+  assert.deepEqual(maths(ed), ["inlineMath:K = XW_K"]);
+  ed.editor.commands.focus("end");
+  ed.editor.commands.insertContent(" \\(V = XW_V\\)");
+  assert.deepEqual(maths(ed), ["inlineMath:K = XW_K"], "not while the caret touches it");
+  ed.editor.commands.insertContent(" done");
+  assert.deepEqual(maths(ed), ["inlineMath:K = XW_K", "inlineMath:V = XW_V"]);
+});
+check("clicking a formula gives its source back to edit", () => {
+  const ed = mount("Value $V = XW_V$ here");
+  ed.editor.view.dom.querySelector('[data-type="inline-math"]').dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  assert.deepEqual(maths(ed), []);
+  assert.equal(ed.editor.state.doc.textContent, "Value $V = XW_V$ here");
+  ed.editor.commands.setTextSelection(1);
+  assert.deepEqual(maths(ed), ["inlineMath:V = XW_V"]);
 });
 check("shortcuts list is exported", () => assert.ok(MNEditor.shortcuts.length >= 20));
 

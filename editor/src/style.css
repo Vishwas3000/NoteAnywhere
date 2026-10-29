@@ -168,3 +168,11 @@
 .mn-hover strong { display: block; margin-bottom: 4px; font-size: 13px; }
 .mn-hover p { margin: 0 0 6px; color: var(--mn-muted); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
 .mn-hover small { color: var(--mn-muted); font-size: 11px; }
+/* Maths (KaTeX → MathML). Click a formula to edit its source. */
+.mn-content .tiptap-mathematics-render { cursor: pointer; border-radius: 4px; }
+.mn-content .tiptap-mathematics-render:hover { background: var(--mn-hover); }
+.mn-content [data-type="inline-math"] math { font-size: 1.05em; }
+.mn-content [data-type="block-math"] { margin: 0.6em 0; padding: 4px 0; text-align: center; overflow-x: auto; }
+.mn-content [data-type="block-math"] math { font-size: 1.15em; }
+.mn-content .inline-math-error, .mn-content .block-math-error { color: #d70015; font-family: ui-monospace, monospace; }
+.mn-content .ProseMirror-selectednode.tiptap-mathematics-render { outline: 2px solid color-mix(in srgb, var(--mn-check) 60%, transparent); }

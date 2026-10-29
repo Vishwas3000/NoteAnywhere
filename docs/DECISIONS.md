@@ -464,3 +464,20 @@ Made by the subagent that wrote the extension:
   hidden from the list (user chose normal notes).
 - **Status:** Decided (user chose the peek, menu items and visibility). Editor tests cover add, link and hover; a
   Swift test covers the page text.
+
+## D52 — Maths in notes (2026-10-29)
+- **Why:** user pasted `\(Q = XW_Q\)` (an AI chat's LaTeX) and it wasn't formatted. Worse, Markdown read `\(` as an
+  escaped bracket, so reopening a note turned it into `(Q = XW_Q)`, and typed text saved as `\\(…\\)` / `XW\_Q`.
+- TipTap's maths nodes (`@tiptap/extension-mathematics` 3.32.0, KaTeX 0.16.47) with our own Markdown tokenizers:
+  `$…$` and `\(…\)` inline, `$$…$$` and `\[…\]` on a line of their own; saved as `$…$` / `$$…$$` (Obsidian's form). The
+  LaTeX is kept exactly; no Markdown escaping touches it.
+- A single `$` follows pandoc's rule (opens before a non-space, closes after one, not before a digit): "$5 and $10" and
+  `$HOME` stay text.
+- Text that reads as maths (pasted, typed, or saved before this, escaped) becomes a formula once the caret leaves it;
+  clicking a formula turns it back into its source, like the date chips.
+- KaTeX renders MathML only, which WebKit and Chrome draw natively: no KaTeX CSS or fonts to ship. The bundle grew
+  from 521 to 794 KB.
+- **Rejected:** KaTeX's HTML output (needs ~20 font files copied into the app, extension and iPhone); Temml (smaller,
+  but TipTap's nodes call KaTeX); rendering math as decorations over text (Markdown would still mangle `_` and `\`).
+- **Status:** Decided (user reported it). Editor tests cover parsing, saving, prices, legacy escaped text, typing and
+  click-to-edit; checked in WebKit, light and dark.

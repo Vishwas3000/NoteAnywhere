@@ -7,6 +7,7 @@ import { TableKit } from "@tiptap/extension-table";
 import Image from "@tiptap/extension-image";
 import { Placeholder } from "@tiptap/extensions";
 import { Markdown } from "@tiptap/markdown";
+import { BlockMath, InlineMath } from "@tiptap/extension-mathematics";
 import { shortcuts } from "./shortcuts.js";
 import "./style.css";
 
@@ -359,6 +360,82 @@ function dates(onDate, pickDate, datePattern) {
       },
     })],
   });
+}
+
+// Maths as notes, Obsidian and AI chats write it: $…$ or \(…\) inline, $$…$$ or \[…\] on a line of its own; saved
+// as $…$ and $$…$$. A single "$" opens only before a non-space and closes only after one, not before a digit
+// (pandoc's rule), so "$5 and $10" stays text.
+const DOLLAR = String.raw`\$(?![\s$])((?:[^$\n\\]|\\.)*?)(?<![\s\\])\$(?!\d)`;
+const INLINE_MATH = new RegExp(String.raw`\\\((.+?)\\\)|\\\[(.+?)\\\]|\$\$([^$\n]+?)\$\$|` + DOLLAR, "g");
+const INLINE_MATH_START = new RegExp(`^(?:${INLINE_MATH.source})`);
+const BLOCK_MATH = /^(?:\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\])[ \t]*(?:\n|$)/;
+const latexOf = (m) => (m[1] ?? m[2] ?? m[3] ?? m[4] ?? "").trim();
+
+/**
+ * Formulas render with KaTeX as MathML, which WebKit and Chrome draw themselves (no fonts to ship). The Markdown
+ * tokenizers keep the LaTeX exactly as written; text that reads as maths (pasted, typed, or saved before maths
+ * worked) becomes a formula once the caret leaves it, and clicking a formula gives its source back to edit.
+ */
+function maths(getEditor) {
+  const katexOptions = { output: "mathml", throwOnError: false };
+  const edit = (node, pos, inline) => {
+    const latex = node.attrs.latex.replace(/\s*\n\s*/g, " ");
+    const source = inline ? `$${latex}$` : `$$${latex}$$`;
+    const content = { type: "text", text: source };
+    getEditor().chain().focus()
+      .insertContentAt({ from: pos, to: pos + node.nodeSize }, inline ? content : { type: "paragraph", content: [content] })
+      .setTextSelection(pos + (inline ? 1 : 3) + latex.length)  // just before the closing $
+      .run();
+  };
+  return [
+    InlineMath.extend({
+      markdownTokenizer: {
+        name: "inlineMath",
+        level: "inline",
+        start: (src) => src.search(/\\[([]|\$/),
+        tokenize: (src) => {
+          const m = INLINE_MATH_START.exec(src);
+          return m && latexOf(m) ? { type: "inlineMath", raw: m[0], latex: latexOf(m) } : undefined;
+        },
+      },
+    }).configure({ katexOptions, onClick: (node, pos) => edit(node, pos, true) }),
+    BlockMath.extend({
+      markdownTokenizer: {
+        name: "blockMath",
+        level: "block",
+        start: (src) => src.search(/^(?:\$\$|\\\[)/m),  // only at a line's start, so paragraphs aren't cut mid-line
+        tokenize: (src) => {
+          const m = BLOCK_MATH.exec(src);
+          return m && latexOf(m) ? { type: "blockMath", raw: m[0], latex: latexOf(m) } : undefined;
+        },
+      },
+    }).configure({ katexOptions: { ...katexOptions, displayMode: true }, onClick: (node, pos) => edit(node, pos, false) }),
+    Extension.create({
+      name: "mnMathFromText",
+      addProseMirrorPlugins: () => [new Plugin({
+        appendTransaction(transactions, _old, state) {
+          if (!transactions.some((t) => t.docChanged || t.selectionSet || t.getMeta("mnMath"))) return null;
+          const { inlineMath, blockMath } = state.schema.nodes, head = state.selection.head, found = [];
+          state.doc.descendants((node, pos, parent) => {
+            if (parent?.type.name === "codeBlock" || !node.isText || node.marks.some((m) => m.type.name === "code")) return;
+            for (const m of node.text.matchAll(INLINE_MATH)) {
+              const from = pos + m.index, to = from + m[0].length, latex = latexOf(m);
+              if (!latex || (head >= from && head <= to)) continue;  // still being typed or edited
+              // "$$…$$" or "\[…\]" alone in a paragraph is display maths; anything else stays in the line.
+              const alone = parent.type.name === "paragraph" && parent.childCount === 1 && node.text.trim() === m[0];
+              found.push(alone && (m[2] != null || m[3] != null)
+                ? { from: pos - 1, to: pos - 1 + parent.nodeSize, node: blockMath.create({ latex }) }
+                : { from, to, node: inlineMath.create({ latex }) });
+            }
+          });
+          if (!found.length) return null;
+          const tr = state.tr;
+          for (const f of found.reverse()) tr.replaceWith(f.from, f.to, f.node);
+          return tr;
+        },
+      })],
+    }),
+  ];
 }
 
 const AT_QUERY = /(?:^|[\s(\[])@([a-z]*)$/i;
@@ -848,6 +925,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     extensions: [
       tagHighlighter(onTag),
       dates(onDate, () => pickDate?.(), datePattern),
+      ...maths(() => editor),
       Extension.create({ name: "mnSlash", addProseMirrorPlugins() { return [slashMenu(this.editor, () => pickDate?.())]; } }),
       dragHandle(),
       StarterKit.configure({ link: { openOnClick: false, protocols: ["note"], autolink: true },
@@ -882,6 +960,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     onUpdate: () => onChange?.(editor.getMarkdown()),
   });
 
+  editor.view.dispatch(editor.state.tr.setMeta("mnMath", true));  // maths saved as text before formulas rendered
   const buttons = TOOLBAR.map((item) => {
     if (!item) {
       bar.append(Object.assign(document.createElement("span"), { className: "mn-sep" }));

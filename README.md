@@ -45,7 +45,8 @@ by default.
 - **A calendar.** Month, week and day views. Dated lines and checklist tasks appear under "Planned", with a circle that
   ticks the task in the note itself. Below them, what you edited that day, with each note as it was then.
 - **A real Markdown editor**, shared by the app and the extension: headings, lists that continue, checklists,
-  tables, code, quotes and links between notes. A Notion-style ⋮⋮ handle drags any block or list item between
+  tables, code, quotes, links between notes and maths: `$…$` or `\(…\)` inline, `$$…$$` or `\[…\]` on its own line
+  (what ChatGPT and Claude give you when you copy an answer), drawn as real formulas; click one to edit it. A Notion-style ⋮⋮ handle drags any block or list item between
   blocks, and ⌘⇧↑/↓ moves the current one.
 - **Organized like Apple Notes.** Right-click a note to open it in its own window, pin it, duplicate it, share it,
   move it to a folder, give it a color label (like Chrome's tab groups) or delete it. The sidebar has Folders, a
@@ -237,6 +238,7 @@ NoteAnywhere is free software under the [GNU General Public License v3.0](LICENS
 | Component | Used for | License |
 |-----------|----------|---------|
 | [TipTap](https://tiptap.dev) and [ProseMirror](https://prosemirror.net) (with marked, linkifyjs and small helpers) | The shared editor, bundled in `editor/dist` and `extension/editor` | MIT |
+| [KaTeX](https://katex.org) and [@tiptap/extension-mathematics](https://tiptap.dev) | Maths in notes, drawn as MathML | MIT |
 | [swift-embeddings](https://github.com/jkrukowski/swift-embeddings) | Running MiniLM in Swift | MIT |
 | Its dependencies: [swift-transformers](https://github.com/huggingface/swift-transformers), swift-huggingface, swift-jinja, swift-collections, swift-crypto, swift-asn1, swift-argument-parser, swift-safetensors, swift-sentencepiece, yyjson, EventSource | Loading and tokenizing the model | Apache-2.0 or MIT |
 | [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) | The search model, downloaded on first use | Apache-2.0 |
