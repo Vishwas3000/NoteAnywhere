@@ -1,20 +1,42 @@
-# NoteAnywhere
+<p align="center"><img src="extension/icons/icon128.png" width="96" alt=""></p>
 
-Notes that show up where they belong: in the app, chat, project or web page they're about.
+<h1 align="center">NoteAnywhere</h1>
 
-**[Download for Mac](https://github.com/Vishwas3000/NoteAnywhere/releases/latest)** ·
-**[Get the browser extension](#install)** · Free and open source (GPL-3.0)
+<p align="center"><b>Notes that show up where they belong:</b> in the chat, channel, project or web page they're about.</p>
 
-![The NoteAnywhere panel on a Wikipedia page, with two notes written for that page](docs/images/hero.png)
+<p align="center">
+  <a href="https://github.com/Vishwas3000/NoteAnywhere/releases/latest"><b>Download for Mac</b></a> ·
+  <a href="#install"><b>Get the browser extension</b></a> ·
+  Free and open source (GPL-3.0)
+</p>
 
-Write a note while you're in a Slack DM, a VS Code project, a WhatsApp chat or on a GitHub page. Next time you're
-back there, the note is waiting in a small floating panel. Everything is also in one Apple Notes–style window, with
-on-device semantic search, a calendar, #tags and a knowledge graph.
+![A note for the #design-review channel, waiting in NoteAnywhere's floating panel next to a chat app](docs/images/chat-channel.png)
+<sub>Illustration with a made-up chat app. The panel and the notes in it are NoteAnywhere's.</sub>
 
-Your notes stay on your Mac in a SQLite database. Search and the AI actions run on-device. Sync is optional and off
-by default.
+## How it works
+
+Write a note while you're in a channel, a DM, a group chat, a code project or on a web page. Next time you're back
+there, it's waiting in a small floating panel.
+
+| Every chat has its own notes | So does every web page |
+|---|---|
+| ![The Family group chat with its own notes in the panel](docs/images/chat-group.png) | ![The NoteAnywhere panel on a Wikipedia page, with two notes for that page](docs/images/browser-page.png) |
+| Open the Family chat and its notes are there. Switch chats, and the notes switch too. | The browser extension shows a page's notes right on the page, in Chrome, Brave, Edge and Arc. |
+
+Everything is also in one Apple Notes–style window, with on-device search, a calendar, #tags and a graph of how your
+notes link up.
 
 ## Features
+
+- **Notes per chat, channel, DM, project or file**: Slack, WhatsApp, VS Code, Xcode and more.
+- **A floating panel** that opens by itself when the place in front has notes. ⌥⇧M shows it anywhere.
+- **Notes on web pages**, kept in step between the browser and the app.
+- **Search by meaning**, on your Mac: ⌥⇧Space from anywhere.
+- **A real Markdown editor**: checklists, tables, code, maths, dates and links between notes.
+- **A calendar and a graph** of your tasks and links.
+- **Private**: notes stay on your Mac, and the optional sync is end-to-end encrypted.
+
+<details><summary>All features in detail</summary>
 
 - **Notes for the app and window you're in.** NoteAnywhere reads the front window's title to know the Slack
   workspace and channel or DM, the VS Code project and file, the Xcode project, the WhatsApp chat, and so on. A broader
@@ -58,6 +80,8 @@ by default.
 - **Optional sync** through Supabase, signing in with a link sent to your email. Folders, pins and colors sync too.
 - **Light on your Mac**: about 0% CPU when idle and 37–65 MB of memory (measured).
 
+</details>
+
 ## Install
 
 Requires macOS 15 or later, and Chrome or Brave for website notes. The ✨ actions need macOS 26 and a Mac that
@@ -85,6 +109,8 @@ The first search downloads the search model once (about 87 MB). Until then, sear
   note that isn't tied to any app or page.
 
 ## Use your notes from Claude, Codex or Gemini (MCP)
+
+<details><summary>Let AI assistants search and update your notes</summary>
 
 NoteAnywhere is also an MCP server, so AI assistants can search your notes, read them, list dated tasks, create notes,
 add to them, tick tasks, and pin, colour or file them. They can't delete notes or open locked ones, and a rewrite is
@@ -115,7 +141,11 @@ Try: "What's on my calendar this week in NoteAnywhere?" or "Add these steps to m
 Tools: `search_notes`, `list_notes`, `get_note`, `list_tasks`, `list_tags`, `list_folders`, `create_note`,
 `append_to_note`, `replace_note_text`, `update_note` (pin, colour, folder), `set_task_done`.
 
+</details>
+
 ## Keyboard shortcuts
+
+<details><summary>Show all shortcuts</summary>
 
 | Keys | Action |
 |------|--------|
@@ -136,6 +166,8 @@ Tools: `search_notes`, `list_notes`, `get_note`, `list_tasks`, `list_tags`, `lis
 | ⌘-click a #tag or date | Show that tag's notes, or that day |
 | ⇧⌘/ | All shortcuts, including every editor shortcut and Markdown trigger |
 
+</details>
+
 ## Privacy
 
 - Notes are stored in `~/Library/Application Support/MemoryNotes/memorynotes.sqlite` on your Mac.
@@ -149,6 +181,8 @@ Tools: `search_notes`, `list_notes`, `get_note`, `list_tasks`, `list_tags`, `lis
 Details in [PRIVACY.md](PRIVACY.md).
 
 ## How context detection works
+
+<details><summary>How a window title becomes a place</summary>
 
 When the front app or its window title changes, NoteAnywhere reads the title through the Accessibility API (it
 subscribes to change notifications; it doesn't poll) and turns it into a path from broad to narrow:
@@ -170,7 +204,11 @@ while the app is in front.
 Limits: titles carry names, not ids, so renaming a channel starts a new place. The parser lives in
 `Sources/MemoryNotes/WindowContext.swift` and is covered by `swift test`.
 
+</details>
+
 ## Build from source
+
+<details><summary>Build, install and test</summary>
 
 You need Xcode 26 (or its command-line tools) and Node.js 20.19+ or 22.12+.
 
@@ -198,7 +236,11 @@ swift test && swift build -c release && python3 scripts/test_host.py && (cd edit
 The browser overlay's show/close/reopen check runs in headless Chromium (needs a global Playwright):
 `node scripts/test_overlay.mjs`.
 
+</details>
+
 ## Architecture
+
+<details><summary>How the app, the extension and the database fit together</summary>
 
 ```
 Chrome/Brave tab ─content.js─▶ overlay.html (extension iframe) ─Native Messaging─▶ NoteAnywhere binary (host mode)
@@ -226,6 +268,8 @@ The project used to be called MemoryNotes, and internal identifiers keep that na
 `com.memorynotes.host`, the `memorynotes://` URL scheme, the data folder) so existing installs keep their notes,
 permissions and sync.
 
+</details>
+
 ## Coming soon
 
 - **An iPhone app**, with a Share extension and a Safari extension (in progress).
@@ -244,6 +288,8 @@ NoteAnywhere is free software under the [GNU General Public License v3.0](LICENS
 
 ## Credits and third-party licenses
 
+<details><summary>Show credits</summary>
+
 | Component | Used for | License |
 |-----------|----------|---------|
 | [TipTap](https://tiptap.dev) and [ProseMirror](https://prosemirror.net) (with marked, linkifyjs and small helpers) | The shared editor, bundled in `editor/dist` and `extension/editor` | MIT |
@@ -255,3 +301,5 @@ NoteAnywhere is free software under the [GNU General Public License v3.0](LICENS
 
 NoteAnywhere was built with a lot of help from Claude Code. The decision log records which calls were the author's
 and which the AI proposed.
+
+</details>

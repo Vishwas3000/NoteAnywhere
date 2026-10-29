@@ -16,6 +16,9 @@ struct WelcomeView: View {
             }
             .frame(maxWidth: .infinity)
 
+            Text("Notes follow the chat, DM or channel you're in. Write one in #design-review, and it's there the next time you are.")
+                .fixedSize(horizontal: false, vertical: true)
+
             step(1, "Allow Accessibility", "So notes can follow the chat, channel or file you're in, not just the app.",
                  done: trusted ? "Allowed" : nil) {
                 Button("Open Settings") {
