@@ -35,6 +35,15 @@ signature from any team other than GH5YVSN865 (`NOTEANYWHERE_TEAM_ID`).
    ```
 3. Check: `xcrun notarytool history --keychain-profile NoteAnywhere` lists submissions (none yet) without an error.
 
+The password prompt needs a real terminal: run step 2 in Terminal, not through an agent's shell, where it reads an
+empty password and Apple answers 401. Or skip the password and use an App Store Connect API key (what 0.1.0 used):
+[appstoreconnect.apple.com](https://appstoreconnect.apple.com) → Users and Access → Integrations → generate a key with the
+Developer role and download the `.p8` (once only). Keep it out of the repo, e.g. in `~/.appstoreconnect/private_keys/`:
+```sh
+xcrun notarytool store-credentials NoteAnywhere --key ~/.appstoreconnect/private_keys/AuthKey_<KEY ID>.p8 \
+  --key-id <KEY ID> --issuer <ISSUER ID>   # leave out --issuer for an Individual key
+```
+
 Another profile name works with `NOTARY_PROFILE=<name> scripts/release.sh`.
 
 ## Cutting a release

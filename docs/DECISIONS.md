@@ -510,3 +510,18 @@ Made by the subagent that wrote the extension:
   vault tests, and a headless Chromium run with the real host: a note's image shows, a pasted screenshot is kept.
   WebKit loads `noteimage:` from the editor's file page. The Supabase migration is written and was checked in a local
   Postgres; it is **not applied** to the hosted project yet, and the Storage calls haven't run against a real server.
+
+## D54 — First release: NoteAnywhere 0.1.0 on GitHub (2026-10-29)
+
+- **Asked by the user:** "can you add the dmg in the github", notarized first.
+- Built by `scripts/release.sh` from 087ca14 (tag `v0.1.0`), the last commit before images (D53), whose Supabase
+  migration isn't applied yet. Universal (Apple silicon and Intel), macOS 15+, Developer ID signed, notarized and
+  stapled; `spctl` accepts the DMG and the app inside, and the downloaded asset matches the local file (SHA-256
+  0da4605d…). The release has the DMG only; the extension zip goes to the Chrome Web Store.
+- Notarization signs in with an App Store Connect API key (Team key, Developer role) saved as the `NoteAnywhere`
+  keychain profile. The app-specific password route failed: the agent's shell has no terminal, so the prompt read an
+  empty password (401). The `.p8` lives in `~/.appstoreconnect/private_keys/`, outside the repo.
+- **Chosen by the user:** publish now rather than wait for the Web Store id. 0.1.0 only trusts the unpacked development
+  extension (`BrowserBridge.devExtensionID`), so the store extension needs a follow-up release with
+  `storeExtensionID` set; store review takes days, so that release can be out first.
+- **Status:** Done. Published at https://github.com/Vishwas3000/NoteAnywhere/releases/tag/v0.1.0.
