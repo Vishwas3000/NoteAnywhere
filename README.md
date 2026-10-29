@@ -189,6 +189,9 @@ Tests:
 swift test && swift build -c release && python3 scripts/test_host.py && (cd editor && npm test)
 ```
 
+The browser overlay's show/close/reopen check runs in headless Chromium (needs a global Playwright):
+`node scripts/test_overlay.mjs`.
+
 ## Architecture
 
 ```

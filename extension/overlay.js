@@ -6,7 +6,7 @@ const MISSING = "Install NoteAnywhere for Mac and open it once: vishwas3000.gith
 let tabId, page = {};
 let notes = [], visible = false, dismissed = false, collapsed = false, forced = false, error = "";
 let query = "", results = [], searchSeq = 0, searchTimer, changeTimer;
-let editors = [], stamps = [], toolbarOn = false, expanded = false, watching = false, hostH;
+let editors = [], stamps = [], toolbarOn = false, expanded = false, watching = false, hostH, lastHeight = 0;
 let datePattern; // the Mac app's Settings ▸ "Dates in notes", sent with each list
 
 const $ = (s) => document.querySelector(s);
@@ -56,7 +56,9 @@ function edited(ms) {
 function report() {
   if (tabId === undefined) return; // not wired up yet; the first load reports
   const shown = query ? resultList : help.hidden ? list : help;
-  const height = expanded && !collapsed && hostH ? hostH : panel.offsetHeight - shown.clientHeight + shown.scrollHeight;
+  let height = expanded && !collapsed && hostH ? hostH : panel.offsetHeight - shown.clientHeight + shown.scrollHeight;
+  // A hidden frame isn't laid out, so the panel measures 0 when reopened: show it at its last size, measure once drawn.
+  if (visible && !height) { height = lastHeight; requestAnimationFrame(report); } else if (height) lastHeight = height;
   chrome.tabs.sendMessage(tabId, { type: "mn:frame", visible, height, width: panel.offsetWidth }, { frameId: 0 })
     .then((h) => {
       if (!h || h === hostH) return;
