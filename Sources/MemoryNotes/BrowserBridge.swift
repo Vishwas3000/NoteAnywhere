@@ -6,13 +6,15 @@ enum BrowserBridge {
     static let hostName = "com.memorynotes.host"
     /// The unpacked extension's id, pinned by the "key" in extension/manifest.json (D3).
     static let devExtensionID = "fmjimldgmehkakonbffiaacmpijhajop"
-    /// FILL IN: the id the Chrome Web Store assigns on the first upload (docs/RELEASING.md), then ship a new app release.
-    static let storeExtensionID = ""
-    /// Where to get the extension: its Web Store page once it has an id; until then the latest release, whose notes say
-    /// how to load it unpacked.
+    /// The id the Chrome Web Store assigned (docs/RELEASING.md); apps from before it was set only trust the unpacked one.
+    static let storeExtensionID = "fngldbimlphnokkkkodneojgbdnofjha"
+    /// Set once the store approves the listing; until then its page says "not found".
+    static let storeListed = false
+    /// Where to get the extension: its Web Store page once listed; until then the latest release, whose notes say how to
+    /// load it unpacked.
     static var extensionPage: URL {
-        URL(string: storeExtensionID.isEmpty ? "https://github.com/Vishwas3000/NoteAnywhere/releases/latest"
-                                             : "https://chromewebstore.google.com/detail/\(storeExtensionID)")!
+        URL(string: storeListed ? "https://chromewebstore.google.com/detail/\(storeExtensionID)"
+                                : "https://github.com/Vishwas3000/NoteAnywhere/releases/latest")!
     }
 
     /// User-data folders under ~/Library/Application Support; each browser reads NativeMessagingHosts/ inside its own.
