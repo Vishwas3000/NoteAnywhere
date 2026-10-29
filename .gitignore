@@ -6,3 +6,7 @@ supabase/.temp/
 ios/MemoryNotes.xcodeproj/
 .signing-identity
 dist/
+# Signing and notarization exports (docs/RELEASING.md), and local env files
+*.p8
+*.p12
+.env*
