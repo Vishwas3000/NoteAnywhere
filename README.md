@@ -74,6 +74,37 @@ The first search downloads the search model once (about 87 MB). Until then, sear
 - **Everything.** Menu-bar icon ▸ Open Notes shows all notes, the calendar (⌘2) and the graph (⌘3). ⌘N makes a
   note that isn't tied to any app or page.
 
+## Use your notes from Claude, Codex or Gemini (MCP)
+
+NoteAnywhere is also an MCP server, so AI assistants can search your notes, read them, list dated tasks, create notes,
+add to them, tick tasks, and pin, colour or file them. They can't delete notes or open locked ones, and a rewrite is
+refused if the note changed since the assistant read it. Everything runs on your Mac; the assistant sees what its
+tools return.
+
+The server is the app itself: `/Applications/NoteAnywhere.app/Contents/MacOS/MemoryNotes --mcp`
+(`~/Applications/…` if you built it with `scripts/install.sh`). Use the full path; `~` isn't expanded in JSON or TOML.
+
+**Claude Code**
+```sh
+claude mcp add -s user noteanywhere -- /Applications/NoteAnywhere.app/Contents/MacOS/MemoryNotes --mcp
+```
+
+**Codex**
+```sh
+codex mcp add noteanywhere -- /Applications/NoteAnywhere.app/Contents/MacOS/MemoryNotes --mcp
+```
+
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`, then restart Claude) and
+**Gemini CLI** (`~/.gemini/settings.json`; Gemini loads it only in folders you trust):
+```json
+{ "mcpServers": { "noteanywhere": { "command": "/Applications/NoteAnywhere.app/Contents/MacOS/MemoryNotes", "args": ["--mcp"] } } }
+```
+
+Try: "What's on my calendar this week in NoteAnywhere?" or "Add these steps to my launch plan note."
+
+Tools: `search_notes`, `list_notes`, `get_note`, `list_tasks`, `list_tags`, `list_folders`, `create_note`,
+`append_to_note`, `replace_note_text`, `update_note` (pin, colour, folder), `set_task_done`.
+
 ## Keyboard shortcuts
 
 | Keys | Action |
@@ -88,6 +119,7 @@ The first search downloads the search model once (about 87 MB). Until then, sear
 | ⌘⌫ | Delete the selected note (asks first) |
 | ⌘⇧↑ / ⌘⇧↓ | Move the current block or list item |
 | ⌘⇧9 | Checklist |
+| `/` | Block menu: headings, lists, to-do, quote, code, table, date; `/break page` draws a divider |
 | `@` | Date menu: Today, Tomorrow, the coming week, Pick a date… |
 | `@today`, `@fri` + Space | Put this line on a day in the calendar |
 | ⌘-click a #tag or date | Show that tag's notes, or that day |

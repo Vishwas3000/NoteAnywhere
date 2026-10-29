@@ -50,7 +50,7 @@ enum NativeHost {
     }
 
     /// The host loop is synchronous; run one async call to completion.
-    private static func blocking<T>(_ work: @escaping () async -> T) -> T {
+    static func blocking<T>(_ work: @escaping () async -> T) -> T {
         var result: T?
         let done = DispatchSemaphore(value: 0)
         Task.detached {

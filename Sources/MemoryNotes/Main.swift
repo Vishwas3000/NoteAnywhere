@@ -8,6 +8,8 @@ enum Main {
         if CommandLine.arguments.dropFirst().first?.hasPrefix("chrome-extension://") == true {
             NativeHost.run()
         }
+        // AI apps (Claude, Codex, Gemini) launch it as an MCP server: MemoryNotes --mcp.
+        if CommandLine.arguments.dropFirst().first == "--mcp" { MCPServer.run() }
         MemoryNotesApp.main()
     }
 }

@@ -423,3 +423,23 @@ Made by the subagent that wrote the extension:
 - The "@" date menu and the "/" menu now share one popup (`suggestMenu`), so they behave the same.
 - **Rejected:** a page break for print/PDF (user picked the divider); a long Notion-sized list (user: most used only).
 - **Status:** Decided (user asked). Editor tests cover filter, apply, divider, to-do, Esc and no menu inside URLs.
+
+## D50 — An MCP server for Claude, Codex and Gemini (2026-10-29)
+- **Why:** user wants Claude, Codex and Gemini sessions to work with their notes; chose "read + full edit, no delete".
+- The app's own binary runs as a stdio MCP server (`MemoryNotes --mcp`), like the browser host: no extra install, the
+  same NoteStore, search and save path, so edits sync, get a day snapshot and show in the open app at once.
+- Dual-era: the 2026-07-28 protocol (`_meta` per request, `server/discover`) and the older `initialize` handshake
+  (2024-11-05 to 2025-11-25) that clients still speak.
+- 11 tools: search, list, get, tasks, tags, folders, create, append, replace (refused if the note changed since it was
+  read; the stamp is checked whether sent as a number, float or string, and junk is refused), update
+  pin/colour/folder, tick a task. Summaries by default, full text only from get_note.
+- No delete tool. Locked notes' text is never returned or written; pin, colour and folder still work, as in the app.
+- Registered for the user in Claude Code (user scope), Codex, Claude Desktop and Gemini CLI (user settings; Gemini
+  loads it only in trusted folders). Config backups were kept outside the repo.
+- **Rejected:** the official Swift MCP SDK (a dependency for ~400 lines of JSON-RPC); a separate server process or
+  HTTP transport (stdio is what all four clients launch); exposing notes as MCP resources (tools work in every client,
+  resources don't).
+- Built by a parallel agent; the parent reviewed it and fixed the stale-stamp check, which skipped string or float
+  stamps.
+- **Status:** Decided (user chose the access level and clients). Tested over stdio (scripts/test_mcp.py) and
+  `claude mcp list` shows it connected; not yet used in a real conversation.
