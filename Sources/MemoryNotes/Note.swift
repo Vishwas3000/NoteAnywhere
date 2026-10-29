@@ -52,9 +52,9 @@ struct Folder: Identifiable, Hashable {
 
 extension Note {
     /// The first line without Markdown, like the title Apple Notes shows in its list.
-    var title: String { locked ? "Locked Note" : plainLines.first ?? "New Note" }
+    var title: String { locked ? "Locked Note" : plainLines(1).first ?? "New Note" }
     /// What follows the title, flattened to one line.
-    var preview: String { locked ? "" : plainLines.dropFirst().prefix(4).joined(separator: " ") }
+    var preview: String { locked ? "" : plainLines(5).dropFirst().joined(separator: " ") }
     var edited: Date { Date(timeIntervalSince1970: updatedAt / 1000) }
     /// A note can stand alone: no app or website, stored as a website note without an address.
     var hasSource: Bool { !target.isEmpty }
@@ -66,7 +66,7 @@ extension Note {
         var inFence = false, seen = Set<String>(), found: [String] = []
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
             if line.hasPrefix("```") { inFence.toggle(); continue }
-            if inFence { continue }
+            if inFence || !line.contains("#") { continue }  // Swift Regex is slow; most lines have no tag
             let prose = line.replacing(#/`[^`]*`|\]\([^)]*\)|<[^>]*>/#, with: " ")  // code spans, link targets, autolinks
             for match in prose.matches(of: #/(?:^|[\s(\[{,;:!?])#([\w\-/]*[^\W\d][\w\-/]*)/#) {
                 let tag = String(match.1).lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -83,7 +83,7 @@ extension Note {
         var inFence = false, found: [DatedLine] = []
         for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
             if line.hasPrefix("```") { inFence.toggle(); continue }
-            if inFence { continue }
+            if inFence || !(line.contains("@") || line.contains("📅")) { continue }  // most lines have no date
             let prose = line.replacing(#/`[^`]*`/#, with: " ")
             let days = prose.matches(of: #/(?:^|[\s(\[])(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?![\w-])/#).map { String($0.1) }
                 .filter { DatedLine.isDay($0) }
@@ -102,18 +102,24 @@ extension Note {
     /// True for "#project" on a note tagged #project or #project/notes, like Obsidian's tag search.
     func hasTag(_ tag: String) -> Bool { tags.contains { $0 == tag || $0.hasPrefix(tag + "/") } }
 
-    private var plainLines: [String] {
-        var inFence = false
-        return text.split(separator: "\n").compactMap { line in
-            if line.hasPrefix("```") { inFence.toggle(); return nil }
+    /// The first `limit` non-empty lines as plain text; the sidebar asks for every note's title and preview.
+    private func plainLines(_ limit: Int) -> [String] {
+        var inFence = false, found: [String] = []
+        for line in text.split(separator: "\n") {
+            if found.count == limit { break }
+            if line.hasPrefix("```") { inFence.toggle(); continue }
             let plain = inFence ? String(line).trimmingCharacters(in: .whitespaces) : Self.plain(line)
-            return plain.isEmpty ? nil : plain
+            if !plain.isEmpty { found.append(plain) }
         }
+        return found
     }
 
     /// One line of Markdown as plain text: no heading/list/quote/checkbox markers, emphasis, code ticks or link targets.
     static func plain(_ line: Substring) -> String {
-        line.replacing(#/^\s*(#{1,6}\s+|>\s*|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)*/#, with: "")
+        // Every pattern below needs one of these, or a list number; plain prose skips the (slow) regexes.
+        guard line.contains(where: { "#>-*+_~`[|".contains($0) }) || line.drop(while: \.isWhitespace).first?.isNumber == true
+        else { return line.trimmingCharacters(in: .whitespaces) }
+        return line.replacing(#/^\s*(#{1,6}\s+|>\s*|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)*/#, with: "")
             .replacing(#/^\s*(-{3,}|\*{3,}|_{3,}|\|?[\s:|-]+\|[\s:|-]*)\s*$/#, with: "")  // rules, table separators
             .replacing(#/!?\[([^\]]*)\]\([^)]*\)/#) { $0.1 }
             .replacing(#/\*\*|__|~~|`/#, with: "")

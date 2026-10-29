@@ -23,6 +23,7 @@ struct CalendarView: View {
 
     var body: some View {
         let days = Dictionary(grouping: model.snapshots.filter { filter.isEmpty || sourceKey($0.note) == filter }, by: \.day)
+        let due = dueByDay()  // once per draw: it reads every note
         VStack(alignment: .leading, spacing: 0) {
             Text(title).font(.largeTitle.bold()).lineLimit(1).padding([.horizontal, .top]).padding(.bottom, 8)
             Divider()
@@ -31,9 +32,9 @@ struct CalendarView: View {
                     "Notes appear on the days you edit them. Type @today or @tomorrow in a note to put a line or task on a day."))
             } else {
                 switch mode {
-                case .month: month(days)
-                case .week: week(days)
-                case .day: day(days)
+                case .month: month(days, due)
+                case .week: week(days, due)
+                case .day: day(days, due)
                 }
             }
         }
@@ -74,7 +75,7 @@ struct CalendarView: View {
 
     // MARK: Views
 
-    private func month(_ days: [String: [Snapshot]]) -> some View {
+    private func month(_ days: [String: [Snapshot]], _ due: [String: [DatedLine]]) -> some View {
         let start = weekStart(cal.dateInterval(of: .month, for: date)!.start)
         let symbols = cal.shortWeekdaySymbols
         let headers = Array(symbols[(cal.firstWeekday - 1)...] + symbols[..<(cal.firstWeekday - 1)])
@@ -88,16 +89,15 @@ struct CalendarView: View {
                 HStack(spacing: 0) {
                     ForEach(0..<7, id: \.self) { col in
                         let d = cal.date(byAdding: .day, value: row * 7 + col, to: start)!
-                        monthCell(d, days[key(d)] ?? [])
+                        monthCell(d, days[key(d)] ?? [], planned: due[key(d)] ?? [])
                     }
                 }
             }
         }
     }
 
-    private func monthCell(_ d: Date, _ items: [Snapshot]) -> some View {
+    private func monthCell(_ d: Date, _ items: [Snapshot], planned: [DatedLine]) -> some View {
         let inMonth = cal.isDate(d, equalTo: date, toGranularity: .month)
-        let planned = due[key(d)] ?? []
         let edited = items.prefix(max(0, 3 - planned.count))
         let hidden = planned.count + items.count - min(planned.count, 3) - edited.count
         return Button { open(d) } label: {
@@ -126,7 +126,7 @@ struct CalendarView: View {
         .accessibilityLabel("\(d.formatted(date: .complete, time: .omitted)), \(planned.count) planned, \(items.count) notes edited")
     }
 
-    private func week(_ days: [String: [Snapshot]]) -> some View {
+    private func week(_ days: [String: [Snapshot]], _ due: [String: [DatedLine]]) -> some View {
         let start = weekStart(date)
         let dates = (0..<7).map { cal.date(byAdding: .day, value: $0, to: start)! }
         return HStack(alignment: .top, spacing: 0) {
@@ -191,7 +191,7 @@ struct CalendarView: View {
     }
 
     @ViewBuilder
-    private func day(_ days: [String: [Snapshot]]) -> some View {
+    private func day(_ days: [String: [Snapshot]], _ due: [String: [DatedLine]]) -> some View {
         let items = days[key(date)] ?? [], planned = due[key(date)] ?? []
         if items.isEmpty && planned.isEmpty {
             ContentUnavailableView("Nothing on This Day", systemImage: "calendar",
@@ -221,7 +221,7 @@ struct CalendarView: View {
     // MARK: Planned (dated lines)
 
     /// Dated lines by day, for the notes the filter lets through.
-    private var due: [String: [DatedLine]] {
+    private func dueByDay() -> [String: [DatedLine]] {
         Dictionary(grouping: model.notes.filter { filter.isEmpty || sourceKey($0) == filter }.flatMap(\.dates), by: \.day)
     }
 
