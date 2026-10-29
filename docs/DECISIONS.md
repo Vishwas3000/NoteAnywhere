@@ -551,3 +551,13 @@ Made by the subagent that wrote the extension:
 - Swift (`DateStyle.format`) and the editor (`formatDay`) share one token rule (E, d, M, y); names are English, like
   the rest of the app.
 - **Status:** Done. Swift and editor tests cover each format and the other-year case.
+
+## D57 — Release 0.1.1: images, welcome window, store extension (2026-10-29)
+
+- **Chosen by the user:** everything on main plus the database update, over a store-ID-only release. The images
+  migration (D53) was applied to the hosted Supabase project first (`supabase db push`, user approved).
+- The app trusts the Web Store extension (`fngldbimlphnokkkkodneojgbdnofjha`). `BrowserBridge.storeListed` stays false
+  until Google approves the listing, so "Get the Extension" opens the GitHub release instead of a "not found" page.
+- Built from d2f6561 (tag `v0.1.1`); notarized, stapled, universal; the downloaded asset matches (SHA-256 d0bfcbe7…).
+  The store is reviewing the 0.1.0 extension zip; the 0.1.1 zip (image paste) goes up as an update after approval.
+- **Status:** Done. https://github.com/Vishwas3000/NoteAnywhere/releases/tag/v0.1.1
