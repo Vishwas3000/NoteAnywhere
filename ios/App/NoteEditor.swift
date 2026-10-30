@@ -63,6 +63,7 @@ private struct EditorWebView: UIViewRepresentable {
         web.scrollView.backgroundColor = .clear
         web.scrollView.keyboardDismissMode = .interactive
         web.navigationDelegate = context.coordinator
+        web.uiDelegate = context.coordinator
         web.loadFileURL(dir.appendingPathComponent("editor.html"), allowingReadAccessTo: dir)
         context.coordinator.web = web
         return web
@@ -81,7 +82,7 @@ private struct EditorWebView: UIViewRepresentable {
         (try? JSONSerialization.data(withJSONObject: value, options: .fragmentsAllowed)).flatMap { String(data: $0, encoding: .utf8) } ?? "null"
     }
 
-    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
         var parent: EditorWebView
         weak var web: WKWebView?
         private var ready = false
@@ -154,6 +155,13 @@ private struct EditorWebView: UIViewRepresentable {
                 return decisionHandler(.cancel)
             }
             decisionHandler(.allow)
+        }
+
+        // The editor opens web links with window.open; WebKit drops that without a UI delegate.
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                     for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            if let url = action.request.url { UIApplication.shared.open(url) }
+            return nil
         }
     }
 }

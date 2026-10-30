@@ -1052,7 +1052,8 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     contentType: "markdown",
     editorProps: {
       attributes: { class: "mn-content", role: "textbox", "aria-multiline": "true", "aria-label": placeholder },
-      // Runs before the link plugin: note:// goes to the host, web links open in a new tab with ⌘-click.
+      // Runs before the link plugin: note:// goes to the host, web links open in a new tab on click or tap, like Notes
+      // (shift-click still extends the selection; ⌘K or the link button edits a link).
       handleClick(view, pos, event) {
         const href = event.target.closest?.("a")?.getAttribute("href");
         if (!href) return false;
@@ -1060,7 +1061,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
           onLinkNote?.(href.slice("note://".length));
           return true;
         }
-        if (event.metaKey) {
+        if (!event.shiftKey && !/^\s*(javascript|data|vbscript):/i.test(href)) {
           window.open(href, "_blank", "noopener");
           return true;
         }

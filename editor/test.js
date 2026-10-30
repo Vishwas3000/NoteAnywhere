@@ -85,6 +85,25 @@ check("note:// link click calls onLinkNote", () => {
   if (got === undefined) ed.editor.view.someProp("handleClick", (f) => f(ed.editor.view, 2, { target: ed.editor.view.dom.querySelector("a") }));
   assert.equal(got, "ABCD-1234");
 });
+check("a click or tap opens a web link; shift-click and javascript: links don't", () => {
+  const opened = [];
+  const open = window.open;
+  window.open = (href) => opened.push(href);
+  const click = (md, event = {}) => {
+    const ed = mount(md);
+    ed.editor.view.someProp("handleClick", (f) => f(ed.editor.view, 2, { target: ed.editor.view.dom.querySelector("a"), ...event }));
+  };
+  click("[site](https://example.com)");
+  click("[site](https://example.org)", { shiftKey: true });
+  try {
+    // The schema already drops javascript: links, so hand the click one directly.
+    const fake = { closest: () => ({ getAttribute: () => "javascript:alert(1)" }) };
+    click("[site](https://example.net)", { target: fake });
+  } finally {
+    window.open = open;
+  }
+  assert.deepEqual(opened, ["https://example.com"]);
+});
 check("Shift-Enter in a code block adds a line inside it", () => {
   const ed = mount("```\na\n```");
   press(ed, "a", "Enter", true);
