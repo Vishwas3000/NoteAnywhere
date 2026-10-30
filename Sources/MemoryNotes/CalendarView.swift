@@ -126,13 +126,20 @@ struct CalendarView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .overlay(Rectangle().stroke(.separator, lineWidth: 0.5))
+        .background(Rectangle().stroke(.separator, lineWidth: 0.5))  // under the range strips, which run across it
         .accessibilityLabel("\(d.formatted(date: .complete, time: .omitted)), \(planned.count) planned, \(items.count) notes edited")
     }
 
     private func week(_ days: [String: [Snapshot]], _ due: [String: [DatedLine]]) -> some View {
         let start = weekStart(date)
         let dates = (0..<7).map { cal.date(byAdding: .day, value: $0, to: start)! }
+        // Ranges touching the week go in rows shared by every column, so a strip lines up from day to day; one that
+        // starts after a row's last range ends joins that row.
+        var seen = Set<String>(), rows: [[DatedLine]] = []
+        for range in dates.flatMap({ due[key($0)] ?? [] }).filter({ $0.isRange && seen.insert("\($0.noteID)/\($0.line)/\($0.first!)").inserted })
+            .sorted(by: { ($0.first!, $1.last!) < ($1.first!, $0.last!) }) {
+            if let i = rows.firstIndex(where: { $0.last!.last! < range.first! }) { rows[i].append(range) } else { rows.append([range]) }
+        }
         return HStack(alignment: .top, spacing: 0) {
             ForEach(dates, id: \.self) { d in
                 VStack(alignment: .leading, spacing: 8) {
@@ -144,9 +151,18 @@ struct CalendarView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open \(d.formatted(date: .complete, time: .omitted))")
+                    ForEach(rows.indices, id: \.self) { row in
+                        if let item = rows[row].first(where: { ($0.first!...$0.last!).contains(key(d)) }) {
+                            Button { model.openRequest = item.noteID } label: { rangeBar(item, d, inset: 8) }
+                                .buttonStyle(.plain)
+                                .accessibilityHint("Opens the note")
+                        } else {
+                            rangeBar(rows[row][0], d, inset: 8).hidden()  // keeps the row, so the strips below stay level
+                        }
+                    }
                     ScrollView {
                         VStack(alignment: .leading, spacing: 6) {
-                            ForEach(due[key(d)] ?? []) { plannedRow($0, compact: true) }
+                            ForEach((due[key(d)] ?? []).filter { !$0.isRange }) { plannedRow($0, compact: true) }
                             ForEach(days[key(d)] ?? []) { s in
                                 Button { open(d) } label: { card(s) }.buttonStyle(.plain)
                             }
@@ -155,7 +171,7 @@ struct CalendarView: View {
                 }
                 .padding(8)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .overlay(alignment: .trailing) { Divider() }
+                .background(alignment: .trailing) { Divider() }  // under the range strips, which run across it
             }
         }
         .overlay {
@@ -235,17 +251,19 @@ struct CalendarView: View {
 
     /// One day of a range: a tinted bar that runs into the next day's cell, rounded where the range starts and ends.
     /// The title shows on the first day and again where a week begins.
-    private func rangeBar(_ item: DatedLine, _ d: Date) -> some View {
+    private func rangeBar(_ item: DatedLine, _ d: Date, inset: CGFloat = 6) -> some View {
         let day = key(d), starts = day == item.first, ends = day == item.last
         let titled = starts || cal.component(.weekday, from: d) == cal.firstWeekday
         return Text(titled ? item.text : " ")
             .font(.caption.weight(.medium)).lineLimit(1)
             .padding(.horizontal, 5).padding(.vertical, 1)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(color(item).opacity(0.3), in: UnevenRoundedRectangle(
-                topLeadingRadius: starts ? 4 : 0, bottomLeadingRadius: starts ? 4 : 0,
-                bottomTrailingRadius: ends ? 4 : 0, topTrailingRadius: ends ? 4 : 0))
-            .padding(.leading, starts ? 0 : -6).padding(.trailing, ends ? 0 : -6)  // over the cell's padding, to its edges
+            .background {
+                let shape = UnevenRoundedRectangle(topLeadingRadius: starts ? 4 : 0, bottomLeadingRadius: starts ? 4 : 0,
+                                                   bottomTrailingRadius: ends ? 4 : 0, topTrailingRadius: ends ? 4 : 0)
+                shape.fill(.background).overlay(shape.fill(color(item).opacity(0.3)))  // opaque, so no grid line shows through
+            }
+            .padding(.leading, starts ? 0 : -inset).padding(.trailing, ends ? 0 : -inset)  // over the cell's padding, to its edges
             .accessibilityLabel("\(item.text), \(span(item))")
     }
 

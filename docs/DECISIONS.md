@@ -617,6 +617,9 @@ Made by the subagent that wrote the extension:
 - **By Claude:** Mac month view draws a tinted bar running across the cells, rounded at the ends, titled on the first
   day and where a week starts; week and day views tint the row and show "3 Dec – 6 Dec". iPhone month view draws a thin
   bar under the day numbers. Ranges sort first, earliest start first, so a bar mostly keeps its row.
+- **Asked by the user (follow-up):** the strip should be continuous in the week view too. Ranges there sit above each
+  day's list in rows shared by all seven columns (a range that starts after a row's last one ends joins that row), so
+  each strip runs unbroken across the days; grid lines and column dividers now draw under the strips, which are opaque.
 - shortcut: a range stops after 366 days; overlapping ranges with different starts can step down a row.
 - **Status:** Done. Swift tests (parsing, order, colour); the real Mac calendar rendered offscreen in light and dark
   from demo notes. iPhone builds; its calendar not looked at.
