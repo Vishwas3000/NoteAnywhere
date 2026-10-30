@@ -196,6 +196,7 @@ struct NotesWindow: View {
         .onChange(of: model.openRequest, initial: true) { _, id in  // initial: a request made while the window was closed
             guard let id else { return }
             query = ""
+            if folderFilter != nil, model.notes.first(where: { $0.id == id })?.folderID != folderFilter { folderFilter = nil }  // so its row shows too
             switchTo(.notes)
             selection = id
             model.openRequest = nil

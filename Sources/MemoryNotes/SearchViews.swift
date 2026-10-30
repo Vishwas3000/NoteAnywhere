@@ -2,22 +2,24 @@ import AppKit
 import Carbon
 import SwiftUI
 
-/// Search hits for `query`; a hit expands in place into an editor. Used by the hotkey popup and the overlay.
-/// The popup drives `selection` (↑/↓) and bumps `submits` (Return) from its search field, which keeps focus.
+/// Search hits for `query`; a hit expands in place into an editor, or goes to `open` when given. Used by the hotkey
+/// popup and the overlay. The popup drives `selection` (↑/↓) and bumps `submits` (Return) from its search field, which keeps focus.
 struct SearchResultsView: View {
     let query: String
     @Binding var selection: Int
     var submits = 0
+    var open: ((Note) -> Void)?
     @ObservedObject private var model = NotesModel.shared
     @Environment(\.colorSchemeContrast) private var contrast
     @State private var hits: [SearchIndex.Hit] = []
     @State private var searched: String?  // the query `hits` belongs to; no empty state while still debouncing
     @State private var expanded: String?
 
-    init(query: String, selection: Binding<Int> = .constant(-1), submits: Int = 0) {
+    init(query: String, selection: Binding<Int> = .constant(-1), submits: Int = 0, open: ((Note) -> Void)? = nil) {
         self.query = query
         _selection = selection
         self.submits = submits
+        self.open = open
     }
 
     var body: some View {
@@ -45,7 +47,7 @@ struct SearchResultsView: View {
         }
         .onChange(of: submits) {
             guard hits.indices.contains(selection) else { return }
-            toggle(hits[selection].note.id)
+            choose(hits[selection].note)
         }
         .task(id: query) {
             try? await Task.sleep(for: .milliseconds(250))  // debounce typing
@@ -56,8 +58,9 @@ struct SearchResultsView: View {
         }
     }
 
-    private func toggle(_ id: String) {
-        expanded = expanded == id ? nil : id
+    private func choose(_ note: Note) {
+        if let open { return open(note) }
+        expanded = expanded == note.id ? nil : note.id
     }
 
     /// Apple Notes style: bold title, then the preview, then where the note lives and when it was edited.
@@ -67,7 +70,7 @@ struct SearchResultsView: View {
         return VStack(alignment: .leading, spacing: 6) {
             Button {
                 selection = index
-                toggle(note.id)
+                choose(note)
             } label: {
                 HStack(alignment: .top, spacing: 10) {
                     NoteIcon(note: note, size: 24)
@@ -89,7 +92,7 @@ struct SearchResultsView: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(selected ? .isSelected : [])
-            .accessibilityHint(isOpen ? "Closes the editor" : "Opens the note for editing")
+            .accessibilityHint(open != nil ? "Opens the note in NoteAnywhere" : isOpen ? "Closes the editor" : "Opens the note for editing")
             if isOpen {
                 NoteEditor(noteID: note.id, toolbar: false, fit: 44...240)
                     .padding(6)
@@ -155,6 +158,7 @@ private final class KeyPanel: NSPanel {
 
 private struct SearchPopupView: View {
     let close: () -> Void
+    @Environment(\.openWindow) private var openWindow
     @State private var query = ""
     @State private var selection = 0
     @State private var submits = 0
@@ -172,7 +176,7 @@ private struct SearchPopupView: View {
                     .onKeyPress(.downArrow) { selection += 1; return .handled }
                     .onKeyPress(.upArrow) { selection -= 1; return .handled }
                     .onSubmit { submits += 1 }
-                    .accessibilityHint("Up and Down Arrow choose a note, Return edits it, Escape closes")
+                    .accessibilityHint("Up and Down Arrow choose a note, Return opens it in NoteAnywhere, Escape closes")
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 14)
@@ -182,14 +186,21 @@ private struct SearchPopupView: View {
                     ContentUnavailableView("Search Your Notes", systemImage: "note.text",
                                            description: Text("Find any note by meaning or keyword, from every app and website."))
                 } else {
-                    SearchResultsView(query: query, selection: $selection, submits: submits).padding(8)
+                    SearchResultsView(query: query, selection: $selection, submits: submits) { note in
+                        // The main window picks it up when it opens, or right away if it's already open (NotesWindow).
+                        NotesModel.shared.openRequest = note.id
+                        openWindow(id: "notes")
+                        NSApp.activate()
+                        close()
+                    }
+                    .padding(8)
                 }
             }
             .frame(maxHeight: .infinity)
             Divider()
             HStack(spacing: 16) {
                 keyHint("↑↓", "Select")
-                keyHint("↩", "Edit")
+                keyHint("↩", "Open")
                 keyHint("esc", "Close")
                 Spacer()
             }
