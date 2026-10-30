@@ -87,11 +87,21 @@ struct CalendarView: View {
     private func monthCell(_ d: Date, _ items: [Snapshot]) -> some View {
         let inMonth = cal.isDate(d, equalTo: date, toGranularity: .month)
         let planned = due[key(d)] ?? []
-        let shownPlanned = planned.prefix(3), shownEdited = items.prefix(3 - shownPlanned.count)
-        let hidden = planned.count + items.count - shownPlanned.count - shownEdited.count
+        let ranges = planned.filter(\.isRange).prefix(2), single = planned.filter { !$0.isRange }
+        let shownPlanned = single.prefix(3), shownEdited = items.prefix(3 - shownPlanned.count)
+        let hidden = planned.count + items.count - ranges.count - shownPlanned.count - shownEdited.count
         return Button { open(d) } label: {
             VStack(spacing: 5) {
                 dayNumber(d)
+                // Ranges ("@2026-12-03 - @2026-12-06") as bars that join up across the days, rounded at their ends.
+                ForEach(ranges) { item in
+                    let starts = key(d) == item.first, ends = key(d) == item.last
+                    UnevenRoundedRectangle(topLeadingRadius: starts ? 2 : 0, bottomLeadingRadius: starts ? 2 : 0,
+                                           bottomTrailingRadius: ends ? 2 : 0, topTrailingRadius: ends ? 2 : 0)
+                        .fill(item.barColor(label: model.note(item.noteID)?.color).swatch)
+                        .frame(height: 4)
+                        .padding(.leading, starts ? 4 : 0).padding(.trailing, ends ? 4 : 0)
+                }
                 // Up to three marks, planned lines first, then edited notes as their site icon; the count says the rest.
                 HStack(spacing: 2) {
                     ForEach(shownPlanned) { item in
@@ -173,7 +183,7 @@ struct CalendarView: View {
 
     /// Dated lines by day, for the notes the filter lets through.
     private var due: [String: [DatedLine]] {
-        Dictionary(grouping: model.notes.filter { filter.isEmpty || sourceKey($0) == filter }.flatMap(\.dates), by: \.day)
+        DatedLine.byDay(model.notes.filter { filter.isEmpty || sourceKey($0) == filter }.flatMap(\.dates))
     }
 
     /// A tickable circle for tasks (it edits the note's checklist), a calendar glyph for other dated lines;
@@ -191,11 +201,15 @@ struct CalendarView: View {
                 .accessibilityLabel(item.done ? "Done" : "Not done")
                 .accessibilityHint("Ticks the task in its note")
             } else {
-                Image(systemName: "calendar").font(.title3).foregroundStyle(.secondary).accessibilityHidden(true)
+                Image(systemName: "calendar").font(.title3)
+                    .foregroundStyle(item.isRange ? item.barColor(label: note?.color).swatch : .secondary).accessibilityHidden(true)
             }
             NavigationLink(value: item.noteID) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.text).strikethrough(item.done).foregroundStyle(item.done ? .secondary : .primary)
+                    if let first = item.first, let last = item.last {
+                        Text("\(DateStyle.format(first)) – \(DateStyle.format(last))").font(.caption).foregroundStyle(.secondary)
+                    }
                     if let note, note.title != item.text {
                         Text(note.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }

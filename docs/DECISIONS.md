@@ -110,7 +110,7 @@ Made by the subagent that wrote the extension:
 - Score = cosine similarity + 0.5 × (share of query words found). Results need cosine > 0.25 or a keyword hit.
   Measured through the host: 6/7 top-1 on the benchmark set, ~0.4 s per browser search (the host loads the model per call).
 - The app keeps `embeddings.json` up to date (2 s after typing stops); the browser host only reads it and embeds the query.
-- Results expand into an editor in place (popup and overlay) instead of opening the main window.
+- Results expand into an editor in place (popup and overlay) instead of opening the main window. Popup: superseded by D60.
 - **Status:** Proposed.
 
 ## D15 — Calendar layout details (2026-10-28, subagent)
@@ -595,3 +595,28 @@ Made by the subagent that wrote the extension:
   ICO→PNG, plain text), and `scripts/test_overlay.mjs` in Chromium with the real extension and host: paste a link,
   pick Card, the picture is kept and shows. Live pages checked through the host: react.dev, developer.apple.com,
   GitHub, Wikipedia (no description: it serves none), Hacker News. Not yet tried by hand in the Mac or iPhone app.
+
+## D60 — ⌥⇧Space results open the note in the main window (2026-10-30, subagent)
+
+- **Reported by the user:** clicking a note in the ⌥⇧Space search didn't open it in NoteAnywhere.
+- Cause: not broken wiring but D14's choice: a popup result only expanded into an editor in place
+  (`SearchResultsView.toggle`), and Return did the same; nothing asked the main window to open.
+- **Chosen by the user:** click or Return opens the note in the main window. **By Claude:** the popup sets
+  `openRequest`, opens the "notes" window, activates the app and hides itself, like the overlay's "Open in
+  NoteAnywhere"; the footer says "↩ Open". The overlay's own search still expands in place (not reported). An open
+  request now clears a folder filter that would hide the note's row. Locked notes ask to unlock as usual (NoteEditor).
+- **Status:** Done. Builds, tests pass; not tried by hand in the running app (opening from another app, window closed).
+
+## D61 — Date ranges in the calendar (2026-10-30)
+
+- **Asked by the user:** "Rohin Wedding @2026-12-03 - @2026-12-06" should colour the days from the first to the last.
+- A line with two dates joined by `-`, `–`, `—` or `to` is a range: it's on every day from the first to the last
+  (either order; a same-day "range" is one date). Other dates on the line still count on their own.
+- **Chosen by the user:** the bar takes the note's colour label, else a colour of its own picked from the line (no
+  pink or yellow: too close to purple and the accent), stable between launches.
+- **By Claude:** Mac month view draws a tinted bar running across the cells, rounded at the ends, titled on the first
+  day and where a week starts; week and day views tint the row and show "3 Dec – 6 Dec". iPhone month view draws a thin
+  bar under the day numbers. Ranges sort first, earliest start first, so a bar mostly keeps its row.
+- shortcut: a range stops after 366 days; overlapping ranges with different starts can step down a row.
+- **Status:** Done. Swift tests (parsing, order, colour); the real Mac calendar rendered offscreen in light and dark
+  from demo notes. iPhone builds; its calendar not looked at.

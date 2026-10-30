@@ -85,16 +85,23 @@ extension Note {
             if line.hasPrefix("```") { inFence.toggle(); continue }
             if inFence || !(line.contains("@") || line.contains("📅")) { continue }  // most lines have no date
             let prose = line.replacing(#/`[^`]*`/#, with: " ")
-            let days = prose.matches(of: #/(?:^|[\s(\[])(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?![\w-])/#).map { String($0.1) }
+            // "@2026-12-03 - @2026-12-06" (or –, —, "to") is every day from the first to the last.
+            let range = #/(?:@|📅\s?)(\d{4}-\d{2}-\d{2})\s*(?:-|–|—|to)\s*(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?![\w-])/#
+            let spans = prose.matches(of: range).map { (String($0.1), String($0.2)) }
+                .filter { DatedLine.isDay($0.0) && DatedLine.isDay($0.1) && $0.0 != $0.1 }.map { (min($0.0, $0.1), max($0.0, $0.1)) }
+            let rest = spans.isEmpty ? prose : prose.replacing(range, with: " ")
+            let days = rest.matches(of: #/(?:^|[\s(\[])(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?![\w-])/#).map { String($0.1) }
                 .filter { DatedLine.isDay($0) }
-            guard !days.isEmpty else { continue }
+            guard !days.isEmpty || !spans.isEmpty else { continue }
             let task = line.firstMatch(of: #/^\s*[-*+]\s+\[([ xX])\]\s/#)
-            let words = Note.plain(Substring(prose.replacing(#/(?:@|📅\s?)\d{4}-\d{2}-\d{2}/#, with: "")))
+            let words = Note.plain(Substring(rest.replacing(#/(?:@|📅\s?)\d{4}-\d{2}-\d{2}/#, with: "")))
                 .replacing(#/\s{2,}/#, with: " ")
-            for day in Set(days).sorted() {
-                found.append(DatedLine(noteID: id, line: index, day: day, text: words.isEmpty ? title : words,
-                                       isTask: task != nil, done: task.map { $0.1 != " " } ?? false))
+            let dated = { (day: String, span: (String, String)?) in
+                DatedLine(noteID: id, line: index, day: day, text: words.isEmpty ? title : words, isTask: task != nil,
+                          done: task.map { $0.1 != " " } ?? false, first: span?.0, last: span?.1)
             }
+            for day in Set(days).sorted() { found.append(dated(day, nil)) }
+            for span in spans { found += DatedLine.days(from: span.0, to: span.1).map { dated($0, span) } }
         }
         return found
     }
@@ -153,7 +160,33 @@ struct DatedLine: Hashable, Identifiable {
     let text: String
     let isTask: Bool
     let done: Bool
-    var id: String { "\(noteID)/\(line)/\(day)" }
+    /// A range's first and last day ("@2026-12-03 - @2026-12-06"), on each of its days; nil for a single day.
+    var first: String? = nil
+    var last: String? = nil
+    var id: String { "\(noteID)/\(line)/\(day)/\(first ?? "")" }
+    var isRange: Bool { first != nil }
+
+    /// Every day from `first` to `last`, both included.
+    /// shortcut: stops after a year, so a typo like 2026→2062 can't fill decades; lift it if anyone plans longer.
+    static func days(from first: String, to last: String) -> [String] {
+        guard var day = parser.date(from: first) else { return [] }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = parser.timeZone
+        var out: [String] = []
+        while out.count < 366, case let key = parser.string(from: day), key <= last {
+            out.append(key)
+            day = calendar.date(byAdding: .day, value: 1, to: day)!
+        }
+        return out
+    }
+
+    /// Dated lines by day. Ranges come first, earliest start first, so one keeps its row across its days.
+    static func byDay(_ lines: [DatedLine]) -> [String: [DatedLine]] {
+        Dictionary(grouping: lines, by: \.day).mapValues { day in
+            day.filter(\.isRange).sorted { ($0.first!, $1.last!, $0.noteID, $0.line) < ($1.first!, $0.last!, $1.noteID, $1.line) }
+                + day.filter { !$0.isRange }
+        }
+    }
 
     private static let parser: DateFormatter = {
         let f = DateFormatter()

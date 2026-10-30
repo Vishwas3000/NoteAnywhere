@@ -104,9 +104,13 @@ struct CalendarView: View {
             VStack(alignment: .leading, spacing: 3) {
                 dayNumber(d)
                 ForEach(planned.prefix(3)) { item in
-                    Label { Text(item.text).strikethrough(item.done) } icon: { checkbox(item) }
-                        .font(.caption).lineLimit(1)
-                        .foregroundStyle(item.done ? .secondary : .primary)
+                    if item.isRange {
+                        rangeBar(item, d)
+                    } else {
+                        Label { Text(item.text).strikethrough(item.done) } icon: { checkbox(item) }
+                            .font(.caption).lineLimit(1)
+                            .foregroundStyle(item.done ? .secondary : .primary)
+                    }
                 }
                 ForEach(edited) { s in
                     Label { Text(s.note.title) } icon: { NoteIcon(note: s.note, size: 12) }
@@ -222,7 +226,32 @@ struct CalendarView: View {
 
     /// Dated lines by day, for the notes the filter lets through.
     private func dueByDay() -> [String: [DatedLine]] {
-        Dictionary(grouping: model.notes.filter { filter.isEmpty || sourceKey($0) == filter }.flatMap(\.dates), by: \.day)
+        DatedLine.byDay(model.notes.filter { filter.isEmpty || sourceKey($0) == filter }.flatMap(\.dates))
+    }
+
+    private func color(_ item: DatedLine) -> Color {
+        item.barColor(label: model.notes.first { $0.id == item.noteID }?.color).swatch
+    }
+
+    /// One day of a range: a tinted bar that runs into the next day's cell, rounded where the range starts and ends.
+    /// The title shows on the first day and again where a week begins.
+    private func rangeBar(_ item: DatedLine, _ d: Date) -> some View {
+        let day = key(d), starts = day == item.first, ends = day == item.last
+        let titled = starts || cal.component(.weekday, from: d) == cal.firstWeekday
+        return Text(titled ? item.text : " ")
+            .font(.caption.weight(.medium)).lineLimit(1)
+            .padding(.horizontal, 5).padding(.vertical, 1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(color(item).opacity(0.3), in: UnevenRoundedRectangle(
+                topLeadingRadius: starts ? 4 : 0, bottomLeadingRadius: starts ? 4 : 0,
+                bottomTrailingRadius: ends ? 4 : 0, topTrailingRadius: ends ? 4 : 0))
+            .padding(.leading, starts ? 0 : -6).padding(.trailing, ends ? 0 : -6)  // over the cell's padding, to its edges
+            .accessibilityLabel("\(item.text), \(span(item))")
+    }
+
+    /// "3 Dec – 6 Dec" in the date format chosen in Settings.
+    private func span(_ item: DatedLine) -> String {
+        "\(DateStyle.format(item.first ?? item.day)) – \(DateStyle.format(item.last ?? item.day))"
     }
 
     /// A tickable box for tasks (it edits the note's checklist), a calendar glyph for other dated lines.
@@ -237,7 +266,7 @@ struct CalendarView: View {
             .accessibilityLabel(item.done ? "Done" : "Not done")
             .accessibilityHint("Ticks the task in its note")
         } else {
-            Image(systemName: "calendar").foregroundStyle(.secondary).accessibilityHidden(true)
+            Image(systemName: "calendar").foregroundStyle(item.isRange ? color(item) : .secondary).accessibilityHidden(true)
         }
     }
 
@@ -249,6 +278,9 @@ struct CalendarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.text).strikethrough(item.done).foregroundStyle(item.done ? .secondary : .primary)
                         .font(compact ? .callout : .body).lineLimit(compact ? 3 : nil)
+                    if item.isRange {
+                        Text(span(item)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
                     if let note, note.title != item.text {
                         Text(note.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
@@ -260,7 +292,7 @@ struct CalendarView: View {
             .accessibilityHint("Opens the note")
         }
         .padding(compact ? 8 : 2)
-        .background { if compact { RoundedRectangle(cornerRadius: 8).fill(Color.notesAccent.opacity(0.12)) } }
+        .background { if compact { RoundedRectangle(cornerRadius: 8).fill(item.isRange ? color(item).opacity(0.25) : Color.notesAccent.opacity(0.12)) } }
     }
 
     // MARK: Helpers

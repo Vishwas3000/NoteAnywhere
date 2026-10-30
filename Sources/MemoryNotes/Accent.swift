@@ -34,3 +34,14 @@ extension Color {
         #endif
     }()
 }
+
+extension DatedLine {
+    /// A range's colour in the calendar: its note's label, else one of its own picked from the line, so it stays the
+    /// same between launches and two events side by side usually differ.
+    func barColor(label: NoteColor?) -> NoteColor {
+        if let label { return label }
+        let auto: [NoteColor] = [.blue, .green, .purple, .orange, .cyan, .red]  // not pink: too close to purple when tinted
+        let seed = "\(noteID)/\(line)".unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFFFF }
+        return auto[seed % auto.count]
+    }
+}

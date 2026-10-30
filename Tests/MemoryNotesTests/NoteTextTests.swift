@@ -72,6 +72,38 @@ func pageTargets(url: String, expected: String) {
     #expect(note.dates.map(\.line) == [1, 2, 3])
 }
 
+@Test func datedRanges() {
+    let note = Note(id: "n", kind: .url, target: "", label: "", text: """
+        Rohin Wedding @2026-12-03 - @2026-12-06
+        Trip @2026-12-31 to @2027-01-01, call @2026-12-20
+        Backwards @2026-12-10 – @2026-12-09
+        Same day @2026-12-15 - @2026-12-15
+        """)
+    let wedding = note.dates.filter { $0.line == 0 }
+    #expect(wedding.map(\.day) == ["2026-12-03", "2026-12-04", "2026-12-05", "2026-12-06"])
+    #expect(wedding.allSatisfy { $0.isRange && $0.first == "2026-12-03" && $0.last == "2026-12-06" && $0.text == "Rohin Wedding" })
+    let trip = note.dates.filter { $0.line == 1 }
+    #expect(trip.map(\.day) == ["2026-12-20", "2026-12-31", "2027-01-01"])  // across a year, and the single date too
+    #expect(trip.map(\.isRange) == [false, true, true])
+    #expect(trip[0].text == "Trip , call")
+    #expect(note.dates.filter { $0.line == 2 }.map(\.day) == ["2026-12-09", "2026-12-10"])
+    #expect(note.dates.filter { $0.line == 3 }.map(\.isRange) == [false])  // a one-day "range" is just a date
+    #expect(DatedLine.days(from: "2026-01-01", to: "2099-01-01").count == 366)
+}
+
+@Test func rangesKeepTheirRowAndColour() {
+    let note = Note(id: "n", kind: .url, target: "", label: "", text: """
+        Dentist @2026-12-04
+        Short @2026-12-04 - @2026-12-05
+        Long @2026-12-03 - @2026-12-06
+        """)
+    let dec4 = DatedLine.byDay(note.dates)["2026-12-04"]!
+    #expect(dec4.map(\.text) == ["Long", "Short", "Dentist"])  // earliest start first, then single days
+    #expect(dec4[0].barColor(label: .purple) == .purple)  // the note's colour label wins
+    #expect(dec4[0].barColor(label: nil) == dec4[0].barColor(label: nil))
+    #expect(dec4[0].barColor(label: nil) != .grey && dec4[0].barColor(label: nil) != .yellow)
+}
+
 @Test func pageFromHighlightLinksBack() {
     var parent = Note(kind: .url, target: "", label: "", updatedAt: 0)
     parent.text = "Sync [notes]\nWhy does sync lag?"
