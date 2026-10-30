@@ -144,6 +144,17 @@ private struct EditorWebView: NSViewRepresentable {
                 } catch {
                     call("reply", id, NSNull(), error.localizedDescription)
                 }
+            case "linkPreview":
+                guard let id = body["id"] as? Int, let address = body["url"] as? String else { return }
+                Task { @MainActor in
+                    do {
+                        guard let url = URL(string: address) else { throw LinkPreview.Failure(errorDescription: "That isn't a web address.") }
+                        let page = try await LinkPreview.fetch(url)
+                        call("reply", id, ["title": page.title, "description": page.description, "icon": page.icon, "image": page.image], NSNull())
+                    } catch {
+                        call("reply", id, NSNull(), error.localizedDescription)
+                    }
+                }
             case "findNotes":
                 // Notes to link highlighted text to: titles and first lines that contain the words, newest first.
                 guard let id = body["id"] as? Int else { return }

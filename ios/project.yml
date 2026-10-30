@@ -47,6 +47,8 @@ targets:
         group: Shared
       - path: ../Sources/MemoryNotes/ImageScheme.swift
         group: Shared
+      - path: ../Sources/MemoryNotes/LinkPreview.swift
+        group: Shared
     dependencies:
       - package: swift-embeddings
         product: Embeddings
@@ -106,6 +108,8 @@ targets:
       - path: ../Sources/MemoryNotes/Assistant.swift
         group: Shared
       - path: ../Sources/MemoryNotes/NativeHost.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/LinkPreview.swift  # NativeHost's linkPreview op
         group: Shared
     dependencies:
       - package: swift-embeddings

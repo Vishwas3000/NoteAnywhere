@@ -26,7 +26,7 @@ function send(msg) {
 
 // Mirrors Note.plain in Sources/MemoryNotes/Note.swift: one Markdown line as plain text.
 const plain = (line) => line
-  .replace(/^\s*(#{1,6}\s+|>\s*|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)*/, "")
+  .replace(/^\s*(#{1,6}\s+|>\s*(\[!\w+\]\s*)?|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)*/, "")
   .replace(/^\s*(-{3,}|\*{3,}|_{3,}|\|?[\s:|-]+\|[\s:|-]*)\s*$/, "")
   .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
   .replace(/\*\*|__|~~|`/g, "")
@@ -287,6 +287,11 @@ function noteRow(note) {
       return r.src;
     }),
     imageURL,
+    // The Mac app fetches a pasted link's page (no extra site permissions here) and keeps its pictures as note images.
+    onLinkPreview: (url) => send({ op: "linkPreview", url }).then((r) => {
+      if (!r.ok) throw new Error(r.error);
+      return r.preview;
+    }),
     // Ignored by editor bundles that predate the ✨ menu.
     onAI: (action, markdown) => send({ op: "ai", action, text: markdown }).then((r) => {
       if (!r.ok) throw new Error(r.error);

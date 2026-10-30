@@ -392,6 +392,9 @@ await checkAsync("a pasted screenshot is kept by the host and shows as noteimage
   await waitFor(() => saved.length && ed.getMarkdown().includes("noteimage"));
   assert.deepEqual(saved, [["image/png", "iVBORw0KGgo="]]);
   assert.equal(ed.getMarkdown().trim(), "Before\n\n![](noteimage:id1)");
+  // Typing next goes after the image instead of replacing it.
+  ed.editor.commands.insertContent("After");
+  assert.equal(ed.getMarkdown().trim(), "Before\n\n![](noteimage:id1)\n\nAfter");
 });
 await checkAsync("Copy Image on a web page keeps the bytes, not the site's link", async () => {
   const saved = [];
@@ -427,6 +430,82 @@ await checkAsync("imageURL shows noteimage: sources; one it can't fetch says why
   assert.equal(imgs[1].alt, "Open NoteAnywhere");
   assert.ok(imgs[1].classList.contains("mn-image-broken"));
   assert.equal(ed.getMarkdown().trim(), "![](noteimage:aa)\n\n![](noteimage:bb)\n\n![](https://example.com/c.png)");
+});
+
+// Pasted links: Link · Mention · Card.
+const MENTION_MD = 'See [Quick Start \\[React\\]](https://react.dev/learn "mention noteimage:ic1") today';
+const CARD_MD = "> [!bookmark] [Quick Start – React](https://react.dev/learn)\n> Welcome to the React docs!\n> ![](noteimage:ic1 \"icon\") ![](noteimage:im1)";
+check("a mention round-trips and shows its icon and title", () => {
+  const ed = mount(MENTION_MD);
+  assert.equal(ed.getMarkdown().trim(), MENTION_MD);
+  const a = ed.editor.view.dom.querySelector("a.mn-mention");
+  assert.equal(a.textContent, "Quick Start [React]");
+  assert.equal(a.querySelector("img").getAttribute("src"), "noteimage:ic1");
+});
+check("a card round-trips; one with no description or pictures too", () => {
+  roundTrip(CARD_MD);
+  roundTrip("> [!bookmark] [example.com](https://example.com/a%20b)");
+  const card = mount(CARD_MD).editor.view.dom.querySelector("a.mn-card");
+  assert.equal(card.getAttribute("href"), "https://react.dev/learn");
+  assert.equal(card.querySelector("strong").textContent, "Quick Start – React");
+  assert.equal(card.querySelector(".mn-card-desc").textContent, "Welcome to the React docs!");
+  assert.equal(card.querySelector(".mn-card-site").textContent, "react.dev");
+});
+check("an ordinary quote and link stay as they are", () => roundTrip("> a quote with [a link](https://example.com)"));
+const hit = (ed, k) => ed.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+const URL_CLIP = (url) => clip([], { "text/plain": url });
+const previewHost = (asked) => ({ onLinkPreview: async (url) => {
+  asked.push(url);
+  return { title: "Quick Start – React", description: "Welcome to the React docs!", icon: "noteimage:ic1", image: "noteimage:im1" };
+} });
+const menuItems = (ed) => [...ed.editor.options.element.closest(".mn-editor").querySelectorAll(".mn-at-item")].map((i) => i.firstChild.textContent);
+await checkAsync("pasting a lone URL inserts a link and offers Link, Mention, Card; Enter keeps the link", async () => {
+  const asked = [];
+  const ed = mount("", previewHost(asked));
+  assert.equal(paste(ed, URL_CLIP("https://react.dev/learn")), true);
+  assert.deepEqual(menuItems(ed), ["Link", "Mention", "Card"]);
+  hit(ed, "Enter");
+  await settle();
+  assert.deepEqual(menuItems(ed), []);
+  assert.deepEqual(asked, []);
+  assert.match(ed.getMarkdown(), /\]\(https:\/\/react\.dev\/learn\)/);
+});
+await checkAsync("Mention asks the host and puts the title in the line", async () => {
+  const asked = [];
+  const ed = mount("See ", previewHost(asked));
+  ed.editor.commands.setTextSelection(5);
+  paste(ed, URL_CLIP("https://react.dev/learn"));
+  hit(ed, "ArrowDown");
+  hit(ed, "Enter");
+  await waitFor(() => ed.getMarkdown().includes("mention"));
+  assert.deepEqual(asked, ["https://react.dev/learn"]);
+  assert.equal(ed.getMarkdown().trim(), 'See [Quick Start – React](https://react.dev/learn "mention noteimage:ic1")');
+});
+await checkAsync("Card replaces a link alone on its line; typing instead keeps the link", async () => {
+  const ed = mount("", previewHost([]));
+  paste(ed, URL_CLIP("https://react.dev/learn"));
+  hit(ed, "ArrowDown");
+  hit(ed, "ArrowDown");
+  hit(ed, "Enter");
+  await waitFor(() => ed.getMarkdown().includes("bookmark"));
+  assert.equal(ed.getMarkdown().trim(), CARD_MD);
+  const typed = mount("", previewHost([]));
+  paste(typed, URL_CLIP("https://example.com"));
+  hit(typed, "a");
+  assert.deepEqual(menuItems(typed), []);
+});
+await checkAsync("a preview that fails says why and leaves the link; code and text pastes get no menu", async () => {
+  const ed = mount("", { onLinkPreview: async () => { throw new Error("The site didn't answer."); } });
+  paste(ed, URL_CLIP("https://example.com"));
+  hit(ed, "ArrowDown");
+  hit(ed, "Enter");
+  await waitFor(() => ed.editor.options.element.closest(".mn-editor").querySelector(".mn-notice"));
+  assert.equal(ed.editor.options.element.closest(".mn-editor").querySelector(".mn-notice")?.textContent, "Preview not added: The site didn't answer.");
+  assert.match(ed.getMarkdown(), /\]\(https:\/\/example\.com\)/);
+  const code = mount("```\nx\n```", previewHost([]));
+  code.editor.commands.setTextSelection(2);
+  assert.ok(!paste(code, URL_CLIP("https://example.com")));
+  assert.ok(!paste(mount("", previewHost([])), URL_CLIP("see https://example.com")));
 });
 
 await window.happyDOM.close();

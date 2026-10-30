@@ -28,6 +28,7 @@ enum NativeHost {
         var datePattern: String?  // with "list": how the extension's editor shows dates (Settings ▸ General)
         var src: String?  // addImage: what the note shows, noteimage:<id>
         var data: String?, mime: String?, size: Int?  // image: one piece (base64), the type and the whole size
+        var preview: LinkPreview.Page?  // linkPreview: the pictures as noteimage:<id> sources, so the reply stays small
     }
 
     /// Image bytes per reply: their base64 stays under Chrome's 1 MB cap on what a host sends back.
@@ -113,6 +114,13 @@ enum NativeHost {
                 let text = req.text ?? ""
                 return blocking {
                     do { return Reply(text: try await Assistant.run(action, on: text)) } catch {
+                        return Reply(ok: false, error: error.localizedDescription)
+                    }
+                }
+            case "linkPreview":
+                guard let url = req.url.flatMap(URL.init(string:)) else { return Reply(ok: false, error: "That isn't a web address.") }
+                return blocking {
+                    do { return Reply(preview: try await LinkPreview.fetch(url)) } catch {
                         return Reply(ok: false, error: error.localizedDescription)
                     }
                 }

@@ -561,3 +561,37 @@ Made by the subagent that wrote the extension:
 - Built from d2f6561 (tag `v0.1.1`); notarized, stapled, universal; the downloaded asset matches (SHA-256 d0bfcbe7…).
   The store is reviewing the 0.1.0 extension zip; the 0.1.1 zip (image paste) goes up as an update after approval.
 - **Status:** Done. https://github.com/Vishwas3000/NoteAnywhere/releases/tag/v0.1.1
+
+## D58 — Links open on click or tap (2026-10-30)
+
+- **Reported by the user:** tapping a link in a note didn't open it.
+- Cause: web links opened only with ⌘-click, through `window.open`, which the Mac and iPhone editors' WKWebView
+  dropped (no `WKUIDelegate`), so in the apps they never opened at all.
+- **Chosen by Claude:** a click or tap opens the link in the default browser (Safari or the link's app on iPhone), like
+  Apple Notes and Notion; shift-click still extends the selection and ⌘K edits the link. Both web views now hand
+  `window.open` to the system. `javascript:`, `data:` and `vbscript:` links never open.
+- **Status:** Done. Editor test covers click, shift-click and `javascript:`; a real click in the app not yet tried by Claude.
+
+## D59 — Pasted links as a link, mention or card (2026-10-30)
+
+- **Asked by the user:** preview pasted links, asking each time how to show them, like Notion.
+- **Chosen by the user:** on pasting a lone URL, a menu offers Link (selected), Mention (site icon and page title in
+  the line) and Card (title, description, site, picture); Enter, Esc or typing keeps the link. The card's picture and
+  the icon are downloaded once and kept as note images (D53), synced end-to-end encrypted, so the site never sees the
+  note opened and the picture outlives the page.
+- **Chosen by Claude:** the host fetches the page (`LinkPreview.swift`, shared by the Mac and iPhone apps); the
+  extension asks the Mac app through the native host, so it needs no new site permissions or store re-review.
+  Markdown that other apps can read: a mention is `[Title](url "mention noteimage:…")` (a normal link elsewhere), a
+  card an Obsidian-style callout `> [!bookmark] [Title](url)` with the description and `![](… "icon") ![](…)` lines.
+- **Rejected:** Embed (loads the site in the note on every open: slower, less private); remembering a default instead
+  of asking; loading pictures from the site each time.
+- Fetching (`LinkPreview.swift`): http/https only, 10 s timeout, 2 MB of the page's `<head>`; Open Graph, then Twitter
+  cards, then `<title>`/`description`; apple-touch-icon over the largest `sizes`, SVG icons skipped for `/favicon.ico`;
+  pictures up to 5 MB from http, https or data: only, ICO and the like converted to PNG. A page that answers non-2xx,
+  or blocks bots (some Cloudflare sites, x.com), says why and stays a link.
+- Found on the way: after pasting a screenshot the image stayed selected, so the next keystroke or paste replaced it
+  (since D53). The cursor now goes after pasted images.
+- **Status:** Done. Editor tests (menu, mention, card, Markdown round-trips, failure message), Swift tests (parsing,
+  ICO→PNG, plain text), and `scripts/test_overlay.mjs` in Chromium with the real extension and host: paste a link,
+  pick Card, the picture is kept and shows. Live pages checked through the host: react.dev, developer.apple.com,
+  GitHub, Wikipedia (no description: it serves none), Hacker News. Not yet tried by hand in the Mac or iPhone app.

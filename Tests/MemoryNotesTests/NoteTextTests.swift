@@ -14,6 +14,11 @@ import Testing
     ("| A | B |", "A  B"),
     ("| --- | --- |", ""),
     ("---", ""),
+    // Link cards and mentions (Notion-style previews) read as their titles; the card's pictures as nothing.
+    ("> [!bookmark] [Quick Start – React](https://react.dev/learn)", "Quick Start – React"),
+    ("> Welcome to the React docs!", "Welcome to the React docs!"),
+    ("> ![](noteimage:abc \"icon\") ![](noteimage:def)", ""),
+    ("See [Quick Start – React](https://react.dev/learn \"mention noteimage:abc\") first", "See Quick Start – React first"),
 ])
 func plainLine(markdown: String, expected: String) {
     #expect(Note.plain(Substring(markdown)) == expected)

@@ -136,6 +136,17 @@ private struct EditorWebView: UIViewRepresentable {
                 } catch {
                     call("reply", id, NSNull(), error.localizedDescription)
                 }
+            case "linkPreview":
+                guard let id = body["id"] as? Int, let address = body["url"] as? String else { return }
+                Task { @MainActor in
+                    do {
+                        guard let url = URL(string: address) else { throw LinkPreview.Failure(errorDescription: "That isn't a web address.") }
+                        let page = try await LinkPreview.fetch(url)
+                        call("reply", id, ["title": page.title, "description": page.description, "icon": page.icon, "image": page.image], NSNull())
+                    } catch {
+                        call("reply", id, NSNull(), error.localizedDescription)
+                    }
+                }
             case "date":  // ⌘-click, so only with a hardware keyboard on the phone
                 if let day = body["day"] as? String { NotesModel.shared.calendarRequest = day }
             case "tag":

@@ -1,4 +1,4 @@
-import { Editor, Extension, InputRule } from "@tiptap/core";
+import { Editor, Extension, InputRule, Node as TiptapNode } from "@tiptap/core";
 import { NodeSelection, Plugin, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import StarterKit from "@tiptap/starter-kit";
@@ -511,7 +511,13 @@ function images(getEditor, { onAddImage, imageURL, say }) {
     })).then((srcs) => {
       const editor = getEditor();
       const pos = at !== undefined && editor.state.doc === doc ? at : editor.state.selection.from;
-      editor.chain().focus().insertContentAt(pos, srcs.map((src) => ({ type: "image", attrs: { src } }))).run();
+      // The cursor goes after the images; left selected, the next keystroke or paste would replace them.
+      editor.chain().focus().insertContentAt(pos, srcs.map((src) => ({ type: "image", attrs: { src } })))
+        .command(({ tr }) => {
+          const end = tr.selection.to;
+          if (!tr.doc.resolve(end).nodeAfter?.isTextblock) tr.insert(end, tr.doc.type.schema.nodes.paragraph.create());
+          return !!tr.setSelection(TextSelection.create(tr.doc, end + 1));
+        }).run();
     }).catch((e) => say(`Image not added: ${e.message}`));
     return true;
   };
@@ -535,6 +541,209 @@ function images(getEditor, { onAddImage, imageURL, say }) {
       },
     })],
   })];
+}
+
+// A noteimage: source loads through imageURL where the page can't (the browser asks the Mac app); one that can't hides.
+const showSrc = (img, src, imageURL) => {
+  if (!imageURL || !src.startsWith("noteimage:")) return (img.src = src);
+  Promise.resolve(imageURL(src)).then((url) => (img.src = url), () => img.remove());
+};
+const domainOf = (href) => { try { return new URL(href).hostname.replace(/^www\./, ""); } catch { return href; } };
+// Markdown link text and destination: brackets escaped, and the characters that would end the destination encoded.
+const mdText = (s) => s.replace(/[\\[\]]/g, "\\$&");
+const unMdText = (s) => s.replace(/\\([\\[\]])/g, "$1");
+const mdHref = (s) => s.replace(/[\s()<>"]/g, encodeURIComponent);
+const LONE_URL = /^https?:\/\/\S+$/i;
+// [Title](https://… "mention noteimage:icon")
+const MENTION = /^\[((?:\\.|[^\\\]\n])*)\]\((\S+) "mention(?: (noteimage:[\w.-]+))?"\)/;
+// > [!bookmark] [Title](https://…), then "> description" and "> ![](icon "icon") ![](image)", an Obsidian-style callout.
+const CARD = /^> \[!bookmark\] \[((?:\\.|[^\\\]\n])*)\]\((\S+)\)[ \t]*(?:\n|$)((?:>[^\n]*(?:\n|$))*)/;
+const CARD_PICTURES = /^(?:!\[\]\((\S+) "icon"\))?\s*(?:!\[\]\((\S+)\))?\s*$/;
+
+/**
+ * Pasted links, like Notion's: a lone URL pasted at the cursor goes in as a link, and a menu offers it as a mention
+ * (site icon and page title, in the line) or a card (title, description, site, picture). onLinkPreview(url) =>
+ * Promise<{title, description, icon, image}> fetches the page in the host, which keeps the icon and picture as note
+ * images (noteimage:), so the site never sees the note opened. Enter, Esc, typing or clicking elsewhere keeps the link.
+ */
+function linkPreviews(getEditor, { onLinkPreview, imageURL, say }) {
+  const linkView = (className, build) => () => ({ node }) => {
+    const a = el("a", className);
+    a.href = node.attrs.href;
+    a.contentEditable = "false";
+    a.onclick = (e) => e.preventDefault();  // the editor's click handler opens it, in the host's browser
+    build(a, node.attrs);
+    return { dom: a };
+  };
+  const icon = (src, className) => {
+    const img = el("img", className);
+    img.alt = "";
+    showSrc(img, src, imageURL);
+    return img;
+  };
+  const attrs = (...names) => Object.fromEntries(names.map((n) => [n, { default: "" }]));
+
+  const Mention = TiptapNode.create({
+    name: "linkMention",
+    group: "inline",
+    inline: true,
+    atom: true,
+    addAttributes: () => attrs("href", "title", "icon"),
+    parseHTML: () => [{ tag: "a[data-mn-mention]", getAttrs: (a) => ({ href: a.getAttribute("href"), title: a.textContent, icon: a.dataset.icon ?? "" }) }],
+    renderHTML: ({ node: { attrs: a } }) => ["a", { href: a.href, "data-mn-mention": "", "data-icon": a.icon }, a.title],
+    addNodeView: linkView("mn-mention", (a, { title, icon: src, href }) => {
+      a.append(src ? icon(src, "mn-mention-icon") : el("span", "mn-mention-icon mn-mention-globe", "↗"), title || domainOf(href));
+    }),
+    markdownTokenizer: {
+      name: "linkMention",
+      level: "inline",
+      start: (src) => src.indexOf("["),
+      tokenize: (src) => {
+        const m = MENTION.exec(src);
+        return m ? { type: "linkMention", raw: m[0], title: unMdText(m[1]), href: m[2], icon: m[3] ?? "" } : undefined;
+      },
+    },
+    parseMarkdown: (t) => ({ type: "linkMention", attrs: { href: t.href, title: t.title, icon: t.icon } }),
+    renderMarkdown: ({ attrs: a }) => `[${mdText(a.title)}](${mdHref(a.href)} "mention${a.icon ? ` ${a.icon}` : ""}")`,
+  });
+
+  const Card = TiptapNode.create({
+    name: "linkCard",
+    group: "block",
+    atom: true,
+    draggable: true,
+    addAttributes: () => attrs("href", "title", "description", "icon", "image"),
+    parseHTML: () => [{ tag: "a[data-mn-card]", getAttrs: (a) => ({ href: a.getAttribute("href"), title: a.dataset.title, description: a.dataset.description, icon: a.dataset.icon, image: a.dataset.image }) }],
+    renderHTML: ({ node: { attrs: a } }) => ["a", { href: a.href, "data-mn-card": "", "data-title": a.title,
+      "data-description": a.description, "data-icon": a.icon, "data-image": a.image }, a.title],
+    addNodeView: linkView("mn-card", (a, { href, title, description, icon: iconSrc, image }) => {
+      const text = el("span", "mn-card-text");
+      const site = el("span", "mn-card-site");
+      if (iconSrc) site.append(icon(iconSrc, "mn-card-icon"));
+      site.append(domainOf(href));
+      text.append(el("strong", "", title || domainOf(href)), ...(description ? [el("span", "mn-card-desc", description)] : []), site);
+      a.append(text);
+      if (image) a.append(icon(image, "mn-card-image"));
+    }),
+    markdownTokenizer: {
+      name: "linkCard",
+      level: "block",
+      start: (src) => src.search(/^> \[!bookmark\]/m),
+      tokenize: (src) => {
+        const m = CARD.exec(src);
+        if (!m) return undefined;
+        const card = { type: "linkCard", raw: m[0], title: unMdText(m[1]), href: m[2], description: "", icon: "", image: "" };
+        for (const line of m[3].split("\n").map((l) => l.replace(/^>\s?/, "").trim()).filter(Boolean)) {
+          const pictures = CARD_PICTURES.exec(line);
+          if (pictures && (pictures[1] || pictures[2])) Object.assign(card, { icon: pictures[1] ?? "", image: pictures[2] ?? "" });
+          else card.description = card.description ? `${card.description} ${line}` : line;
+        }
+        return card;
+      },
+    },
+    parseMarkdown: (t) => ({ type: "linkCard", attrs: { href: t.href, title: t.title, description: t.description, icon: t.icon, image: t.image } }),
+    renderMarkdown: ({ attrs: a }) => {
+      const pictures = [a.icon && `![](${a.icon} "icon")`, a.image && `![](${a.image})`].filter(Boolean).join(" ");
+      return [`> [!bookmark] [${mdText(a.title || domainOf(a.href))}](${mdHref(a.href)})`,
+        ...(a.description ? [`> ${a.description.replace(/\s+/g, " ")}`] : []), ...(pictures ? [`> ${pictures}`] : [])].join("\n");
+    },
+  });
+  if (!onLinkPreview) return [Mention, Card];
+
+  // The pasted link's range while its menu is open or its preview loads, kept current through edits.
+  let pending = null, menu = null, active = 0;
+  const OPTIONS = [["Link", "as pasted"], ["Mention", "title in the line"], ["Card", "title, text and picture"]];
+  const closeMenu = () => { menu?.remove(); menu = null; const root = getEditor().view.dom.closest(".mn-editor"); if (root) root.style.minHeight = ""; };
+  const renderMenu = (view) => {
+    menu.replaceChildren(...OPTIONS.map(([label, hint], i) => {
+      const item = el("div", "mn-at-item" + (i === active ? " active" : ""));
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", String(i === active));
+      item.append(el("span", "", label), el("span", "mn-at-hint", hint));
+      item.onmousedown = (e) => { e.preventDefault(); choose(view, i); };
+      return item;
+    }));
+  };
+  const openMenu = (view) => {
+    const body = view.dom.parentElement;
+    if (!body) return;
+    menu = el("div", "mn-at-menu");
+    menu.setAttribute("role", "listbox");
+    menu.setAttribute("aria-label", "Paste link as");
+    active = 0;
+    renderMenu(view);
+    body.append(menu);
+    const coords = view.coordsAtPos(pending.to), frame = body.getBoundingClientRect();
+    menu.style.top = `${coords.bottom - frame.top + 4}px`;
+    menu.style.left = `${Math.max(0, Math.min(coords.left - frame.left, body.clientWidth - menu.offsetWidth))}px`;
+    const root = view.dom.closest(".mn-editor");  // a short note's editor grows so the menu isn't cut off
+    if (root) root.style.minHeight = `${body.offsetTop + menu.offsetTop + menu.offsetHeight + 8}px`;
+  };
+  const choose = async (view, i) => {
+    closeMenu();
+    if (i === 0) return (pending = null);
+    const { url } = pending;
+    view.dispatch(view.state.tr.setMeta(plugin, "loading"));
+    let page;
+    try {
+      page = await onLinkPreview(url);
+    } catch (e) {
+      say(`Preview not added: ${e.message}`);
+    }
+    const editor = getEditor(), at = pending;
+    pending = null;
+    editor.view.dispatch(editor.state.tr.setMeta(plugin, "done"));
+    if (!page || !at || editor.state.doc.textBetween(at.from, at.to) !== url) return;  // failed, or the link was edited
+    const { schema } = editor.state, $from = editor.state.doc.resolve(at.from);
+    const fields = { href: url, title: (page.title ?? "").replace(/\s+/g, " ").trim(), icon: page.icon ?? "" };
+    if (i === 1) return editor.view.dispatch(editor.state.tr.replaceWith(at.from, at.to, schema.nodes.linkMention.create(fields)));
+    const card = schema.nodes.linkCard.create({ ...fields, description: page.description ?? "", image: page.image ?? "" });
+    const alone = $from.parent.type.name === "paragraph" && $from.parent.textContent.trim() === url;
+    const tr = editor.state.tr;
+    if (alone) tr.replaceWith($from.before(), $from.after(), card);
+    else tr.delete(at.from, at.to).insert(tr.mapping.map($from.after()), card);
+    editor.view.dispatch(tr);
+  };
+
+  const plugin = new Plugin({
+    state: {
+      init: () => DecorationSet.empty,
+      apply(tr, set) {
+        if (pending) pending = { ...pending, from: tr.mapping.map(pending.from), to: tr.mapping.map(pending.to) };
+        const meta = tr.getMeta(plugin);
+        if (meta === "loading") return DecorationSet.create(tr.doc, [Decoration.inline(pending.from, pending.to, { class: "mn-link-loading" })]);
+        return meta === "done" ? DecorationSet.empty : set.map(tr.mapping, tr.doc);
+      },
+    },
+    props: {
+      decorations: (state) => plugin.getState(state),
+      handlePaste(view, event) {
+        const text = event.clipboardData?.getData("text/plain").trim() ?? "";
+        const { selection } = view.state, $from = selection.$from;
+        if (!LONE_URL.test(text) || !selection.empty || event.clipboardData?.files?.length || pending
+          || $from.parent.type.spec.code || $from.marks().some((m) => m.type.name === "code")) return false;
+        const link = view.state.schema.marks.link.create({ href: text });
+        view.dispatch(view.state.tr.insert(selection.from, view.state.schema.text(text, [link])).setStoredMarks([]));
+        pending = { url: text, from: selection.from, to: selection.from + text.length };
+        openMenu(view);
+        return true;
+      },
+      handleKeyDown(view, event) {
+        if (!menu) return false;
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          active = (active + (event.key === "ArrowDown" ? 1 : OPTIONS.length - 1)) % OPTIONS.length;
+          renderMenu(view);
+          return true;
+        }
+        if (event.key === "Enter" || event.key === "Tab") { choose(view, active); return true; }
+        closeMenu();  // Esc, or typing on: it stays a link
+        pending = null;
+        return event.key === "Escape";
+      },
+      handleDOMEvents: { mousedown: () => { if (menu) { closeMenu(); pending = null; } return false; } },
+    },
+  });
+  return [Mention, Card, Extension.create({ name: "mnLinkPaste", priority: 1000, addProseMirrorPlugins: () => [plugin] })];
 }
 
 const AT_QUERY = /(?:^|[\s(\[])@([a-z]*)$/i;
@@ -959,10 +1168,11 @@ const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.0
  * datePattern ("dd/MM/yyyy", …) shows date chips that way; the Markdown keeps "@yyyy-mm-dd".
  * onAddPage / onFindNotes add "Add page" and "Link to a note…" on highlighted text (see selectionMenu); onNotePreview(id)
  * => Promise<{title, preview}> shows a card when hovering a note link. onAddImage / imageURL: pasted and dropped images
- * (see images).
+ * (see images). onLinkPreview(url) => Promise<{title, description, icon, image}>: the menu on a pasted link (see
+ * linkPreviews).
  */
 export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
-  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview, onAddImage, imageURL } = {}) {
+  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview, onAddImage, imageURL, onLinkPreview } = {}) {
   const root = document.createElement("div");
   root.className = "mn-editor" + (titleLine ? " mn-title-line" : "");
   if (fontSize) root.style.setProperty("--mn-font-size", `${fontSize}px`);
@@ -1044,6 +1254,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
       TaskItem.configure({ nested: true }),
       TableKit.configure({ table: { resizable: false } }),
       ...images(() => editor, { onAddImage, imageURL, say }),
+      ...linkPreviews(() => editor, { onLinkPreview, imageURL, say }),
       Placeholder.configure({ placeholder }),
       Markdown,
       Extra,

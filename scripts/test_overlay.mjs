@@ -1,6 +1,7 @@
 // Browser overlay in headless Chromium: the toolbar icon (⌥⇧N) shows it, × closes it, and the icon brings it back
 // at full height (it used to come back 0 px tall). With a built host (swift build -c release), also images (D53): a
-// note's image shows, and a pasted screenshot is kept by the host. Its store is a scratch folder, never your notes.
+// note's image shows, a pasted screenshot is kept by the host, and a pasted link becomes a card (D59). Its store is a
+// scratch folder, never your notes.
 // Needs Playwright: npm i -g playwright && npx playwright install chromium
 import { createRequire } from "module";
 import fs from "fs"; import os from "os"; import path from "path"; import { execFileSync, spawn } from "child_process";
@@ -33,6 +34,9 @@ if (hosted) {
 } else console.log("skip: images (no .build/release/MemoryNotes)");
 fs.mkdirSync(path.join(tmp, "site"));
 for (const name of ["plain", "notes"]) fs.writeFileSync(path.join(tmp, `site/${name}.html`), "<!doctype html><title>Page</title><p>A page");
+fs.writeFileSync(path.join(tmp, "site/linked.html"), '<!doctype html><head><meta property="og:title" content="Linked page">'
+  + '<meta name="description" content="A page to preview"><meta property="og:image" content="/pic.png"><link rel="icon" href="/pic.png"></head>');
+fs.writeFileSync(path.join(tmp, "site/pic.png"), Buffer.from(PNG, "base64"));
 const server = spawn("python3", ["-m", "http.server", "8767", "--bind", "127.0.0.1", "-d", path.join(tmp, "site")], { stdio: "ignore" });
 const ctx = await chromium.launchPersistentContext(path.join(tmp, "profile"), { channel: "chromium", headless: true,
   args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`] });
@@ -89,6 +93,22 @@ try {
     const pasted = refs.length === 2 && refs[0] !== refs[1] && host({ op: "image", id: refs[1].slice(10) }).size === Buffer.from(PNG, "base64").length;
     if (!pasted) failed++;
     console.log(`${pasted ? "PASS" : "FAIL"} a pasted screenshot is kept: ${JSON.stringify(text)}`);
+    // Paste a link and pick Card (D59): the Mac app fetches the page and keeps its picture; the card shows it.
+    await overlay.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.setData("text/plain", "http://127.0.0.1:8767/linked.html");
+      document.querySelector(".ProseMirror").dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    const menu = await overlay.locator(".mn-at-item").allTextContents();
+    for (const key of ["ArrowDown", "ArrowDown", "Enter"]) await page.keyboard.press(key);
+    await overlay.locator(".mn-card img.mn-card-image").first().waitFor({ timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(1500); // the save is debounced
+    const saved = host({ op: "list", url: "127.0.0.1:8767/notes.html" }).notes[0].text;
+    const picture = await overlay.locator(".mn-card img.mn-card-image").first().evaluate((i) => i.naturalWidth).catch(() => 0);
+    const carded = menu.length === 3 && saved.includes("> [!bookmark] [Linked page](http://127.0.0.1:8767/linked.html)\n> A page to preview\n> ![](noteimage:")
+      && picture === 2;
+    if (!carded) failed++;
+    console.log(`${carded ? "PASS" : "FAIL"} a pasted link becomes a card: ${JSON.stringify({ menu, picture, saved })}`);
   }
 } finally {
   server.kill();

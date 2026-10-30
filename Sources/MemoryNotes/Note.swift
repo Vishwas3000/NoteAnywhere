@@ -120,7 +120,8 @@ extension Note {
         // Every pattern below needs one of these, or a list number; plain prose skips the (slow) regexes.
         guard line.contains(where: { "#>-*+_~`[|@📅".contains($0) }) || line.drop(while: \.isWhitespace).first?.isNumber == true
         else { return line.trimmingCharacters(in: .whitespaces) }
-        return line.replacing(#/^\s*(#{1,6}\s+|>\s*|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)*/#, with: "")
+        // A link card is a callout, "> [!bookmark] [Title](url)"; the marker isn't text.
+        return line.replacing(#/^\s*(#{1,6}\s+|>\s*(?:\[!bookmark\]\s*)?|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)*/#, with: "")
             .replacing(#/^\s*(-{3,}|\*{3,}|_{3,}|\|?[\s:|-]+\|[\s:|-]*)\s*$/#, with: "")  // rules, table separators
             .replacing(#/!?\[([^\]]*)\]\([^)]*\)/#) { $0.1 }
             .replacing(#/\*\*|__|~~|`/#, with: "")

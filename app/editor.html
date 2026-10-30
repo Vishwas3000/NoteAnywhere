@@ -38,6 +38,7 @@
         onHeight: (px) => post({ type: "height", value: px }),
         onAI: (action, text) => ask("ai", { action, text }),
         onAddImage: (mime, data) => ask("addImage", { mime, data }),  // shown through ImageScheme (noteimage:)
+        onLinkPreview: (url) => ask("linkPreview", { url }),  // LinkPreview.swift fetches the page; its pictures become note images
         // The Mac app makes pages from highlighted text, finds notes to link and previews them on hover.
         ...(options.pages ? {
           onAddPage: (text) => ask("addPage", { text }),

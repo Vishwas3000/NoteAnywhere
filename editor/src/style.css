@@ -174,6 +174,23 @@
 .mn-hover strong { display: block; margin-bottom: 4px; font-size: 13px; }
 .mn-hover p { margin: 0 0 6px; color: var(--mn-muted); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
 .mn-hover small { color: var(--mn-muted); font-size: 11px; }
+/* Pasted links: the menu reuses the "@" menu; a mention sits in the line, a card is its own block. */
+.mn-content a.mn-mention { display: inline-flex; align-items: baseline; gap: 4px; }
+.mn-content .mn-mention-icon { width: 14px; height: 14px; align-self: center; border-radius: 3px; object-fit: contain; }
+.mn-mention-globe { font-size: 11px; color: var(--mn-muted); text-align: center; }
+.mn-content a.mn-card { display: flex; margin: 6px 0; overflow: hidden; color: var(--mn-fg); border: 1px solid var(--mn-line);
+  border-radius: 10px; }
+.mn-content a.mn-card:hover { background: var(--mn-hover); }
+.mn-content .ProseMirror-selectednode.mn-card, .mn-content .ProseMirror-selectednode.mn-mention { outline: 2px solid var(--mn-accent); }
+.mn-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; }
+.mn-card-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mn-card-desc { color: var(--mn-muted); font-size: 0.9em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mn-card-site { display: flex; align-items: center; gap: 6px; color: var(--mn-muted); font-size: 0.85em; }
+.mn-content .mn-card-icon { width: 14px; height: 14px; border-radius: 3px; object-fit: contain; }
+.mn-content .mn-card-image { width: 32%; max-width: 220px; max-height: 120px; object-fit: cover; border-radius: 0; }
+.mn-link-loading { animation: mn-pulse 1s ease-in-out infinite alternate; }
+@keyframes mn-pulse { to { opacity: 0.4; } }
+@media (prefers-reduced-motion: reduce) { .mn-link-loading { animation: none; opacity: 0.6; } }
 /* Maths (KaTeX → MathML). Click a formula to edit its source. */
 .mn-content .tiptap-mathematics-render { cursor: pointer; border-radius: 4px; }
 .mn-content .tiptap-mathematics-render:hover { background: var(--mn-hover); }
