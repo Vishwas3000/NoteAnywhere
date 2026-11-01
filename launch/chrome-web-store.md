@@ -3,10 +3,9 @@
 Field by field, in the order the Developer Dashboard asks. Everything here matches what `extension/` does today; if
 the extension changes, update this and [PRIVACY.md](../PRIVACY.md) together.
 
-**Before uploading** (release work, not copy): the manifest still says "MemoryNotes" in `name`, `description` and
-`action.default_title`; the Web Store gives the extension its own id, which the Mac app's native host manifest must
-list in `allowed_origins` (next to the dev id); and the panel's "Mac app not installed — run scripts/install.sh"
-message should point store users to the download page instead. See the checklist in [README.md](README.md).
+**Status:** 0.1.0 was rejected on Oct 31, 2026 for a browser list typed into the description (D62); resubmit with the
+description below. The release work it depended on is done (see the checklist in [README.md](README.md)). Upload the
+`NoteAnywhere-extension-X.Y.Z.zip` from the release, which has no `"key"` in its manifest.
 
 ---
 

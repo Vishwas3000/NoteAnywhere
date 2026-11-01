@@ -632,4 +632,7 @@ Made by the subagent that wrote the extension:
 - **By Claude:** the description lists no browsers; the line is now "Needs the NoteAnywhere app on a Mac with macOS 15
   or later." The site's footer, which isn't store metadata, keeps its browser list. Rejected: appealing (the policy
   names exactly this pattern).
+- **Asked by the user (follow-up):** bring the rest up to date. The README and the site now say "Chrome and Brave"
+  like D6, the privacy policy and the posts (they claimed Edge, Arc and Vivaldi, never tested; the app still registers
+  its host with those browsers). The launch checklist's release items are ticked: each was checked in the code.
 - **Status:** Draft fixed; the user pastes it into the dashboard and resubmits.

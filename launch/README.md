@@ -20,18 +20,17 @@ placeholders are filled.
 
 Release work (not in this kit, but the launch depends on it):
 
-- [ ] Notarized DMG published as the latest GitHub Release.
-- [ ] The DMG's app registers the native messaging host for Chrome and Brave on first launch, with the **Web Store
-      extension id** in `allowed_origins` (today only `scripts/install.sh` registers it, for the unpacked dev id).
-      Without this, the store extension can't reach the app.
-- [ ] Extension manifest: `name`, `description` and `action.default_title` say NoteAnywhere. Check whether the store
-      accepts the manifest's `key` field; if not, strip it from the uploaded zip only (dev builds need it).
-- [ ] The extension's "Mac app not installed — run scripts/install.sh" message points store users to the Releases
-      page instead.
-- [ ] User-visible app names say NoteAnywhere (window title, menu items like "Quit MemoryNotes", the "MemoryNotes
-      Cloud" sync option), as decided in D36.
-- [ ] Extension submitted to the Chrome Web Store with [chrome-web-store.md](chrome-web-store.md). Review can take
-      several days, and content scripts on all sites often mean a longer review, so submit first.
+- [x] Notarized DMG published as the latest GitHub Release (v0.1.1).
+- [x] The app registers the native messaging host on every launch, with the **Web Store extension id** in
+      `allowed_origins` next to the dev id (`BrowserBridge.swift`).
+- [x] Extension manifest: `name`, `description` and `action.default_title` say NoteAnywhere. The release's store zip
+      has no `key` field; dev builds keep it.
+- [x] The extension's "Mac app not installed" message points to the download page.
+- [x] User-visible app names say NoteAnywhere (D36).
+- [ ] Extension submitted to the Chrome Web Store with [chrome-web-store.md](chrome-web-store.md). 0.1.0 was
+      rejected on Oct 31, 2026 for listing browsers in the description (D62); resubmit with the fixed description.
+      Review can take several days, and content scripts on all sites often mean a longer review.
+- [ ] Once approved: set `BrowserBridge.storeListed = true`, fill `{{CHROME_WEB_STORE_URL}}`, and release.
 
 Repo hygiene:
 

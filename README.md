@@ -21,7 +21,7 @@ there, it's waiting in a small floating panel.
 | Every chat has its own notes | So does every web page |
 |---|---|
 | ![The Family group chat with its own notes in the panel](docs/images/chat-group.png) | ![The NoteAnywhere panel on a Wikipedia page, with two notes for that page](docs/images/browser-page.png) |
-| Open the Family chat and its notes are there. Switch chats, and the notes switch too. | The browser extension shows a page's notes right on the page, in Chrome, Brave, Edge and Arc. |
+| Open the Family chat and its notes are there. Switch chats, and the notes switch too. | The browser extension shows a page's notes right on the page, in Chrome and Brave. |
 
 Everything is also in one Apple Notes–style window, with on-device search, a calendar, #tags and a graph of how your
 notes link up.
@@ -102,7 +102,7 @@ supports Apple Intelligence.
 3. For website notes, add the browser extension. It's in review on the Chrome Web Store; until it's listed, download
    the source code from the [latest release](https://github.com/Vishwas3000/NoteAnywhere/releases/latest), open
    `chrome://extensions`, turn on Developer mode, click **Load unpacked** and choose the `extension` folder. It works
-   in Chrome, Brave, Edge and Arc.
+   in Chrome and Brave.
 
 The first search downloads the search model once (about 87 MB). Until then, search matches exact words.
 
