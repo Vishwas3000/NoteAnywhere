@@ -623,3 +623,13 @@ Made by the subagent that wrote the extension:
 - shortcut: a range stops after 366 days; overlapping ranges with different starts can step down a row.
 - **Status:** Done. Swift tests (parsing, order, colour); the real Mac calendar rendered offscreen in light and dark
   from demo notes. iPhone builds; its calendar not looked at.
+
+## D62. Chrome Web Store description names no browsers
+
+- **What happened:** the store rejected 0.1.0 (Spam and Placement, "Yellow Argon") for excessive keywords in the
+  description: "It works with Chrome, Brave, Edge, Arc, Vivaldi and Chromium." That line was typed in the dashboard;
+  the draft in launch/chrome-web-store.md said "Works in Chrome and Brave".
+- **By Claude:** the description lists no browsers; the line is now "Needs the NoteAnywhere app on a Mac with macOS 15
+  or later." The site's footer, which isn't store metadata, keeps its browser list. Rejected: appealing (the policy
+  names exactly this pattern).
+- **Status:** Draft fixed; the user pastes it into the dashboard and resubmits.

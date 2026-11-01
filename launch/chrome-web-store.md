@@ -22,7 +22,8 @@ message should point store users to the download page instead. See the checklist
 
 **Language:** English
 
-**Detailed description** (plain text; the store doesn't render Markdown):
+**Detailed description** (plain text; the store doesn't render Markdown): Don't list other browsers by name: the store rejected
+0.1.0 for "excessive keywords" over "It works with Chrome, Brave, Edge, Arc, Vivaldi and Chromium." (D62).
 
 ```
 NoteAnywhere shows your notes for the page you're on, in a small panel on that page.
@@ -46,7 +47,7 @@ PRIVATE BY DESIGN
 
 The Mac app works without this extension, with notes for apps and windows (a Slack channel, a VS Code project) as well as web pages.
 
-Works in Chrome and Brave on macOS 15 or later.
+Needs the NoteAnywhere app on a Mac with macOS 15 or later.
 
 Open source (GPL-3.0): https://github.com/Vishwas3000/NoteAnywhere
 Privacy policy: https://github.com/Vishwas3000/NoteAnywhere/blob/main/PRIVACY.md
