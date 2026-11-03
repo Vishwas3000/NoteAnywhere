@@ -170,6 +170,21 @@ check("weekdays mean the next one, today included", () => {
   assert.equal(MNEditor.dayFor("mon", wed), "2026-11-02");
   assert.equal(MNEditor.dayFor("yesterday", wed), "2026-10-27");
 });
+check("a month and day means the next one: @dec9th, @9 dec, @December 25; impossible days stay text", () => {
+  const wed = new Date(2026, 9, 28);
+  assert.equal(MNEditor.dayFor("dec9th", wed), "2026-12-09");
+  assert.equal(MNEditor.dayFor("9 Dec", wed), "2026-12-09");
+  assert.equal(MNEditor.dayFor("December 25", wed), "2026-12-25");
+  assert.equal(MNEditor.dayFor("oct28", wed), "2026-10-28");
+  assert.equal(MNEditor.dayFor("jan 1st", wed), "2027-01-01"); // already past this year
+  assert.equal(MNEditor.dayFor("feb30", wed), null);
+  const ed = mount("");
+  for (const ch of "Party @dec9th and @feb30 ") {
+    const { from, to } = ed.editor.state.selection;
+    if (!ed.editor.view.someProp("handleTextInput", (f) => f(ed.editor.view, from, to, ch))) ed.editor.commands.insertContent(ch);
+  }
+  assert.equal(ed.getMarkdown().trim(), `Party @${MNEditor.dayFor("dec9th")} and @feb30`);
+});
 check("Obsidian 📅 dates are chips too; impossible dates aren't", () => {
   const ed = mount("a 📅 2026-10-30 b @2026-02-30");
   assert.deepEqual([...ed.editor.view.dom.querySelectorAll(".mn-date")].map((c) => c.dataset.day), ["2026-10-30"]);

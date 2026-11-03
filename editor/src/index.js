@@ -288,10 +288,21 @@ const CALENDAR_ICON = icon('<rect x="3" y="4" width="18" height="18" rx="2"/><pa
 
 const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-/** "today", "tomorrow", "yesterday", or a weekday (its next one, today included) as yyyy-mm-dd. */
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+/**
+ * "today", "tomorrow", "yesterday", a weekday, or a month and day ("dec9th", "9 dec", "December 25") as yyyy-mm-dd;
+ * a weekday or month and day means the next one, today included. null for a day that doesn't exist ("feb30").
+ */
 export function dayFor(word, now = new Date()) {
   const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const w = word.toLowerCase();
+  const md = w.match(/^(?:([a-z]{3})[a-z]*\s?(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})(?:st|nd|rd|th)?\s?([a-z]{3})[a-z]*)$/);
+  if (md) {
+    const month = MONTHS.indexOf(md[1] ?? md[4]), date = +(md[2] ?? md[3]);
+    let day = new Date(d.getFullYear(), month, date);
+    if (day < d) day = new Date(d.getFullYear() + 1, month, date);
+    return month >= 0 && day.getMonth() === month ? isoDay(day) : null;
+  }
   if (w === "tomorrow") d.setDate(d.getDate() + 1);
   else if (w === "yesterday") d.setDate(d.getDate() - 1);
   else if (w !== "today") d.setDate(d.getDate() + ((WEEKDAYS.indexOf(w.slice(0, 3)) - d.getDay() + 7) % 7));
@@ -300,7 +311,10 @@ export function dayFor(word, now = new Date()) {
 
 // Same rule as Note.dates in Swift: "@2026-10-30", or Obsidian Tasks' "📅 2026-10-30".
 const DATE = /(^|[\s(\[])((?:@|📅\s?)(\d{4}-\d{2}-\d{2}))(?![\w-])/gu;
-const SHORTHAND = /(?:^|\s)(@(today|tomorrow|yesterday|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?))\s$/i;
+const MONTH = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+const NTH = "\\d{1,2}(?:st|nd|rd|th)?";
+const SHORTHAND = new RegExp("(?:^|\\s)(@(today|tomorrow|yesterday|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:rs|rsday)?|fri(?:day)?"
+  + `|sat(?:urday)?|sun(?:day)?|(?:${MONTH})\\s?${NTH}|${NTH}\\s?(?:${MONTH})))\\s$`, "i");
 
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
   "November", "December"];
@@ -332,8 +346,9 @@ function dates(onDate, pickDate, datePattern) {
     addInputRules: () => [new InputRule({
       find: SHORTHAND,
       handler: ({ state, range, match }) => {
-        const start = range.from + match[0].indexOf(match[1]);
-        state.tr.insertText(`@${dayFor(match[2])} `, start, range.to);
+        const start = range.from + match[0].indexOf(match[1]), day = dayFor(match[2]);
+        if (!day) return null; // "@feb30 " stays as typed
+        state.tr.insertText(`@${day} `, start, range.to);
       },
     })],
     addProseMirrorPlugins: () => [atMenu(pickDate), new Plugin({
