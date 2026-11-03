@@ -746,3 +746,14 @@ Made by the subagent that wrote the extension:
   Now it's saved like typing; a test reads it back from the store (it failed on the old code).
 - **Asked by the user (follow-up):** a range's start and end should show the same colour. In the editor both date
   chips of a range take the colour written on either end (the calendar already coloured the whole bar).
+
+## D68 — Swipe the calendar to move it (2026-11-03)
+
+- **Asked by the user:** swipe left or right on the calendar to move it.
+- **Mac:** a two-finger sideways swipe on the trackpad over the calendar steps one month, week or day (whichever is
+  showing): fingers left = next, right = previous, like Calendar. One step per swipe; the coasting after the fingers
+  lift and mouse wheels are ignored; vertical scrolls pass through. SwiftUI has no trackpad swipe on the Mac, so it
+  watches scroll events (they are not swallowed).
+- **iPhone:** a sideways drag of 60 pt or more does the same; it runs alongside the lists, so they still scroll.
+- **Rejected:** NSEvent swipe(with:), which fires only for three-finger swipes when the user has set that up.
+- **Not done:** Android has no calendar yet.

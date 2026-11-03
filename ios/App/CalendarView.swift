@@ -38,6 +38,11 @@ struct CalendarView: View {
                 }
             }
             .background(mode == .month ? Color(.systemBackground) : Color(.systemGroupedBackground))  // no seam above the lists
+            // Swipe left for the next month, week or day, right for the previous (D68); simultaneous so lists still scroll.
+            .simultaneousGesture(DragGesture(minimumDistance: 30).onEnded { drag in
+                let w = drag.translation.width
+                if abs(w) > 60, abs(w) > 2 * abs(drag.translation.height) { step(w < 0 ? 1 : -1) }
+            })
             .navigationTitle(title)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { filterMenu }

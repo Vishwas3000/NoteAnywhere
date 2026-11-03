@@ -38,6 +38,7 @@ struct CalendarView: View {
                 }
             }
         }
+        .background(TrackpadSwipe { step($0) })
         .onChange(of: model.calendarRequest, initial: true) { showRequestedDay() }
         .toolbar {
             // ⌘-arrows rather than bare arrows, so text fields keep their arrow keys.
@@ -381,4 +382,50 @@ struct CalendarView: View {
     private func weekStart(_ d: Date) -> Date { cal.dateInterval(of: .weekOfYear, for: d)!.start }
     private func key(_ d: Date) -> String { Self.dayKey.string(from: d) }
     private func sourceKey(_ n: Note) -> String { n.kind.rawValue + ":" + n.target }
+}
+
+/// A two-finger sideways swipe on the trackpad over the calendar: fingers left = next, right = previous, one step per
+/// swipe (D68). SwiftUI has no trackpad swipe on the Mac, so this watches scroll events and lets them through.
+struct TrackpadSwipe: NSViewRepresentable {
+    let onSwipe: (Int) -> Void
+
+    func makeNSView(context: Context) -> NSView { context.coordinator.view }
+    func updateNSView(_ view: NSView, context: Context) { context.coordinator.onSwipe = onSwipe }
+    func makeCoordinator() -> Coordinator { Coordinator(onSwipe) }
+
+    /// Which way a swipe that has moved the fingers this far goes, or nil while it's too short or mostly vertical.
+    static func step(dx: CGFloat, dy: CGFloat) -> Int? {
+        abs(dx) > 40 && abs(dx) > 2 * abs(dy) ? (dx < 0 ? 1 : -1) : nil
+    }
+
+    final class Coordinator {
+        let view = NSView()
+        var onSwipe: (Int) -> Void
+        private var monitor: Any?
+        private var dx: CGFloat = 0, dy: CGFloat = 0, done = false
+
+        init(_ onSwipe: @escaping (Int) -> Void) {
+            self.onSwipe = onSwipe
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+                self?.handle(event)
+                return event
+            }
+        }
+        deinit { monitor.map(NSEvent.removeMonitor) }
+
+        private func handle(_ event: NSEvent) {
+            // Trackpad only (a mouse wheel has no phase), and not the coasting after the fingers lift.
+            guard !event.phase.isEmpty, event.momentumPhase.isEmpty, event.window == view.window,
+                  view.bounds.contains(view.convert(event.locationInWindow, from: nil)) else { return }
+            if event.phase == .began { (dx, dy, done) = (0, 0, false) }
+            // The fingers' own direction, whatever the natural-scrolling setting.
+            let flip: CGFloat = event.isDirectionInvertedFromDevice ? 1 : -1
+            dx += event.scrollingDeltaX * flip
+            dy += event.scrollingDeltaY * flip
+            if !done, let n = TrackpadSwipe.step(dx: dx, dy: dy) {
+                done = true
+                onSwipe(n)
+            }
+        }
+    }
 }

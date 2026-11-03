@@ -144,3 +144,10 @@ func pageTargets(url: String, expected: String) {
     #expect(page.preview == "Supabase closes idle sockets.")
     #expect(NotesModel.pageText("Alone", backTo: nil) == "Alone\n\n")
 }
+
+@Test func calendarSwipeDirection() {
+    #expect(TrackpadSwipe.step(dx: -50, dy: 5) == 1)    // fingers left: next
+    #expect(TrackpadSwipe.step(dx: 50, dy: -5) == -1)   // fingers right: previous
+    #expect(TrackpadSwipe.step(dx: 20, dy: 0) == nil)   // too short
+    #expect(TrackpadSwipe.step(dx: 60, dy: 40) == nil)  // mostly a scroll
+}
