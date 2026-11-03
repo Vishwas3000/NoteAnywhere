@@ -104,6 +104,33 @@ func pageTargets(url: String, expected: String) {
     #expect(dec4[0].barColor(label: nil) != .grey && dec4[0].barColor(label: nil) != .yellow)
 }
 
+@Test func eventsKeepTheirOwnColour() {
+    let note = Note(id: "n", kind: .url, target: "", label: "", text: """
+        Dentist @2026-11-05{red} and gym @2026-11-06
+        Goa @2026-11-15{green} – @2026-11-12, odd @2026-11-20{bogus}
+        """)
+    let byDay = Dictionary(grouping: note.dates, by: \.day)
+    #expect(byDay["2026-11-05"]?.first?.color == .red)
+    #expect(byDay["2026-11-06"]?.first?.color == nil)
+    #expect(note.dates.filter(\.isRange).allSatisfy { $0.color == .green && $0.first == "2026-11-12" })
+    #expect(byDay["2026-11-20"]?.first?.color == nil)
+    #expect(note.dates.first?.text == "Dentist and gym")  // the colour isn't part of the event's words
+    #expect(byDay["2026-11-05"]![0].barColor(label: .blue) == .red)  // its own colour beats the note's label
+    #expect(byDay["2026-11-06"]![0].barColor(label: .blue) == .blue)
+    #expect(Note.plain("Dentist @2026-11-05{red}") == "Dentist \(DateStyle.format("2026-11-05"))")
+
+    let lines = note.text.split(separator: "\n").map(String.init)
+    let gym = byDay["2026-11-06"]![0], dentist = byDay["2026-11-05"]![0], goa = byDay["2026-11-13"]![0]
+    #expect(gym.recolor(lines[0], .purple) == "Dentist @2026-11-05{red} and gym @2026-11-06{purple}")
+    #expect(dentist.recolor(lines[0], nil) == "Dentist @2026-11-05 and gym @2026-11-06")
+    #expect(dentist.recolor(lines[0], .cyan) == "Dentist @2026-11-05{cyan} and gym @2026-11-06")
+    // A range takes one colour, on the date written first, whichever end that is.
+    let orange = goa.recolor(lines[1], .orange)
+    #expect(orange == "Goa @2026-11-15{orange} – @2026-11-12, odd @2026-11-20{bogus}")
+    #expect(Note(id: "n", kind: .url, target: "", label: "", text: orange).dates.filter(\.isRange).allSatisfy { $0.color == .orange })
+    #expect(goa.recolor("Goa @2026-11-15{green} – @2026-11-12{red}", nil) == "Goa @2026-11-15 – @2026-11-12")
+}
+
 @Test func pageFromHighlightLinksBack() {
     var parent = Note(kind: .url, target: "", label: "", updatedAt: 0)
     parent.text = "Sync [notes]\nWhy does sync lag?"

@@ -309,8 +309,10 @@ export function dayFor(word, now = new Date()) {
   return isoDay(d);
 }
 
-// Same rule as Note.dates in Swift: "@2026-10-30", or Obsidian Tasks' "📅 2026-10-30".
-const DATE = /(^|[\s(\[])((?:@|📅\s?)(\d{4}-\d{2}-\d{2}))(?![\w-])/gu;
+// Same rule as Note.dates in Swift: "@2026-10-30", or Obsidian Tasks' "📅 2026-10-30", with an event's own colour
+// right after it, "@2026-10-30{red}" (the calendar's right-click writes it).
+const DATE = /(^|[\s(\[])((?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?:\{([a-z]+)\})?)(?![\w-])/gu;
+const COLORS = ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
 const MONTH = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
 const NTH = "\\d{1,2}(?:st|nd|rd|th)?";
 const SHORTHAND = new RegExp("(?:^|\\s)(@(today|tomorrow|yesterday|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:rs|rsday)?|fri(?:day)?"
@@ -364,17 +366,18 @@ function dates(onDate, pickDate, datePattern) {
               const title = day.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })
                 + (onDate ? " · ⌘-click to open this day" : "");
               const { selection } = state;
+              const className = COLORS.includes(m[4]) ? `mn-date mn-date-c mn-c-${m[4]}` : "mn-date";
               if (!datePattern || (selection.from < to && selection.to > from)) {
-                found.push(Decoration.inline(from, to, { class: "mn-date", "data-day": m[3], title }));
+                found.push(Decoration.inline(from, to, { class: className, "data-day": m[3], title }));
                 continue;
               }
               // The source stays in the text (shrunk to nothing, so the caret can still enter it); a widget shows the day.
-              const label = m[2].replace(m[3], formatDay(m[3], datePattern)).replace(/^@/, "");
+              const label = m[2].replace(/\{[a-z]+\}$/, "").replace(m[3], formatDay(m[3], datePattern)).replace(/^@/, "");
               found.push(Decoration.inline(from, to, { class: "mn-date-src" }), Decoration.widget(from, () => {
-                const chip = Object.assign(document.createElement("span"), { className: "mn-date", textContent: label, title });
+                const chip = Object.assign(document.createElement("span"), { className, textContent: label, title });
                 chip.dataset.day = m[3];
                 return chip;
-              }, { side: 1, key: `${m[3]}|${label}` }));
+              }, { side: 1, key: `${m[3]}|${label}|${className}` }));
             }
           });
           return DecorationSet.create(state.doc, found);

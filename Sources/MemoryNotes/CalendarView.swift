@@ -257,10 +257,9 @@ struct CalendarView: View {
         item.barColor(label: model.notes.first { $0.id == item.noteID }?.color).swatch
     }
 
-    /// Right-click on an event: its note's colour label, which every event in that note takes.
-    @ViewBuilder
+    /// Right-click on an event: that event's own colour, written into its line of the note.
     private func eventMenu(_ item: DatedLine) -> some View {
-        if let note = model.notes.first(where: { $0.id == item.noteID }) { ColorLabelMenu(note: note) }
+        ColorLabelMenu(current: item.color) { model.setColor(item, $0) }
     }
 
     /// One day of a range: a tinted bar that runs into the next day's cell, rounded where the range starts and ends.

@@ -85,23 +85,29 @@ extension Note {
             if line.hasPrefix("```") { inFence.toggle(); continue }
             if inFence || !(line.contains("@") || line.contains("📅")) { continue }  // most lines have no date
             let prose = line.replacing(#/`[^`]*`/#, with: " ")
-            // "@2026-12-03 - @2026-12-06" (or –, —, "to") is every day from the first to the last.
-            let range = #/(?:@|📅\s?)(\d{4}-\d{2}-\d{2})\s*(?:-|–|—|to)\s*(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?![\w-])/#
-            let spans = prose.matches(of: range).map { (String($0.1), String($0.2)) }
-                .filter { DatedLine.isDay($0.0) && DatedLine.isDay($0.1) && $0.0 != $0.1 }.map { (min($0.0, $0.1), max($0.0, $0.1)) }
+            // "@2026-12-03 - @2026-12-06" (or –, —, "to") is every day from the first to the last. "{red}" right after a
+            // date is that event's own colour (D67), on either end of a range.
+            let range = #/(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?:\{([a-z]+)\})?\s*(?:-|–|—|to)\s*(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?:\{([a-z]+)\})?(?![\w-])/#
+            let spans = prose.matches(of: range)
+                .map { (String($0.1), String($0.3), NoteColor(rawValue: String($0.2 ?? $0.4 ?? ""))) }
+                .filter { DatedLine.isDay($0.0) && DatedLine.isDay($0.1) && $0.0 != $0.1 }.map { (min($0.0, $0.1), max($0.0, $0.1), $0.2) }
             let rest = spans.isEmpty ? prose : prose.replacing(range, with: " ")
-            let days = rest.matches(of: #/(?:^|[\s(\[])(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?![\w-])/#).map { String($0.1) }
-                .filter { DatedLine.isDay($0) }
+            var days: [String: NoteColor?] = [:]  // a date twice on a line is one event; the first colour given wins
+            for m in rest.matches(of: #/(?:^|[\s(\[])(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?:\{([a-z]+)\})?(?![\w-])/#)
+            where DatedLine.isDay(String(m.1)) {
+                let color = m.2.flatMap { NoteColor(rawValue: String($0)) }
+                if days[String(m.1)] == nil || days[String(m.1)]! == nil { days[String(m.1)] = color }
+            }
             guard !days.isEmpty || !spans.isEmpty else { continue }
             let task = line.firstMatch(of: #/^\s*[-*+]\s+\[([ xX])\]\s/#)
-            let words = Note.plain(Substring(rest.replacing(#/(?:@|📅\s?)\d{4}-\d{2}-\d{2}/#, with: "")))
+            let words = Note.plain(Substring(rest.replacing(#/(?:@|📅\s?)\d{4}-\d{2}-\d{2}(?:\{[a-z]+\})?/#, with: "")))
                 .replacing(#/\s{2,}/#, with: " ")
-            let dated = { (day: String, span: (String, String)?) in
+            let dated = { (day: String, span: (String, String)?, color: NoteColor?) in
                 DatedLine(noteID: id, line: index, day: day, text: words.isEmpty ? title : words, isTask: task != nil,
-                          done: task.map { $0.1 != " " } ?? false, first: span?.0, last: span?.1)
+                          done: task.map { $0.1 != " " } ?? false, first: span?.0, last: span?.1, color: color)
             }
-            for day in Set(days).sorted() { found.append(dated(day, nil)) }
-            for span in spans { found += DatedLine.days(from: span.0, to: span.1).map { dated($0, span) } }
+            for (day, color) in days.sorted(by: { $0.key < $1.key }) { found.append(dated(day, nil, color)) }
+            for span in spans { found += DatedLine.days(from: span.0, to: span.1).map { dated($0, (span.0, span.1), span.2) } }
         }
         return found
     }
@@ -134,7 +140,7 @@ extension Note {
             .replacing(#/\*\*|__|~~|`/#, with: "")
             .replacing(#/\*(\S|\S[^*]*\S)\*/#) { $0.1 }  // *italic*, but not "2 * 3"
             .replacing(#/\s*\|\s*/#, with: "  ")
-            .replacing(#/(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?![\w-])/#) { DatedLine.isDay(String($0.1)) ? DateStyle.format(String($0.1)) : String($0.0) }
+            .replacing(#/(?:@|📅\s?)(\d{4}-\d{2}-\d{2})(?:\{[a-z]+\})?(?![\w-])/#) { DatedLine.isDay(String($0.1)) ? DateStyle.format(String($0.1)) : String($0.0) }
             .trimmingCharacters(in: .whitespaces)
     }
 }
@@ -163,7 +169,21 @@ struct DatedLine: Hashable, Identifiable {
     /// A range's first and last day ("@2026-12-03 - @2026-12-06"), on each of its days; nil for a single day.
     var first: String? = nil
     var last: String? = nil
+    /// Its own colour, "{red}" after its date; over the note's colour label.
+    var color: NoteColor? = nil
     var id: String { "\(noteID)/\(line)/\(day)/\(first ?? "")" }
+
+    /// `line` with this event's colour set or removed: "{red}" goes after its date as written first (either end of a
+    /// range), and any other colour on its dates comes off, since the first one is what's read.
+    func recolor(_ line: String, _ color: NoteColor?) -> String {
+        let days = [first, last].compactMap { $0 }
+        let token = try! Regex("((?:@|📅\\s?)(?:\((days.isEmpty ? [day] : days).joined(separator: "|"))))(?:\\{[a-z]+\\})?(?![\\w-])")
+        var colored = false
+        return line.replacing(token) { m in
+            defer { colored = true }
+            return String(line[m.output[1].range!]) + (colored ? "" : color.map { "{\($0.rawValue)}" } ?? "")
+        }
+    }
     var isRange: Bool { first != nil }
 
     /// Every day from `first` to `last`, both included.

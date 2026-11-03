@@ -185,6 +185,15 @@ check("a month and day means the next one: @dec9th, @9 dec, @December 25; imposs
   }
   assert.equal(ed.getMarkdown().trim(), `Party @${MNEditor.dayFor("dec9th")} and @feb30`);
 });
+check("an event's own colour tints its chip, hides in the chip and survives a round trip", () => {
+  const md = "Dentist @2026-11-05{red} and gym @2026-11-06";
+  const ed = mount(md, { datePattern: "d MMM yyyy" });
+  assert.equal(ed.getMarkdown().trim(), md);
+  const chips = [...ed.editor.view.dom.querySelectorAll(".mn-date")];
+  assert.deepEqual(chips.map((c) => c.textContent), ["5 Nov 2026", "6 Nov 2026"]);
+  assert.deepEqual(chips.map((c) => c.classList.contains("mn-c-red")), [true, false]);
+  assert.equal(chips[0].dataset.day, "2026-11-05");
+});
 check("Obsidian 📅 dates are chips too; impossible dates aren't", () => {
   const ed = mount("a 📅 2026-10-30 b @2026-02-30");
   assert.deepEqual([...ed.editor.view.dom.querySelectorAll(".mn-date")].map((c) => c.dataset.day), ["2026-10-30"]);

@@ -267,7 +267,7 @@ struct NotesWindow: View {
             Divider()
             Button("New Folder…") { promptFolder(moving: note.id) }
         } label: { Label("Move to", systemImage: "folder") }
-        ColorLabelMenu(note: note)
+        ColorLabelMenu(current: note.color) { color in model.update(note.id) { $0.color = color } }
         if let url = pageURL(note) {
             Divider()
             pageActions(url)
@@ -577,20 +577,20 @@ struct NoteWindow: View {
     }
 }
 
-/// A note's colour label as a menu: the sidebar's right-click and the calendar's.
+/// A colour menu: a note's label in the sidebar, one event's own colour in the calendar.
 struct ColorLabelMenu: View {
-    let note: Note
+    let current: NoteColor?
+    let set: (NoteColor?) -> Void
 
     var body: some View {
-        let model = NotesModel.shared
         Menu {
-            Button("None") { model.update(note.id) { $0.color = nil } }.disabled(note.color == nil)
+            Button("None") { set(nil) }.disabled(current == nil)
             Divider()
             ForEach(NoteColor.allCases, id: \.self) { color in
-                Button { model.update(note.id) { $0.color = color } } label: {
+                Button { set(color) } label: {
                     Label { Text(color.title) } icon: { Image(nsImage: Self.dot(color)) }
                 }
-                .disabled(note.color == color)
+                .disabled(current == color)
             }
         } label: { Label("Color", systemImage: "circle.lefthalf.filled") }
     }

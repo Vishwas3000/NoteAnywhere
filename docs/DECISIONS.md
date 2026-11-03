@@ -672,7 +672,8 @@ Made by the subagent that wrote the extension:
 - **By Claude:** in the month view single-day events are tinted pills like the range bars; edited notes stay plain,
   in grey. Week and day views tint their rows and the task circle or calendar glyph. Right-click any event (pill, bar,
   strip, row) → Color, the same menu as the sidebar's (`ColorLabelMenu`). Mac only; the iPhone calendar is unchanged.
-- **Status:** Done. Month view rendered offscreen from demo notes in light and dark. The right-click menu is not tried
+- **Superseded in part by D67:** right-click now colours only that event. Month view rendered offscreen from demo
+  notes in light and dark. The right-click menu is not tried
   by hand.
 
 ## D66 — Android app v1 (2026-11-03, subagent)
@@ -713,3 +714,17 @@ Made by the subagent that wrote the extension:
   tombstones, mark-pushed, account switch, row columns) are tested too. On an API 35 emulator: the same vectors and the
   Keystore secrets pass on device (`connectedDebugAndroidTest`), and the app starts on the sign-in screen. Not
   verified: real sign-in, vault, push and pull, and the editor and list screens past sign-in.
+
+## D67 — Each calendar event has its own colour (2026-11-03)
+
+- **Asked by the user:** right-click → Color changed every event in the note (D65's choice, the note's label); only the
+  event right-clicked should change.
+- **Chosen by the user:** a tag right after the date, `@2026-11-05{red}` (a range's on its first-written date). The
+  Mac, iPhone and browser editors hide it and tint the date chip; it shows while the cursor is in the date, like the
+  date's source. Android's text box and older versions show it as text. Rejected: a coloured-square emoji (no pink or
+  cyan), and keeping it outside the text (needs a new synced column and breaks when lines move).
+- **By Claude:** an event's colour is its own, else its note's label, else the picked one (D61). Right-click → Color
+  writes or removes the tag on that line (`NotesModel.setColor`); the sidebar's Color still sets the note's label. A
+  range keeps one tag: setting it strips any on the other end. Unknown words (`{bogus}`) are ignored.
+- **Status:** Done. Swift tests (parse, own colour beats label, rewrite incl. a backwards range), editor test (chip
+  tint, hidden tag, round trip). Not tried by hand.
