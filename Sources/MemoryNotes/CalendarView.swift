@@ -104,17 +104,24 @@ struct CalendarView: View {
             VStack(alignment: .leading, spacing: 3) {
                 dayNumber(d)
                 ForEach(planned.prefix(3)) { item in
-                    if item.isRange {
-                        rangeBar(item, d)
-                    } else {
-                        Label { Text(item.text).strikethrough(item.done) } icon: { checkbox(item) }
-                            .font(.caption).lineLimit(1)
-                            .foregroundStyle(item.done ? .secondary : .primary)
+                    Group {
+                        if item.isRange {
+                            rangeBar(item, d)
+                        } else {  // a tinted pill, so planned days stand apart from notes merely edited that day
+                            Label { Text(item.text).strikethrough(item.done) } icon: { checkbox(item) }
+                                .font(.caption).lineLimit(1)
+                                .foregroundStyle(item.done ? .secondary : .primary)
+                                .padding(.horizontal, 4).padding(.vertical, 1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(color(item).opacity(0.3), in: RoundedRectangle(cornerRadius: 4))
+                        }
                     }
+                    .contextMenu { eventMenu(item) }
                 }
                 ForEach(edited) { s in
                     Label { Text(s.note.title) } icon: { NoteIcon(note: s.note, size: 12) }
                         .font(.caption).lineLimit(1)
+                        .foregroundStyle(.secondary)
                 }
                 if hidden > 0 {
                     Text("\(hidden) more").font(.caption).foregroundStyle(.secondary)
@@ -156,6 +163,7 @@ struct CalendarView: View {
                             Button { model.openRequest = item.noteID } label: { rangeBar(item, d, inset: 8) }
                                 .buttonStyle(.plain)
                                 .accessibilityHint("Opens the note")
+                                .contextMenu { eventMenu(item) }
                         } else {
                             rangeBar(rows[row][0], d, inset: 8).hidden()  // keeps the row, so the strips below stay level
                         }
@@ -249,6 +257,12 @@ struct CalendarView: View {
         item.barColor(label: model.notes.first { $0.id == item.noteID }?.color).swatch
     }
 
+    /// Right-click on an event: its note's colour label, which every event in that note takes.
+    @ViewBuilder
+    private func eventMenu(_ item: DatedLine) -> some View {
+        if let note = model.notes.first(where: { $0.id == item.noteID }) { ColorLabelMenu(note: note) }
+    }
+
     /// One day of a range: a tinted bar that runs into the next day's cell, rounded where the range starts and ends.
     /// The title shows on the first day and again where a week begins.
     private func rangeBar(_ item: DatedLine, _ d: Date, inset: CGFloat = 6) -> some View {
@@ -278,13 +292,13 @@ struct CalendarView: View {
         if item.isTask {
             Button { model.toggleTask(item) } label: {
                 Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(item.done ? Color.notesAccent : .secondary)
+                    .foregroundStyle(item.done ? Color.notesAccent : color(item))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(item.done ? "Done" : "Not done")
             .accessibilityHint("Ticks the task in its note")
         } else {
-            Image(systemName: "calendar").foregroundStyle(item.isRange ? color(item) : .secondary).accessibilityHidden(true)
+            Image(systemName: "calendar").foregroundStyle(color(item)).accessibilityHidden(true)
         }
     }
 
@@ -310,7 +324,8 @@ struct CalendarView: View {
             .accessibilityHint("Opens the note")
         }
         .padding(compact ? 8 : 2)
-        .background { if compact { RoundedRectangle(cornerRadius: 8).fill(item.isRange ? color(item).opacity(0.25) : Color.notesAccent.opacity(0.12)) } }
+        .background { if compact { RoundedRectangle(cornerRadius: 8).fill(color(item).opacity(0.25)) } }
+        .contextMenu { eventMenu(item) }
     }
 
     // MARK: Helpers

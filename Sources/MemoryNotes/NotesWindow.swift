@@ -199,6 +199,7 @@ struct NotesWindow: View {
             if folderFilter != nil, model.notes.first(where: { $0.id == id })?.folderID != folderFilter { folderFilter = nil }  // so its row shows too
             switchTo(.notes)
             selection = id
+            model.focusRequest = model.canEdit(id) ? id : nil  // a locked note shows no editor to take it
             model.openRequest = nil
         }
         .onChange(of: model.searchRequest, initial: true) { _, request in
@@ -266,33 +267,13 @@ struct NotesWindow: View {
             Divider()
             Button("New Folder…") { promptFolder(moving: note.id) }
         } label: { Label("Move to", systemImage: "folder") }
-        Menu {
-            Button("None") { model.update(note.id) { $0.color = nil } }.disabled(note.color == nil)
-            Divider()
-            ForEach(NoteColor.allCases, id: \.self) { color in
-                Button { model.update(note.id) { $0.color = color } } label: {
-                    Label { Text(color.title) } icon: { Image(nsImage: Self.dot(color)) }
-                }
-                .disabled(note.color == color)
-            }
-        } label: { Label("Color", systemImage: "circle.lefthalf.filled") }
+        ColorLabelMenu(note: note)
         if let url = pageURL(note) {
             Divider()
             pageActions(url)
         }
         Divider()
         Button(role: .destructive) { pendingDelete = note } label: { Label("Delete", systemImage: "trash") }
-    }
-
-    /// Menus draw images as-is but tint SF Symbols, so colour swatches go in as plain images.
-    private static func dot(_ color: NoteColor) -> NSImage {
-        let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
-            NSColor(color.swatch).setFill()
-            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
-            return true
-        }
-        image.isTemplate = false
-        return image
     }
 
     // MARK: Folders
@@ -593,5 +574,35 @@ struct NoteWindow: View {
         } else {
             ContentUnavailableView("Note Deleted", systemImage: "trash", description: Text("This note no longer exists."))
         }
+    }
+}
+
+/// A note's colour label as a menu: the sidebar's right-click and the calendar's.
+struct ColorLabelMenu: View {
+    let note: Note
+
+    var body: some View {
+        let model = NotesModel.shared
+        Menu {
+            Button("None") { model.update(note.id) { $0.color = nil } }.disabled(note.color == nil)
+            Divider()
+            ForEach(NoteColor.allCases, id: \.self) { color in
+                Button { model.update(note.id) { $0.color = color } } label: {
+                    Label { Text(color.title) } icon: { Image(nsImage: Self.dot(color)) }
+                }
+                .disabled(note.color == color)
+            }
+        } label: { Label("Color", systemImage: "circle.lefthalf.filled") }
+    }
+
+    /// Menus draw images as-is but tint SF Symbols, so colour swatches go in as plain images.
+    private static func dot(_ color: NoteColor) -> NSImage {
+        let image = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
+            NSColor(color.swatch).setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+            return true
+        }
+        image.isTemplate = false
+        return image
     }
 }
