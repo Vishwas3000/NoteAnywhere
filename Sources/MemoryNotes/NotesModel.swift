@@ -21,6 +21,13 @@ final class NotesModel: ObservableObject {
     @Published private(set) var snapshots = NoteStore.loadHistory()
     /// A note to select in the main window, e.g. after clicking a link to it inside another note.
     @Published var openRequest: String?
+    /// A note whose editor should take the cursor once it shows: one the user just opened on purpose.
+    @Published var focusRequest: String?
+    /// Whether opening the note shows its editor: a locked one shows its lock until this session is unlocked.
+    @MainActor func canEdit(_ id: String) -> Bool {
+        guard let note = notes.first(where: { $0.id == id }) else { return false }
+        return !note.locked || LockSession.shared.isUnlocked
+    }
     /// A search to run in the main window, e.g. "#ml" after ⌘-clicking that tag in a note.
     @Published var searchRequest: String?
     /// A day ("yyyy-MM-dd") to show in the calendar, e.g. after ⌘-clicking a date in a note.

@@ -8,7 +8,7 @@ private final class OverlayPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 }
 
-/// Floating panel that follows the frontmost app: it opens by itself when that app has notes.
+/// Floating panel that follows the frontmost app: it opens by itself when that app has notes (unless that's off).
 final class OverlayController {
     private let model = NotesModel.shared
     private var subscription: AnyCancellable?
@@ -34,16 +34,20 @@ final class OverlayController {
 
     func start() {
         subscription = FrontWindow.shared.$context.removeDuplicates().sink { [weak self] context in self?.contextChanged(context) }
-        HotKeys.register(kVK_ANSI_M, optionKey | shiftKey, name: "⌥⇧M") { [weak self] in self?.toggle() }
+        HotKeys.register(kVK_ANSI_M, optionKey | shiftKey, name: "⌥⇧M") { [weak self] in MainActor.assumeIsolated { self?.toggle() } }  // hot keys fire on the main thread
     }
 
-    func toggle() {
-        panel.isVisible ? panel.orderOut(nil) : show(model.frontApp)
+    /// ⌥⇧M: unlike opening by itself, this takes the keyboard, with the cursor in the newest note.
+    @MainActor func toggle() {
+        if panel.isVisible { return panel.orderOut(nil) }
+        show(model.frontApp)
+        panel.makeKey()
+        if let id = model.frontContext.flatMap({ model.notes(inContext: $0).last?.id }), model.canEdit(id) { model.focusRequest = id }
     }
 
     private func contextChanged(_ context: String?) {
         guard let context, !model.notes(inContext: context).isEmpty else { return panel.orderOut(nil) }
-        show(model.frontApp)
+        if panel.isVisible || NativeHost.autoOpen { show(model.frontApp) }  // off: only ⌥⇧M opens it
     }
 
     private func show(_ app: NSRunningApplication?) {
@@ -295,5 +299,17 @@ private struct NoteCard: View {
         .accessibilityLabel(note.title)
         .accessibilityAction(named: "Open in NoteAnywhere", open)
         .accessibilityAction(named: "Delete Note", delete)
+    }
+}
+
+/// Settings ▸ General. The browser panel reads the same setting from the host's "list" reply.
+struct AutoOpenToggle: View {
+    @AppStorage(NativeHost.autoOpenKey) private var on = true
+
+    var body: some View {
+        Toggle(isOn: $on) {
+            Text("Open notes by themselves")
+            Text("When an app, chat or web page has notes. Off: ⌥⇧M shows them on the Mac, ⌥⇧N in the browser.")
+        }
     }
 }

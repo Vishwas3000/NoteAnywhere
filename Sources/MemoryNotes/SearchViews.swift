@@ -61,6 +61,7 @@ struct SearchResultsView: View {
     private func choose(_ note: Note) {
         if let open { return open(note) }
         expanded = expanded == note.id ? nil : note.id
+        if expanded != nil, model.canEdit(note.id) { model.focusRequest = note.id }
     }
 
     /// Apple Notes style: bold title, then the preview, then where the note lives and when it was edited.

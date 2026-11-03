@@ -79,6 +79,7 @@ private struct EditorWebView: NSViewRepresentable {
         web.passesScroll = passesScroll
         context.coordinator.parent = self
         context.coordinator.push(markdown)  // e.g. the same note was edited in the browser
+        context.coordinator.takeFocusIfRequested()  // an editor that was already showing when its note was opened
     }
 
     static func dismantleNSView(_ web: WebView, coordinator: Coordinator) {
@@ -92,6 +93,17 @@ private struct EditorWebView: NSViewRepresentable {
         private var shown: String?  // the Markdown the editor currently holds
 
         init(_ parent: EditorWebView) { self.parent = parent }
+
+        private func takeFocus() {
+            web?.window?.makeFirstResponder(web)
+            call("focus")
+        }
+
+        func takeFocusIfRequested() {
+            guard ready, NotesModel.shared.focusRequest == parent.noteID else { return }
+            DispatchQueue.main.async { NotesModel.shared.focusRequest = nil }  // not during a view update
+            takeFocus()
+        }
 
         private func call(_ function: String, _ args: Any...) {
             guard let json = try? JSONSerialization.data(withJSONObject: args, options: .fragmentsAllowed),
@@ -112,10 +124,8 @@ private struct EditorWebView: NSViewRepresentable {
                 ready = true
                 shown = parent.markdown
                 call("load", parent.markdown, parent.options)
-                if parent.markdown.isEmpty && parent.focusIfEmpty {  // a new note: start typing right away
-                    web?.window?.makeFirstResponder(web)
-                    call("focus")
-                }
+                if parent.markdown.isEmpty && parent.focusIfEmpty { takeFocus() }  // a new note: start typing right away
+                takeFocusIfRequested()
             case "change":
                 guard let markdown = body["markdown"] as? String else { return }
                 shown = markdown

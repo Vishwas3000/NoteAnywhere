@@ -109,6 +109,17 @@ try {
       && picture === 2;
     if (!carded) failed++;
     console.log(`${carded ? "PASS" : "FAIL"} a pasted link becomes a card: ${JSON.stringify({ menu, picture, saved })}`);
+    // Settings ▸ "Open notes by themselves" off (D63): a page with notes stays closed until the icon. The test host is a
+    // bare binary named MemoryNotes, so its defaults domain is "MemoryNotes", not the app's.
+    execFileSync("defaults", ["write", "MemoryNotes", "openNotesByThemselves", "-bool", "false"]);
+    try {
+      await page.goto("http://127.0.0.1:8767/notes.html");
+      await page.waitForTimeout(1500);
+      await expect("off: a page with notes stays closed", false);
+      await icon(); await expect("off: the icon still opens it", true);
+    } finally {
+      execFileSync("defaults", ["delete", "MemoryNotes", "openNotesByThemselves"]);
+    }
   }
 } finally {
   server.kill();

@@ -47,7 +47,7 @@ struct MemoryNotesApp: App {
 
         Settings {
             TabView {
-                Form { DateFormatPicker() }
+                Form { AutoOpenToggle(); DateFormatPicker() }
                     .formStyle(.grouped)
                     .tabItem { Label("General", systemImage: "gearshape") }
                 SyncSettingsView()

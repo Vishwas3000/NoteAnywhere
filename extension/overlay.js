@@ -8,6 +8,7 @@ let notes = [], visible = false, dismissed = false, collapsed = false, forced = 
 let query = "", results = [], searchSeq = 0, searchTimer, changeTimer;
 let editors = [], stamps = [], toolbarOn = false, expanded = false, watching = false, hostH, lastHeight = 0;
 let datePattern; // the Mac app's Settings ▸ "Dates in notes", sent with each list
+let autoOpen = true; // the Mac app's Settings ▸ "Open notes by themselves"; off, only ⌥⇧N or the icon opens the panel
 
 const $ = (s) => document.querySelector(s);
 const [panel, count, body, list, empty, errBox] = [".panel", ".count", ".body", ".notes", ".empty", ".error"].map($);
@@ -337,10 +338,11 @@ async function load(nav) {
   if (typing()) return; // focus may have moved into an editor while the Mac app answered
   error = r.ok ? "" : r.error;
   if (r.datePattern) datePattern = r.datePattern;
+  if (r.ok) autoOpen = r.autoOpen !== false; // an older Mac app doesn't send it
   const fresh = r.ok ? r.notes : nav ? [] : notes;
   // forced: opened by toggle on this page, so a slower first load mustn't hide it again.
-  if (nav) { dismissed = false; visible = forced || fresh.length > 0; }
-  else if (fresh.length && !dismissed) visible = true;
+  if (nav) { dismissed = false; visible = forced || (autoOpen && fresh.length > 0); }
+  else if (fresh.length && !dismissed && autoOpen) visible = true;
   // Same notes: update changed ones in place, so cursors, scroll and the other cards stay put.
   if (!nav && fresh.length === notes.length && fresh.every((n, i) => n.id === notes[i].id)) {
     fresh.forEach((n, i) => {

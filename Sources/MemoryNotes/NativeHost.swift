@@ -4,6 +4,10 @@ import notify
 /// Chrome Native Messaging host: each message is a 4-byte little-endian length followed by UTF-8 JSON.
 /// Chrome starts this process on demand, so the extension works even when the app isn't open.
 enum NativeHost {
+    /// Settings ▸ General: off, the Mac panel and the browser panel open only with their shortcut (D63).
+    static let autoOpenKey = "openNotesByThemselves"
+    static var autoOpen: Bool { UserDefaults.standard.object(forKey: autoOpenKey) as? Bool ?? true }
+
     struct Request: Decodable {
         let op: String
         var url: String?
@@ -26,6 +30,7 @@ enum NativeHost {
         var event: String?
         var error: String?
         var datePattern: String?  // with "list": how the extension's editor shows dates (Settings ▸ General)
+        var autoOpen: Bool?  // with "list": whether a page's notes open the panel by themselves
         var src: String?  // addImage: what the note shows, noteimage:<id>
         var data: String?, mime: String?, size: Int?  // image: one piece (base64), the type and the whole size
         var preview: LinkPreview.Page?  // linkPreview: the pictures as noteimage:<id> sources, so the reply stays small
@@ -76,7 +81,7 @@ enum NativeHost {
             switch req.op {
             case "list":
                 let url = req.url ?? ""
-                return Reply(notes: NoteStore.notes(under: url), datePattern: DateStyle.pattern)
+                return Reply(notes: NoteStore.notes(under: url), datePattern: DateStyle.pattern, autoOpen: autoOpen)
             case "save":
                 // The browser may only write website notes, never app notes.
                 guard var note = req.note, note.kind == .url, !note.target.isEmpty else {

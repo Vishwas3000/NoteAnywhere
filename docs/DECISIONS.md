@@ -624,7 +624,7 @@ Made by the subagent that wrote the extension:
 - **Status:** Done. Swift tests (parsing, order, colour); the real Mac calendar rendered offscreen in light and dark
   from demo notes. iPhone builds; its calendar not looked at.
 
-## D62. Chrome Web Store description names no browsers
+## D62 — Chrome Web Store description names no browsers (2026-11-01)
 
 - **What happened:** the store rejected 0.1.0 (Spam and Placement, "Yellow Argon") for excessive keywords in the
   description: "It works with Chrome, Brave, Edge, Arc, Vivaldi and Chromium." That line was typed in the dashboard;
@@ -636,3 +636,41 @@ Made by the subagent that wrote the extension:
   like D6, the privacy policy and the posts (they claimed Edge, Arc and Vivaldi, never tested; the app still registers
   its host with those browsers). The launch checklist's release items are ticked: each was checked in the code.
 - **Status:** Draft fixed; the user pastes it into the dashboard and resubmits.
+
+## D63 — Notes can wait for their shortcut; a note you open takes the cursor (2026-11-03)
+
+- **Asked by the user:** some people don't want notes popping up by themselves; they'd open them with a hot key.
+- **Chosen by the user:** one switch for both, Settings ▸ General ▸ "Open notes by themselves" (on by default). Off,
+  the Mac panel opens only with ⌥⇧M and the browser panel only with ⌥⇧N or the toolbar icon. The extension learns it
+  from the host's "list" reply (`autoOpen`), so there's nothing to set in the browser; an older app that doesn't send
+  it keeps the old behaviour. An open panel still follows the app in front.
+- **Asked by the user:** with WhatsApp in front, ⌥⇧M → search → open a note showed no cursor.
+- **By Claude:** the panel never took the keyboard (it's non-activating so opening by itself can't steal typing), and
+  an editor only took the cursor when its note was empty. Now ⌥⇧M makes the panel key with the cursor at the end of
+  the newest note there; a search result expanded in the panel, and a note opened in the main window (search popup,
+  calendar, graph, links), take the cursor too (`NotesModel.focusRequest`). Opening by itself still doesn't take it.
+  Locked notes don't ask for it, so no stale request steals focus later.
+- **Status:** Done. Extension test covers the switch off (a page with notes stays closed; the icon opens it); Swift
+  and editor tests pass. The cursor change is not tried by hand (no synthetic keys or clicks on the user's Mac).
+
+## D64 — "@dec9th" and other month-and-day dates (2026-11-03)
+
+- **Asked by the user:** typing @dec9th should become a date in the chosen format, for people who'd rather type.
+- **By Claude:** like `@fri `, a month and day followed by a space becomes `@yyyy-mm-dd` (shown in the Settings
+  format): `@dec9th`, `@dec9`, `@dec 9th`, `@9 dec`, `@9thdec`, `@December 25`. It means the next one, today
+  included, so `@jan1` in November is next year, the same rule as weekdays. A day that doesn't exist (`@feb30`)
+  stays as typed. Only the editor converts; the note still stores ISO dates, so the Swift side needs no change.
+- shortcut: no explicit year (`@dec9 2027`); type the ISO date for a past or far-off day.
+- **Status:** Done. Editor tests (parsing, typing, impossible days).
+
+## D65 — Every calendar event in colour; right-click to change it (2026-11-03)
+
+- **Asked by the user:** always colour calendar events so they stand apart from notes merely edited that day, and
+  right-click an event to switch its colour.
+- **Chosen by the user:** the colour is the note's colour label, so every event in a note takes it and the sidebar
+  strip matches; no change to the note's text.
+- **By Claude:** in the month view single-day events are tinted pills like the range bars; edited notes stay plain,
+  in grey. Week and day views tint their rows and the task circle or calendar glyph. Right-click any event (pill, bar,
+  strip, row) → Color, the same menu as the sidebar's (`ColorLabelMenu`). Mac only; the iPhone calendar is unchanged.
+- **Status:** Done. Month view rendered offscreen from demo notes in light and dark. The right-click menu is not tried
+  by hand.
