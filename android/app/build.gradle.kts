@@ -9,7 +9,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        // Not com.memorynotes.app: that's the Mac app's bundle id (D63+ in docs/DECISIONS.md).
+        // Not com.memorynotes.app: that's the Mac app's bundle id (D66).
         applicationId = "com.memorynotes.android"
         minSdk = 26 // java.util.Base64
         targetSdk = 36

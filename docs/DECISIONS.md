@@ -674,3 +674,42 @@ Made by the subagent that wrote the extension:
   strip, row) → Color, the same menu as the sidebar's (`ColorLabelMenu`). Mac only; the iPhone calendar is unchanged.
 - **Status:** Done. Month view rendered offscreen from demo notes in light and dark. The right-click menu is not tried
   by hand.
+
+## D66 — Android app v1 (2026-11-03, subagent)
+
+- **Chosen by the user:** a native Kotlin + Jetpack Compose app in `android/`, syncing with the Mac and iPhone through
+  the same Supabase project and end-to-end encryption. Scope: email-code sign-in, enter or create the sync passphrase,
+  list / search / create / edit / delete notes, folders and colour labels shown, locked notes shown as locked
+  (read-only), pull on open + pull-to-refresh + push after edits. The editor is a plain Markdown text box. A debug APK
+  to sideload. No calendar, graph, widgets, Google sign-in, images or Play Store.
+- **By Claude:**
+  - applicationId **`com.memorynotes.android`**, not `com.memorynotes.app`: that's already the Mac app's bundle id.
+  - Wire format copied from `SyncCloud.swift`: same project URL and publishable key, `auth/v1/otp` + `verify`, refresh
+    tokens, `rest/v1` upserts with every column (`on_conflict=id`, `merge-duplicates`), `seq` cursors per table (500 a
+    page), push before pull, folders before notes. Fields are `mne2e:v1:` + base64(nonce | ciphertext | tag); the
+    vault key is wrapped under PBKDF2-SHA256(passphrase, salt, 310 000). PBKDF2 is written out over HMAC-SHA256 so the
+    passphrase is UTF-8 on every Android provider. Local rules copy `NoteStore.applyRemote`: the newer `updated_at`
+    wins, deletes stick, a different account gets everything pushed and pulls from the start.
+  - Also handles the sign-in **link** (`memorynotes://auth-callback`), in case the email has no code.
+  - Storage: one JSON file in app-private storage (`notes.json`, written then renamed), not Room: fewer moving parts
+    for a few hundred notes. Note text is in the clear there, like the Mac's SQLite; backup is off. The session and
+    vault key are in a small file sealed by an AES key that never leaves the Android Keystore. Rejected:
+    EncryptedSharedPreferences (androidx.security-crypto is deprecated).
+  - Versions (they were already in the Gradle cache): Gradle 9.8.1 wrapper, AGP 9.4.1 with its built-in Kotlin
+    2.4.21, Compose BOM 2026.09.00 (needs compileSdk 37), minSdk 26, targetSdk 36. Dependencies: activity-compose and
+    material3, plus junit, org.json and androidx.test runner for tests only.
+  - New notes get lowercase uuids (Postgres returns them that way); pulled ids are lowercased.
+  - An edit is saved after 0.5 s and pushed 2 s later (like the Mac); leaving the app saves and pushes. Opening a note
+    without typing changes nothing, so untouched Markdown goes back byte for byte.
+- **Shortcuts:** no snapshots (the Mac calendar's history) and no images are pulled or pushed; an image stays as its
+  Markdown text. No realtime and no 60 s timer: it pulls when the app comes to the front and on pull-to-refresh. A
+  pull doesn't refresh a note that's open in the editor; typing in it then wins over the other device's edit (newer
+  wins). Folders can't be created, renamed or assigned; pins and colours can't be changed. Locked notes can't be deleted
+  here. Dates in titles show in the phone's medium date format, not the Mac's date setting. One unreadable synced row
+  stops the pull with an error, as on the Mac.
+- **Status:** Built, not tried against the real project. 20 JVM tests pass (`./gradlew testDebugUnitTest`):
+  vectors made with CryptoKit/CommonCrypto (PBKDF2 key, wrapped vault key, sealed field, sealed image) open in Kotlin,
+  and a Swift script opened Kotlin's own sealing; with a byte flipped it refuses it. Store rules (newer wins,
+  tombstones, mark-pushed, account switch, row columns) are tested too. On an API 35 emulator: the same vectors and the
+  Keystore secrets pass on device (`connectedDebugAndroidTest`), and the app starts on the sign-in screen. Not
+  verified: real sign-in, vault, push and pull, and the editor and list screens past sign-in.

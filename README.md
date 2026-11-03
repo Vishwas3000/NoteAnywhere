@@ -245,6 +245,24 @@ The browser overlay's show/close/reopen check runs in headless Chromium (needs a
 
 </details>
 
+## Android
+
+<details><summary>Build and install the Android app (v1)</summary>
+
+A simple Android app in `android/` that syncs with the Mac and iPhone through the same account and sync passphrase,
+end-to-end encrypted. v1: sign in with the emailed code, then list, search, write and delete notes in a plain
+Markdown text box. Folders and colour labels show; locked notes stay locked. No calendar, graph or images yet.
+
+You need JDK 17 and the Android SDK (`ANDROID_HOME`, or `sdk.dir` in `android/local.properties`).
+
+```sh
+cd android
+./gradlew testDebugUnitTest assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+</details>
+
 ## Architecture
 
 <details><summary>How the app, the extension and the database fit together</summary>
