@@ -241,7 +241,8 @@ swift test && swift build -c release && python3 scripts/test_host.py && (cd edit
 ```
 
 The browser overlay's show/close/reopen check runs in headless Chromium (needs a global Playwright):
-`node scripts/test_overlay.mjs`.
+`node scripts/test_overlay.mjs`. The MCP server is checked end to end, every tool over stdio as AI apps start it, on a
+scratch store: `node scripts/test_mcp.mjs` (the installed app by default, or pass a binary's path).
 
 </details>
 
