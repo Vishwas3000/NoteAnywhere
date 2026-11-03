@@ -731,3 +731,5 @@ Made by the subagent that wrote the extension:
 - **Bug (user report):** the colour showed for a moment, then the old one came back. setColor went through update(),
   which saves only pin, colour and folder, so the text change never reached the database and the next reload undid it.
   Now it's saved like typing; a test reads it back from the store (it failed on the old code).
+- **Asked by the user (follow-up):** a range's start and end should show the same colour. In the editor both date
+  chips of a range take the colour written on either end (the calendar already coloured the whole bar).

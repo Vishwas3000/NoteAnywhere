@@ -359,14 +359,22 @@ function dates(onDate, pickDate, datePattern) {
           const found = [];
           state.doc.descendants((node, pos, parent) => {
             if (parent?.type.name === "codeBlock" || !node.isText || node.marks.some((m) => m.type.name === "code")) return;
-            for (const m of node.text.matchAll(DATE)) {
+            const ms = [...node.text.matchAll(DATE)], colors = ms.map((m) => m[4]);
+            // A range ("@2026-12-03{red} - @2026-12-06") is one event: both ends take the colour given on either.
+            ms.forEach((m, i) => {
+              const next = ms[i + 1];
+              if (next && /^\s*(?:-|–|—|to)\s*$/.test(node.text.slice(m.index + m[0].length, next.index + next[1].length))) {
+                colors[i] = colors[i + 1] = COLORS.includes(colors[i]) ? colors[i] : colors[i + 1];
+              }
+            });
+            for (const [i, m] of ms.entries()) {
               const day = new Date(`${m[3]}T00:00`);
               if (Number.isNaN(day.getTime()) || isoDay(day) !== m[3]) continue; // 2026-02-30 isn't a day
               const from = pos + m.index + m[1].length, to = from + m[2].length;
               const title = day.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })
                 + (onDate ? " · ⌘-click to open this day" : "");
               const { selection } = state;
-              const className = COLORS.includes(m[4]) ? `mn-date mn-date-c mn-c-${m[4]}` : "mn-date";
+              const className = COLORS.includes(colors[i]) ? `mn-date mn-date-c mn-c-${colors[i]}` : "mn-date";
               if (!datePattern || (selection.from < to && selection.to > from)) {
                 found.push(Decoration.inline(from, to, { class: className, "data-day": m[3], title }));
                 continue;

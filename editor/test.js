@@ -193,6 +193,10 @@ check("an event's own colour tints its chip, hides in the chip and survives a ro
   assert.deepEqual(chips.map((c) => c.textContent), ["5 Nov 2026", "6 Nov 2026"]);
   assert.deepEqual(chips.map((c) => c.classList.contains("mn-c-red")), [true, false]);
   assert.equal(chips[0].dataset.day, "2026-11-05");
+  // A range's colour covers both ends, whichever end carries it; a separate date nearby doesn't take it.
+  const range = mount("Trip @2026-11-03{blue} - @2026-11-16, call @2026-11-20\n\nGoa @2026-12-01 to @2026-12-04{green}");
+  assert.deepEqual([...range.editor.view.dom.querySelectorAll(".mn-date")].map((c) => [...c.classList].find((k) => k.startsWith("mn-c-")) ?? ""),
+    ["mn-c-blue", "mn-c-blue", "", "mn-c-green", "mn-c-green"]);
 });
 check("Obsidian 📅 dates are chips too; impossible dates aren't", () => {
   const ed = mount("a 📅 2026-10-30 b @2026-02-30");
