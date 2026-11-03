@@ -200,6 +200,24 @@ check("the @ menu reads a typed day: @jan7 shows that date, Return picks it", ()
   ed.editor.commands.insertContent(" @feb30");
   assert.equal(items().length, 0, "no menu for a day that doesn't exist");
 });
+check("the @ menu answers every letter on the way to a date", () => {
+  const ed = mount("Trip ");
+  ed.editor.commands.focus("end");
+  const labels = () => [...ed.editor.view.dom.parentElement.querySelectorAll(".mn-at-menu .mn-at-item")].map((i) => i.firstChild.textContent);
+  const steps = [..."@jan 7"].map((ch) => { ed.editor.commands.insertContent(ch); return labels(); });
+  const jan7 = new Date(`${MNEditor.dayFor("jan 7")}T00:00`).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  // "@", "@j", "@ja", "@jan", "@jan " (the space keeps it), "@jan 7"
+  assert.deepEqual(steps.slice(1), [["January", "June", "July"], ["January"], ["January"], ["January"], [jan7]]);
+  assert.deepEqual(labels().length, 1);
+  // Picking a month types it and waits for the day; day first works too.
+  const ed2 = mount("x ");
+  ed2.editor.commands.focus("end");
+  ed2.editor.commands.insertContent("@ju");
+  ed2.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+  assert.equal(ed2.getMarkdown().trim(), "x @jun");
+  ed2.editor.commands.insertContent(" @7 ma");
+  assert.equal([...ed2.editor.view.dom.parentElement.querySelectorAll(".mn-at-menu .mn-at-item")].length, 2, "7 March and 7 May");
+});
 check("an event's own colour tints its chip, hides in the chip and survives a round trip", () => {
   const md = "Dentist @2026-11-05{red} and gym @2026-11-06";
   const ed = mount(md, { datePattern: "d MMM yyyy" });

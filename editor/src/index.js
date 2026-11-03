@@ -773,7 +773,7 @@ function linkPreviews(getEditor, { onLinkPreview, imageURL, say }) {
   return [Mention, Card, Extension.create({ name: "mnLinkPaste", priority: 1000, addProseMirrorPlugins: () => [plugin] })];
 }
 
-const AT_QUERY = /(?:^|[\s(\[])@([a-z0-9]*(?: [a-z0-9]+)?)$/i; // "@tom", "@jan7", "@dec 9th"
+const AT_QUERY = /(?:^|[\s(\[])@([a-z0-9]*(?: [a-z0-9]*)?)$/i; // "@tom", "@jan7", "@jan ", "@dec 9th"
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 /** The "@" menu, like Notion's: Today, Tomorrow, the next weekdays, or "Pick a date…"; typing filters it. */
@@ -784,28 +784,36 @@ function atMenu(pickDate) {
     label: "Dates",
     choices: (query) => {
       const now = new Date(), q = query.toLowerCase();
+      const full = (day) => new Date(`${day}T00:00`).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
       // "@jan7", "@dec 9th": that day, shown in full, so Return or Tab turns it into a date as a space would.
-      const typed = MONTH_DAY.test(q) && dayFor(q);
-      if (typed) {
-        const d = new Date(`${typed}T00:00`);
-        return [{ label: d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" }), hint: "", day: typed }];
+      const typed = MONTH_DAY.test(q.trim()) && dayFor(q.trim());
+      if (typed) return [{ label: full(typed), hint: "", day: typed }];
+      // On the way there the menu answers every letter: "@ja" or "@jan " is January, waiting for its day (picking
+      // it types "@jan"); "@7 ja" is already 7 January.
+      const months = (prefix) => prefix ? MONTH_NAMES.filter((m) => m.toLowerCase().startsWith(prefix)) : [];
+      const dayFirst = q.match(/^(\d{1,2})(?:st|nd|rd|th)? ?([a-z]*)$/);
+      if (dayFirst) {
+        return months(dayFirst[2]).map((m) => dayFor(`${dayFirst[1]} ${m}`)).filter(Boolean).map((day) => ({ label: full(day), hint: "", day }));
       }
+      const monthRows = months(q.trim().match(/^[a-z]+$/)?.[0] ?? "")
+        .map((m) => ({ label: m, hint: "type the day, e.g. 7", day: null, complete: m.slice(0, 3).toLowerCase() }));
       // Today, Tomorrow, then the next six days by name; a week out is "Next <today's weekday>".
       const days = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
         const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
         const name = DAY_NAMES[d.getDay()];
         return { label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : i === 7 ? `Next ${name}` : name, hint: fmt(d), day: isoDay(d) };
       });
-      return [...days, { label: "Pick a date…", hint: "", day: null }]
-        .filter((o) => !q || o.label.toLowerCase().startsWith(q) || (o.day === null && "pick".startsWith(q)));
+      return [...days.filter((o) => !q || o.label.toLowerCase().startsWith(q)), ...monthRows,
+        ...(!q || "pick".startsWith(q) ? [{ label: "Pick a date…", hint: "", day: null }] : [])];
     },
     apply: (option, view, range) => {
       const tr = view.state.tr;
       if (option.day) tr.insertText(`@${option.day} `, range.from, range.to);
+      else if (option.complete) tr.insertText(`@${option.complete}`, range.from, range.to); // the menu stays for the day
       else tr.delete(range.from, range.to);
       view.dispatch(tr);
       view.focus();
-      if (!option.day) pickDate?.();
+      if (!option.day && !option.complete) pickDate?.();
     },
   });
 }

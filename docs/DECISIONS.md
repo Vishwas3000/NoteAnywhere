@@ -671,6 +671,10 @@ Made by the subagent that wrote the extension:
   chosen item with scrollIntoView, which scrolls the note too. Now it's kept inside the editor and scrolls only
   itself. The extension test types "@" at a long line's end in the real panel: it failed before (menu at 342 px of
   340) and passes now.
+- **Chosen by the user (follow-up):** feedback while typing, the menu following every letter. "@j" lists January,
+  June, July (with any day names that match); "@jan" and "@jan " show "January · type the day" (picking it types
+  "@jan" and waits); "@jan7" shows the full date; "@7 ma" shows 7 March and 7 May. Rejected: an inline preview after
+  the typed text. Editor test steps through each keystroke.
 
 ## D65 — Every calendar event in colour; right-click to change it (2026-11-03)
 
