@@ -15,6 +15,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -32,4 +33,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     // Android ships org.json; plain JVM unit tests need the real one.
     testImplementation("org.json:json:20250517")
+    // The crypto and Keystore on a real Android runtime (connectedDebugAndroidTest).
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("junit:junit:4.13.2")
 }
