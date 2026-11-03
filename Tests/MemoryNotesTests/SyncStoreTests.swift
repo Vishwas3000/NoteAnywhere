@@ -20,6 +20,17 @@ import Testing
         .init(id: id, kind: "url", target: "example.com", label: "", body_md: text, created_at: 1, updated_at: at, deleted_at: deleted)
     }
 
+    /// Right-click → Color in the calendar is a text edit: it must reach the database (it once only lived in memory).
+    @Test func eventColourIsSaved() throws {
+        let model = NotesModel.shared
+        let note = model.add(kind: .app, target: "demo.app", label: "Demo", text: "Dentist @2026-11-05 and gym @2026-11-06")
+        let gym = try #require(model.notes.first { $0.id == note.id }?.dates.first { $0.day == "2026-11-06" })
+        model.setColor(gym, .purple)
+        #expect(NoteStore.loadAll().first { $0.id == note.id }?.text == "Dentist @2026-11-05 and gym @2026-11-06{purple}")
+        model.reload()  // what a change notification does: the colour stays
+        #expect(model.notes.first { $0.id == note.id }?.dates.first { $0.day == "2026-11-06" }?.color == .purple)
+    }
+
     @Test func localEditsAreDirtyUntilPushed() throws {
         let id = UUID().uuidString
         try NoteStore.save(Note(id: id, kind: .url, target: "example.com", label: "", text: "a", createdAt: 1, updatedAt: 10))

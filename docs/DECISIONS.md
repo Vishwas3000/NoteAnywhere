@@ -728,3 +728,6 @@ Made by the subagent that wrote the extension:
   range keeps one tag: setting it strips any on the other end. Unknown words (`{bogus}`) are ignored.
 - **Status:** Done. Swift tests (parse, own colour beats label, rewrite incl. a backwards range), editor test (chip
   tint, hidden tag, round trip). Not tried by hand.
+- **Bug (user report):** the colour showed for a moment, then the old one came back. setColor went through update(),
+  which saves only pin, colour and folder, so the text change never reached the database and the next reload undid it.
+  Now it's saved like typing; a test reads it back from the store (it failed on the old code).

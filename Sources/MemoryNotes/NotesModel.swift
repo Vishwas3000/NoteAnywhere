@@ -131,17 +131,17 @@ final class NotesModel: ObservableObject {
         return copy
     }
 
-    /// Pin, colour or folder changes (see NoteStore.saveMeta for why they don't count as edits).
-    /// Colours one calendar event by writing "{red}" after its date in the note; nil takes it out (D67).
+    /// Colours one calendar event by writing "{red}" after its date in the note; nil takes it out (D67). A text edit,
+    /// saved like typing: update() saves only pin, colour and folder, and the text would come back from the database.
     func setColor(_ item: DatedLine, _ color: NoteColor?) {
-        update(item.noteID) { note in
-            var lines = note.text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-            guard lines.indices.contains(item.line) else { return }
-            lines[item.line] = item.recolor(lines[item.line], color)
-            note.text = lines.joined(separator: "\n")
-        }
+        let text = binding(item.noteID, \.text)
+        var lines = text.wrappedValue.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        guard lines.indices.contains(item.line) else { return }
+        lines[item.line] = item.recolor(lines[item.line], color)
+        text.wrappedValue = lines.joined(separator: "\n")
     }
 
+    /// Pin, colour or folder changes (see NoteStore.saveMeta for why they don't count as edits).
     func update(_ id: String, _ change: (inout Note) -> Void) {
         guard let i = notes.firstIndex(where: { $0.id == id }) else { return }
         change(&notes[i])
