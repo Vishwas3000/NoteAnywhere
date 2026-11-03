@@ -317,6 +317,7 @@ const MONTH = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|
 const NTH = "\\d{1,2}(?:st|nd|rd|th)?";
 const SHORTHAND = new RegExp("(?:^|\\s)(@(today|tomorrow|yesterday|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:rs|rsday)?|fri(?:day)?"
   + `|sat(?:urday)?|sun(?:day)?|(?:${MONTH})\\s?${NTH}|${NTH}\\s?(?:${MONTH})))\\s$`, "i");
+const MONTH_DAY = new RegExp(`^(?:(?:${MONTH})\\s?${NTH}|${NTH}\\s?(?:${MONTH}))$`, "i");
 
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
   "November", "December"];
@@ -772,7 +773,7 @@ function linkPreviews(getEditor, { onLinkPreview, imageURL, say }) {
   return [Mention, Card, Extension.create({ name: "mnLinkPaste", priority: 1000, addProseMirrorPlugins: () => [plugin] })];
 }
 
-const AT_QUERY = /(?:^|[\s(\[])@([a-z]*)$/i;
+const AT_QUERY = /(?:^|[\s(\[])@([a-z0-9]*(?: [a-z0-9]+)?)$/i; // "@tom", "@jan7", "@dec 9th"
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 /** The "@" menu, like Notion's: Today, Tomorrow, the next weekdays, or "Pick a date…"; typing filters it. */
@@ -783,6 +784,12 @@ function atMenu(pickDate) {
     label: "Dates",
     choices: (query) => {
       const now = new Date(), q = query.toLowerCase();
+      // "@jan7", "@dec 9th": that day, shown in full, so Return or Tab turns it into a date as a space would.
+      const typed = MONTH_DAY.test(q) && dayFor(q);
+      if (typed) {
+        const d = new Date(`${typed}T00:00`);
+        return [{ label: d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" }), hint: "", day: typed }];
+      }
       // Today, Tomorrow, then the next six days by name; a week out is "Next <today's weekday>".
       const days = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
         const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
@@ -877,7 +884,12 @@ function suggestMenuView(view, find, label, choices, apply) {
       item.onmouseenter = () => { active = i; render(); };
       return item;
     }));
-    menu.children[active]?.scrollIntoView?.({ block: "nearest" });
+    // Scroll the menu itself: scrollIntoView would also scroll the note, sideways too when the menu sticks out.
+    const item = menu.children[active];
+    if (item && item.offsetTop < menu.scrollTop) menu.scrollTop = item.offsetTop;
+    else if (item && item.offsetTop + item.offsetHeight > menu.scrollTop + menu.clientHeight) {
+      menu.scrollTop = item.offsetTop + item.offsetHeight - menu.clientHeight;
+    }
   };
   const update = () => {
     const { $from, empty } = view.state.selection;
@@ -897,7 +909,8 @@ function suggestMenuView(view, find, label, choices, apply) {
     if (menu.parentElement !== body) body.append(menu);
     const coords = view.coordsAtPos(start), frame = body.getBoundingClientRect();
     menu.style.top = `${coords.bottom - frame.top + 4}px`;
-    menu.style.left = `${Math.max(0, coords.left - frame.left)}px`;
+    // Kept inside the editor: one sticking out past the right edge made the whole note scroll sideways.
+    menu.style.left = `${Math.max(0, Math.min(coords.left - frame.left, body.clientWidth - menu.offsetWidth))}px`;
     // An editor sized to its content (onHeight) grows so the menu isn't cut off below a short note.
     const root = view.dom.closest(".mn-editor");
     if (root) root.style.minHeight = `${menu.offsetTop + menu.offsetHeight + 8}px`;

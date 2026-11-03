@@ -662,6 +662,15 @@ Made by the subagent that wrote the extension:
   stays as typed. Only the editor converts; the note still stores ISO dates, so the Swift side needs no change.
 - shortcut: no explicit year (`@dec9 2027`); type the ISO date for a past or far-off day.
 - **Status:** Done. Editor tests (parsing, typing, impossible days).
+- **Asked by the user (follow-up):** "@jan7" didn't turn into a date: it did only on a space, and the @ menu closed as
+  soon as a letter matched none of its days, so nothing showed it would. The menu now reads a typed month and day
+  ("@jan7", "@dec 9th") and offers that date in full ("Thursday, 7 January 2027"); Return or Tab picks it, a space
+  still works. Editor test.
+- **Bug (user report):** typing "@" moved the whole note sideways. The menu opened at the caret with nothing keeping
+  it inside the editor, so near the right edge it stuck out and the note scrolled to show it; and the menu showed its
+  chosen item with scrollIntoView, which scrolls the note too. Now it's kept inside the editor and scrolls only
+  itself. The extension test types "@" at a long line's end in the real panel: it failed before (menu at 342 px of
+  340) and passes now.
 
 ## D65 — Every calendar event in colour; right-click to change it (2026-11-03)
 

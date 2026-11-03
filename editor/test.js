@@ -185,6 +185,21 @@ check("a month and day means the next one: @dec9th, @9 dec, @December 25; imposs
   }
   assert.equal(ed.getMarkdown().trim(), `Party @${MNEditor.dayFor("dec9th")} and @feb30`);
 });
+check("the @ menu reads a typed day: @jan7 shows that date, Return picks it", () => {
+  const ed = mount("Flight ");
+  ed.editor.commands.focus("end");
+  ed.editor.commands.insertContent("@jan7");
+  const items = () => [...ed.editor.view.dom.parentElement.querySelectorAll(".mn-at-menu .mn-at-item")];
+  const day = MNEditor.dayFor("jan7");
+  assert.equal(items().length, 1);
+  assert.ok(items()[0].textContent.includes(String(new Date(`${day}T00:00`).getFullYear())), items()[0].textContent);
+  ed.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+  assert.equal(ed.getMarkdown().trim(), `Flight @${day}`);
+  ed.editor.commands.insertContent(" @dec 9");
+  assert.equal(items().length, 1, "a space between month and day keeps the menu");
+  ed.editor.commands.insertContent(" @feb30");
+  assert.equal(items().length, 0, "no menu for a day that doesn't exist");
+});
 check("an event's own colour tints its chip, hides in the chip and survives a round trip", () => {
   const md = "Dentist @2026-11-05{red} and gym @2026-11-06";
   const ed = mount(md, { datePattern: "d MMM yyyy" });

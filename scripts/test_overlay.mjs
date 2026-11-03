@@ -109,6 +109,22 @@ try {
       && picture === 2;
     if (!carded) failed++;
     console.log(`${carded ? "PASS" : "FAIL"} a pasted link becomes a card: ${JSON.stringify({ menu, picture, saved })}`);
+    // Typing "@" at the end of a long line: the date menu stays inside the panel and nothing scrolls sideways.
+    await overlay.locator(".ProseMirror p").first().click(); // "Diagram", not the card below it
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("A line long enough to reach the panel's right edge @");
+    await page.waitForTimeout(300);
+    const at = await overlay.evaluate(() => {
+      const menu = document.querySelector(".mn-at-menu"), r = menu?.getBoundingClientRect();
+      const shifted = [...document.querySelectorAll("*")].filter((e) => e.scrollLeft > 0).map((e) => e.className || e.tagName);
+      return { menu: !!menu, right: r && Math.round(r.right), width: document.documentElement.clientWidth, shifted };
+    });
+    const inside = at.menu && at.right <= at.width && at.shifted.length === 0;
+    if (!inside) failed++;
+    console.log(`${inside ? "PASS" : "FAIL"} "@" near the right edge: the menu fits and nothing scrolls sideways: ${JSON.stringify(at)}`);
+    await page.keyboard.press("Escape");
+
     // Settings ▸ "Open notes by themselves" off (D63): a page with notes stays closed until the icon. The test host is a
     // bare binary named MemoryNotes, so its defaults domain is "MemoryNotes", not the app's.
     execFileSync("defaults", ["write", "MemoryNotes", "openNotesByThemselves", "-bool", "false"]);
