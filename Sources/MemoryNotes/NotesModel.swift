@@ -96,19 +96,22 @@ final class NotesModel: ObservableObject {
         await SearchIndex.shared.search(query, in: notes)
     }
 
-    /// App notes for a context and everything under it (same rule as web pages: parents see children).
-    func notes(inContext context: String) -> [Note] {
-        notes.filter { $0.kind == .app && ($0.target == context || $0.target.hasPrefix(context + "/")) }
-    }
-
-    /// What the floating panel shows: the app place's notes, plus in a browser the open page's website notes, the same
-    /// ones the browser extension shows there (D69).
+    /// What the floating panel shows: the app place's notes and everything under it (same rule as web pages: parents
+    /// see children), plus in a browser the open page's website notes, the same ones the extension shows there (D69).
     func frontNotes() -> [Note] {
         guard let context = frontContext else { return [] }
-        let page = FrontWindow.shared.page
-        return notes.filter { note in
-            let place = note.kind == .app ? context : note.kind == .url ? page : nil
-            return place.map { note.target == $0 || note.target.hasPrefix($0 + "/") } ?? false
+        let inBrowser = frontApp?.bundleIdentifier.map(WindowContext.browsers.contains) ?? false
+        return Self.shown(notes, context: context, page: FrontWindow.shared.page, inBrowser: inBrowser)
+    }
+
+    /// In a browser a window-title note shows only on that exact title: the page is the place there, and Brave's
+    /// window often has an empty title, which made every Brave title note pop up as if on its parent "Brave".
+    static func shown(_ notes: [Note], context: String, page: String?, inBrowser: Bool) -> [Note] {
+        notes.filter { note in
+            switch note.kind {
+            case .app: note.target == context || (!inBrowser && note.target.hasPrefix(context + "/"))
+            case .url: page.map { note.target == $0 || note.target.hasPrefix($0 + "/") } ?? false
+            }
         }
     }
 

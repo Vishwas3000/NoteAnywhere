@@ -776,3 +776,7 @@ Made by the subagent that wrote the extension:
   opens its panel in the page; ⌥⇧M still shows them. Window-title notes still open it as before.
 - **Chosen by the user:** notes made earlier from the Mac on Brave stay window-title notes (no reliable way to map
   a title to an address).
+- **Bug (user report, follow-up):** the Mac panel kept popping up on pages with no notes. Brave's front window had
+  an empty title most of the time (73 of 100 samples, 0.2 s apart); an empty title makes the place just "Brave",
+  and by "parents see children" every Brave window-title note showed there. Now in a browser a window-title note
+  shows only on exactly its title; other apps keep parents seeing children.

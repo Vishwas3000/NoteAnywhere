@@ -170,3 +170,15 @@ func browserAddressBarIsThePage(_ shown: String, _ target: String) {
     #expect(NotesModel.pageTitle("Next.js - Brave", appName: "Brave Browser") == "Next.js")
     #expect(NotesModel.pageTitle("A - B", appName: "Google Chrome") == "A - B")
 }
+
+@Test func browserTitleNotesShowOnlyOnTheirTitle() {
+    let title = Note(kind: .app, target: "com.brave.Browser/Site/Page", label: "Brave")
+    let page = Note(kind: .url, target: "example.com/docs", label: "Docs")
+    let chat = Note(kind: .app, target: "com.tinyspeck.slackmacgap/Acme/general", label: "Slack")
+    let all = [title, page, chat]
+    // Brave's window with an empty title: only the app is known. Its title notes must not pop up.
+    #expect(NotesModel.shown(all, context: "com.brave.Browser", page: nil, inBrowser: true).isEmpty)
+    #expect(NotesModel.shown(all, context: "com.brave.Browser/Site/Page", page: "example.com", inBrowser: true).map(\.id) == [title.id, page.id])
+    // Other apps keep "parents see children".
+    #expect(NotesModel.shown(all, context: "com.tinyspeck.slackmacgap/Acme", page: nil, inBrowser: false).map(\.id) == [chat.id])
+}
