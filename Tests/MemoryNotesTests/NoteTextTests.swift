@@ -151,3 +151,22 @@ func pageTargets(url: String, expected: String) {
     #expect(TrackpadSwipe.step(dx: 20, dy: 0) == nil)   // too short
     #expect(TrackpadSwipe.step(dx: 60, dy: 40) == nil)  // mostly a scroll
 }
+
+@Test(arguments: [
+    ("github.com/vercel/next.js?tab=readme#top", "github.com/vercel/next.js"),
+    ("https://www.Example.com/", "example.com"),
+    ("example.com", "example.com"),
+    ("en.wikipedia.org/wiki/Café", "en.wikipedia.org/wiki/Caf%C3%A9"),
+    ("localhost:3000/app/", "localhost:3000/app"),
+])
+func browserAddressBarIsThePage(_ shown: String, _ target: String) {
+    #expect(WindowContext.page(addressBar: shown) == target)
+}
+
+@Test func browserAddressBarThatIsNoPage() {
+    for shown in ["", "brave://settings", "chrome://newtab", "best pizza near me", "pizza", "about:blank"] {
+        #expect(WindowContext.page(addressBar: shown) == nil, "\(shown)")
+    }
+    #expect(NotesModel.pageTitle("Next.js - Brave", appName: "Brave Browser") == "Next.js")
+    #expect(NotesModel.pageTitle("A - B", appName: "Google Chrome") == "A - B")
+}

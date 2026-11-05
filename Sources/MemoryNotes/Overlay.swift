@@ -33,7 +33,8 @@ final class OverlayController {
     }()
 
     func start() {
-        subscription = FrontWindow.shared.$context.removeDuplicates().sink { [weak self] context in self?.contextChanged(context) }
+        subscription = FrontWindow.shared.$context.combineLatest(FrontWindow.shared.$page).removeDuplicates { $0 == $1 }
+            .sink { [weak self] context, _ in self?.contextChanged(context) }
         HotKeys.register(kVK_ANSI_M, optionKey | shiftKey, name: "⌥⇧M") { [weak self] in MainActor.assumeIsolated { self?.toggle() } }  // hot keys fire on the main thread
     }
 
@@ -42,12 +43,15 @@ final class OverlayController {
         if panel.isVisible { return panel.orderOut(nil) }
         show(model.frontApp)
         panel.makeKey()
-        if let id = model.frontContext.flatMap({ model.notes(inContext: $0).last?.id }), model.canEdit(id) { model.focusRequest = id }
+        if let id = model.frontNotes().last?.id, model.canEdit(id) { model.focusRequest = id }
     }
 
     private func contextChanged(_ context: String?) {
-        guard let context, !model.notes(inContext: context).isEmpty else { return panel.orderOut(nil) }
-        if panel.isVisible || NativeHost.autoOpen { show(model.frontApp) }  // off: only ⌥⇧M opens it
+        let notes = model.frontNotes()
+        guard context != nil, !notes.isEmpty else { return panel.orderOut(nil) }
+        // A page's own notes open by themselves in the page, from the extension; two panels would be one too many.
+        let auto = NativeHost.autoOpen && notes.contains { $0.kind == .app }
+        if panel.isVisible || auto { show(model.frontApp) }  // off: only ⌥⇧M opens it
     }
 
     private func show(_ app: NSRunningApplication?) {
@@ -130,11 +134,13 @@ struct OverlayView: View {
     }
 
     private func content(_ app: NSRunningApplication, name: String, context: String) -> some View {
-        let place = context.split(separator: "/").dropFirst().joined(separator: " › ")
-        let notes = model.notes(inContext: context).reversed()  // newest first, like Apple Notes
+        let place = front.page ?? context.split(separator: "/").dropFirst().joined(separator: " › ")
+        let notes = model.frontNotes().reversed()  // newest first, like Apple Notes
         let newNote = {
             closeSearch()
-            model.add(kind: .app, target: context, label: name)
+            // In a browser, on the page itself, so the extension shows it there too (D69).
+            if let page = front.page { model.add(kind: .url, target: page, label: front.pageTitle.isEmpty ? page : front.pageTitle) }
+            else { model.add(kind: .app, target: context, label: name) }
         }
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {

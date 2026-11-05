@@ -757,3 +757,22 @@ Made by the subagent that wrote the extension:
 - **iPhone:** a sideways drag of 60 pt or more does the same; it runs alongside the lists, so they still scroll.
 - **Rejected:** NSEvent swipe(with:), which fires only for three-finger swipes when the user has set that up.
 - **Not done:** Android has no calendar yet.
+
+## D69 — In a browser, the Mac panel's notes are the page's notes (2026-11-05)
+
+- **Asked by the user:** a note made from the Mac app on a Brave page should show in the extension on that page.
+- **Bug:** the Mac panel saved it as an app note on Brave's window title ("com.brave.Browser/Page title"); the
+  extension only shows website notes on the page's address, so it never saw it.
+- **Chosen by the user:** read the address through Accessibility (already granted), not via the extension (would
+  need a new store submission) or AppleScript (a "control Brave" prompt). Brave exposes no page content and no AXURL
+  to Accessibility, but its address bar's text is readable: the text field in the window toolbar. It hides
+  "https://" and "www."; the query and hash are dropped, giving the same target the extension makes
+  (`Note.pageTarget`). Searches, "brave://" pages and the like give no page. While the address bar has focus
+  (typing), the place isn't updated.
+- **Now:** in Chrome, Brave, Edge, Vivaldi and Chromium the Mac panel shows the open page's website notes (plus any
+  window-title notes, as before) and its + makes a website note on the page. Arc keeps window-title notes (no
+  address bar in its toolbar).
+- **Chosen by Claude:** the Mac panel doesn't open by itself for a page's own notes, since the extension already
+  opens its panel in the page; ⌥⇧M still shows them. Window-title notes still open it as before.
+- **Chosen by the user:** notes made earlier from the Mac on Brave stay window-title notes (no reliable way to map
+  a title to an address).

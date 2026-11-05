@@ -9,6 +9,9 @@ final class FrontWindow: ObservableObject {
     static let shared = FrontWindow()
     @Published fileprivate(set) var app: NSRunningApplication?
     @Published fileprivate(set) var context: String?
+    /// In a browser, the open page as a website note's target, and its title for new notes there.
+    @Published fileprivate(set) var page: String?
+    fileprivate(set) var pageTitle = ""
 }
 
 /// Shared state for the main window and the overlay: all notes, plus which app is in front.
@@ -52,9 +55,12 @@ final class NotesModel: ObservableObject {
             Task { await SearchIndex.shared.update(notes) }
         }
 
-        titles.onChange = { [weak self] title, conversation in
+        titles.onChange = { [weak self] title, conversation, page in
             guard let self, let app = self.frontApp, let id = app.bundleIdentifier else { return }
             let context = WindowContext.target(bundleID: id, appName: app.localizedName ?? id, title: title, conversation: conversation)
+            // Set before the context, which is what the panel follows.
+            FrontWindow.shared.pageTitle = Self.pageTitle(title ?? "", appName: app.localizedName ?? id)
+            if page != FrontWindow.shared.page { FrontWindow.shared.page = page }
             if context != self.frontContext { FrontWindow.shared.context = context }
         }
         WindowTitleWatcher.requestPermission()
@@ -93,6 +99,24 @@ final class NotesModel: ObservableObject {
     /// App notes for a context and everything under it (same rule as web pages: parents see children).
     func notes(inContext context: String) -> [Note] {
         notes.filter { $0.kind == .app && ($0.target == context || $0.target.hasPrefix(context + "/")) }
+    }
+
+    /// What the floating panel shows: the app place's notes, plus in a browser the open page's website notes, the same
+    /// ones the browser extension shows there (D69).
+    func frontNotes() -> [Note] {
+        guard let context = frontContext else { return [] }
+        let page = FrontWindow.shared.page
+        return notes.filter { note in
+            let place = note.kind == .app ? context : note.kind == .url ? page : nil
+            return place.map { note.target == $0 || note.target.hasPrefix($0 + "/") } ?? false
+        }
+    }
+
+    /// "Next.js - Brave" → "Next.js": the page title, as the extension names its notes.
+    static func pageTitle(_ title: String, appName: String) -> String {
+        var parts = title.components(separatedBy: " - ")
+        if parts.count > 1, let last = parts.last, !last.isEmpty, appName.lowercased().hasPrefix(last.lowercased()) { parts.removeLast() }
+        return parts.joined(separator: " - ")
     }
 
     @discardableResult

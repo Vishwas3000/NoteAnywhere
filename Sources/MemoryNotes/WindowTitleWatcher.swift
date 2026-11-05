@@ -4,11 +4,13 @@ import ApplicationServices
 /// Follows one app's front-window title through Accessibility notifications (no polling).
 /// Without the Accessibility permission it reports nil and notes stay app-level.
 final class WindowTitleWatcher {
-    /// The front window's title, and the open conversation for apps listed in `WindowContext.conversationHeaders`.
-    var onChange: (_ title: String?, _ conversation: String?) -> Void = { _, _ in }
+    /// The front window's title, the open conversation for apps listed in `WindowContext.conversationHeaders`, and in a
+    /// browser the open page as a website note's target (nil when the address bar can't be read).
+    var onChange: (_ title: String?, _ conversation: String?, _ page: String?) -> Void = { _, _, _ in }
     private var observer: AXObserver?
     private var appElement: AXUIElement?
     private var headerID: String?
+    private var isBrowser = false
     private var poll: Timer?
 
     /// Shows the system prompt the first time; afterwards the user toggles NoteAnywhere in Privacy & Security ▸ Accessibility.
@@ -19,8 +21,9 @@ final class WindowTitleWatcher {
 
     func watch(_ app: NSRunningApplication?) {
         stop()
-        guard let app, AXIsProcessTrusted() else { return onChange(nil, nil) }
+        guard let app, AXIsProcessTrusted() else { return onChange(nil, nil, nil) }
         headerID = app.bundleIdentifier.flatMap { WindowContext.conversationHeaders[$0] }
+        isBrowser = app.bundleIdentifier.map(WindowContext.browsers.contains) ?? false
         let element = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(element, 0.5)  // a hung app must not stall our main thread
         var created: AXObserver?
@@ -28,7 +31,7 @@ final class WindowTitleWatcher {
             guard let refcon else { return }
             Unmanaged<WindowTitleWatcher>.fromOpaque(refcon).takeUnretainedValue().emit()
         }
-        guard AXObserverCreate(app.processIdentifier, callback, &created) == .success, let created else { return onChange(nil, nil) }
+        guard AXObserverCreate(app.processIdentifier, callback, &created) == .success, let created else { return onChange(nil, nil, nil) }
         let refcon = Unmanaged.passUnretained(self).toOpaque()  // the watcher lives as long as NotesModel
         // Registered on the app element, these fire for all of its windows.
         for name in [kAXFocusedWindowChangedNotification, kAXMainWindowChangedNotification, kAXTitleChangedNotification] {
@@ -52,11 +55,29 @@ final class WindowTitleWatcher {
         poll?.invalidate()
         poll = nil
         headerID = nil
+        isBrowser = false
     }
 
     private func emit() {
-        guard let window = frontWindow() else { return onChange(nil, nil) }
-        onChange(Self.string(window, kAXTitleAttribute), headerID.flatMap { find($0, in: window, depth: 0) })
+        guard let window = frontWindow() else { return onChange(nil, nil, nil) }
+        var page: String?
+        if isBrowser, let bar = textField(in: window, inToolbar: false, depth: 0) {
+            // While an address or a search is being typed, the place hasn't changed yet; the title changes once it opens.
+            if Self.value(bar, kAXFocusedAttribute) as? Bool == true { return }
+            page = WindowContext.page(addressBar: Self.string(bar, kAXValueAttribute) ?? "")
+        }
+        onChange(Self.string(window, kAXTitleAttribute), headerID.flatMap { find($0, in: window, depth: 0) }, page)
+    }
+
+    /// The browser's address bar: the text field in the window's toolbar (about 10 ms in Brave with a few tabs).
+    private func textField(in element: AXUIElement, inToolbar: Bool, depth: Int) -> AXUIElement? {
+        let role = Self.string(element, kAXRoleAttribute)
+        if inToolbar, role == kAXTextFieldRole { return element }
+        guard depth < 16, role != kAXRadioButtonRole else { return nil }  // tabs are radio buttons, hundreds of them
+        for child in (Self.value(element, kAXChildrenAttribute) as? [AXUIElement]) ?? [] {
+            if let found = textField(in: child, inToolbar: inToolbar || role == kAXToolbarRole, depth: depth + 1) { return found }
+        }
+        return nil
     }
 
     private func frontWindow() -> AXUIElement? {
@@ -82,8 +103,12 @@ final class WindowTitleWatcher {
     }
 
     private static func string(_ element: AXUIElement, _ attribute: String) -> String? {
+        value(element, attribute) as? String
+    }
+
+    private static func value(_ element: AXUIElement, _ attribute: String) -> CFTypeRef? {
         var value: CFTypeRef?
         AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
-        return value as? String
+        return value
     }
 }

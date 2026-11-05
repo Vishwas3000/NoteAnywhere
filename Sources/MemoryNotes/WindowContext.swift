@@ -41,6 +41,22 @@ enum WindowContext {
     /// description names the open conversation. shortcut: one entry per app; add apps here as they come up.
     static let conversationHeaders = ["net.whatsapp.WhatsApp": "NavigationBar_HeaderViewButton"]
 
+    /// Chromium browsers, whose address bar says which page is open, so notes made on the Mac land on the page the
+    /// browser extension shows (D69). Arc has no address bar in its toolbar; its notes stay window-title notes.
+    static let browsers: Set = ["com.google.Chrome", "com.google.Chrome.beta", "com.google.Chrome.canary", "org.chromium.Chromium",
+                                "com.brave.Browser", "com.brave.Browser.beta", "com.brave.Browser.nightly",
+                                "com.microsoft.edgemac", "com.vivaldi.Vivaldi"]
+
+    /// A website note's target from what the address bar shows, which usually hides "https://" and "www.":
+    /// "github.com/vercel/next.js?tab=1" → "github.com/vercel/next.js". Nil for searches, "brave://settings" and the like.
+    static func page(addressBar value: String) -> String? {
+        let value = value.trimmingCharacters(in: .whitespaces)
+        guard !value.isEmpty, !value.contains(" "),
+              let url = URL(string: value.contains("://") ? value : "https://" + value) else { return nil }
+        let target = Note.pageTarget(url)
+        return target.contains(".") || target.hasPrefix("localhost") ? target : nil
+    }
+
     /// Drops what changes without the place changing: unsaved dots, unread counts like "(3) Inbox" / "Inbox (3)".
     private static func clean(_ part: String) -> String {
         part.filter { !("\u{200E}\u{200F}\u{202A}\u{202B}\u{202C}\u{202D}\u{202E}\u{2066}\u{2067}\u{2068}\u{2069}".contains($0)) }  // bidi marks (WhatsApp)
