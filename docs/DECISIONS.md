@@ -794,3 +794,7 @@ Made by the subagent that wrote the extension:
 - **Chosen by the user:** the existing note on "youtube.com/watch" no longer shows on videos; they move it by hand.
   To make that easy, the Mac's "Edit Address…" field turns a pasted link into this key when editing ends.
 - **Needs:** a new extension version in the Chrome Web Store.
+- **Bugs found in review (D69 follow-up):** (1) the panel decided whether to open using the previous place, since
+  @Published announces a value before storing it; the place is now passed in. (2) Switching to a browser whose
+  address bar had focus skipped the update, so the panel kept the last app's place and + saved there; now it updates
+  with no page.

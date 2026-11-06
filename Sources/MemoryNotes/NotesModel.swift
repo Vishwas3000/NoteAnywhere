@@ -98,10 +98,11 @@ final class NotesModel: ObservableObject {
 
     /// What the floating panel shows: the app place's notes and everything under it (same rule as web pages: parents
     /// see children), plus in a browser the open page's website notes, the same ones the extension shows there (D69).
-    func frontNotes() -> [Note] {
-        guard let context = frontContext else { return [] }
+    /// Pass the place when reacting to its change: @Published announces a value before storing it.
+    func frontNotes(context: String? = FrontWindow.shared.context, page: String? = FrontWindow.shared.page) -> [Note] {
+        guard let context else { return [] }
         let inBrowser = frontApp?.bundleIdentifier.map(WindowContext.browsers.contains) ?? false
-        return Self.shown(notes, context: context, page: FrontWindow.shared.page, inBrowser: inBrowser)
+        return Self.shown(notes, context: context, page: page, inBrowser: inBrowser)
     }
 
     /// In a browser a window-title note shows only on that exact title: the page is the place there, and Brave's

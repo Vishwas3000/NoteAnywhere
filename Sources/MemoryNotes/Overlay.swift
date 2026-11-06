@@ -34,7 +34,7 @@ final class OverlayController {
 
     func start() {
         subscription = FrontWindow.shared.$context.combineLatest(FrontWindow.shared.$page).removeDuplicates { $0 == $1 }
-            .sink { [weak self] context, _ in self?.contextChanged(context) }
+            .sink { [weak self] context, page in self?.contextChanged(context, page: page) }
         HotKeys.register(kVK_ANSI_M, optionKey | shiftKey, name: "⌥⇧M") { [weak self] in MainActor.assumeIsolated { self?.toggle() } }  // hot keys fire on the main thread
     }
 
@@ -46,8 +46,8 @@ final class OverlayController {
         if let id = model.frontNotes().last?.id, model.canEdit(id) { model.focusRequest = id }
     }
 
-    private func contextChanged(_ context: String?) {
-        let notes = model.frontNotes()
+    private func contextChanged(_ context: String?, page: String?) {
+        let notes = model.frontNotes(context: context, page: page)
         guard context != nil, !notes.isEmpty else { return panel.orderOut(nil) }
         // A page's own notes open by themselves in the page, from the extension; two panels would be one too many.
         let auto = NativeHost.autoOpen && notes.contains { $0.kind == .app }

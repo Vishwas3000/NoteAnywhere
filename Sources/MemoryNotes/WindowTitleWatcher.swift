@@ -11,6 +11,7 @@ final class WindowTitleWatcher {
     private var appElement: AXUIElement?
     private var headerID: String?
     private var isBrowser = false
+    private var lastPage: String?
     private var poll: Timer?
 
     /// Shows the system prompt the first time; afterwards the user toggles NoteAnywhere in Privacy & Security ▸ Accessibility.
@@ -56,15 +57,17 @@ final class WindowTitleWatcher {
         poll = nil
         headerID = nil
         isBrowser = false
+        lastPage = nil
     }
 
     private func emit() {
         guard let window = frontWindow() else { return onChange(nil, nil, nil) }
         var page: String?
         if isBrowser, let bar = textField(in: window, inToolbar: false, depth: 0) {
-            // While an address or a search is being typed, the place hasn't changed yet; the title changes once it opens.
-            if Self.value(bar, kAXFocusedAttribute) as? Bool == true { return }
-            page = WindowContext.page(addressBar: Self.string(bar, kAXValueAttribute) ?? "")
+            // While an address or a search is being typed the page hasn't changed yet (none, just after switching here).
+            let typing = Self.value(bar, kAXFocusedAttribute) as? Bool == true
+            page = typing ? lastPage : WindowContext.page(addressBar: Self.string(bar, kAXValueAttribute) ?? "")
+            lastPage = page
         }
         onChange(Self.string(window, kAXTitleAttribute), headerID.flatMap { find($0, in: window, depth: 0) }, page)
     }
