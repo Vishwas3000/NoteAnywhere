@@ -403,6 +403,13 @@ struct NotesWindow: View {
                 .task(id: note.id) { if editingAddress { targetFocused = true } }
                 .onSubmit { targetFocused = false }
                 .onExitCommand { targetFocused = false }
+                .onChange(of: targetFocused) { _, focused in
+                    // Done editing: the key the extension makes, so a pasted YouTube link keeps only its video (D70).
+                    let target = model.binding(note.id, \.target)
+                    guard !focused, let url = URL(string: "https://" + target.wrappedValue) else { return }
+                    let page = Note.pageTarget(url)
+                    if !page.isEmpty, page != target.wrappedValue { target.wrappedValue = page }
+                }
         } else if let url = pageURL(note) {
             HStack(spacing: 4) {
                 Button { NSWorkspace.shared.open(url) } label: { chip(note) }

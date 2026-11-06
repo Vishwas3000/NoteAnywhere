@@ -148,14 +148,33 @@ extension Note {
 extension Note {
     /// A website note's target for a page, the way the browser extension makes it: "github.com/vercel/next.js",
     /// without scheme, "www.", query, hash or trailing "/". Empty for addresses that aren't web pages.
+    /// Where the query names the page it keeps that one part: "youtube.com/watch?v=9GHCiiDLHQ4" (D70).
     static func pageTarget(_ url: URL) -> String {
         guard ["http", "https"].contains(url.scheme?.lowercased()),
               let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let host = parts.percentEncodedHost, !host.isEmpty else { return "" }
         var path = parts.percentEncodedPath  // still encoded, like location.pathname
         if path.hasSuffix("/") { path.removeLast() }
-        return host.lowercased().replacing(#/^www\./#, with: "") + (parts.port.map { ":\($0)" } ?? "") + path
+        let site = host.lowercased().replacing(#/^www\./#, with: "")
+        return site + (parts.port.map { ":\($0)" } ?? "") + path + pageQuery(site, path, parts.percentEncodedQueryItems ?? [])
     }
+
+    /// "?v=9GHCiiDLHQ4" on the sites whose address names the page after "?": a YouTube video or search, a Google search.
+    /// Encoded like the extension's encodeURIComponent; mirrors queryName in extension/content.js.
+    private static func pageQuery(_ host: String, _ path: String, _ items: [URLQueryItem]) -> String {
+        let name: String? = switch (host, path) {
+        case ("youtube.com", "/watch"): "v"
+        case ("youtube.com", "/results"): "search_query"
+        case (_, "/search") where host.hasPrefix("google."): "q"
+        default: nil
+        }
+        guard let name, let raw = items.first(where: { $0.name == name })?.value,
+              let value = raw.replacingOccurrences(of: "+", with: " ").removingPercentEncoding, !value.isEmpty,
+              let encoded = value.addingPercentEncoding(withAllowedCharacters: uriComponent) else { return "" }
+        return "?\(name)=\(encoded)"
+    }
+
+    private static let uriComponent = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.!~*'()")
 }
 
 /// One dated line of a note: a task due that day, or anything else written for it.

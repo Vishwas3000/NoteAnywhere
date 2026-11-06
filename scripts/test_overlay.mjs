@@ -31,6 +31,8 @@ if (hosted) {
   const { src } = host({ op: "addImage", mime: "image/png", data: PNG });
   host({ op: "save", note: { id: "eeeeeeee-0000-0000-0000-000000000001", kind: "url", target: "127.0.0.1:8767/notes.html", label: "Page",
     text: `Diagram\n\n![](${src})`, createdAt: 1, updatedAt: 1 } });
+  host({ op: "save", note: { id: "eeeeeeee-0000-0000-0000-000000000002", kind: "url", target: "youtube.com/watch?v=abc",
+    label: "Video", text: "About this video", createdAt: 1, updatedAt: 1 } });
 } else console.log("skip: images (no .build/release/MemoryNotes)");
 fs.mkdirSync(path.join(tmp, "site"));
 for (const name of ["plain", "notes"]) fs.writeFileSync(path.join(tmp, `site/${name}.html`), "<!doctype html><title>Page</title><p>A page");
@@ -124,6 +126,15 @@ try {
     if (!inside) failed++;
     console.log(`${inside ? "PASS" : "FAIL"} "@" near the right edge: the menu fits and nothing scrolls sideways: ${JSON.stringify(at)}`);
     await page.keyboard.press("Escape");
+
+    // The query names a YouTube video (D70): its note shows on that video only, whatever else the address carries.
+    await ctx.route("https://www.youtube.com/**", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><title>Video</title><p>A video" }));
+    await page.goto("https://www.youtube.com/watch?v=abc&t=42s");
+    await page.waitForTimeout(1500);
+    await expect("a YouTube video's note shows on that video", true);
+    await page.goto("https://www.youtube.com/watch?v=xyz");
+    await page.waitForTimeout(1500);
+    await expect("and not on another video", false);
 
     // Settings ▸ "Open notes by themselves" off (D63): a page with notes stays closed until the icon. The test host is a
     // bare binary named MemoryNotes, so its defaults domain is "MemoryNotes", not the app's.

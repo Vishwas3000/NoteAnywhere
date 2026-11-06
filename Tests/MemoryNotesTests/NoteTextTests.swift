@@ -182,3 +182,15 @@ func browserAddressBarIsThePage(_ shown: String, _ target: String) {
     // Other apps keep "parents see children".
     #expect(NotesModel.shown(all, context: "com.tinyspeck.slackmacgap/Acme", page: nil, inBrowser: false).map(\.id) == [chat.id])
 }
+
+@Test(arguments: [
+    ("https://www.youtube.com/watch?v=9GHCiiDLHQ4&t=42s&list=PL1", "youtube.com/watch?v=9GHCiiDLHQ4"),
+    ("https://www.youtube.com/results?search_query=attention+is+all", "youtube.com/results?search_query=attention%20is%20all"),
+    ("https://www.google.co.in/search?q=sqrt(dk)+softmax&sca=1", "google.co.in/search?q=sqrt(dk)%20softmax"),
+    ("https://www.youtube.com/watch", "youtube.com/watch"),
+    ("https://github.com/vercel/next.js?tab=readme", "github.com/vercel/next.js"),
+    ("https://example.com/search?q=x", "example.com/search"),
+])
+func pageKeyKeepsTheQueryThatNamesThePage(_ address: String, _ target: String) {
+    #expect(Note.pageTarget(URL(string: address)!) == target)
+}

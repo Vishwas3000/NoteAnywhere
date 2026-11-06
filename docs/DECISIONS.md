@@ -780,3 +780,17 @@ Made by the subagent that wrote the extension:
   an empty title most of the time (73 of 100 samples, 0.2 s apart); an empty title makes the place just "Brave",
   and by "parents see children" every Brave window-title note showed there. Now in a browser a window-title note
   shows only on exactly its title; other apps keep parents seeing children.
+
+## D70 — A YouTube video, or a search, is its own page (2026-11-06)
+
+- **Bug (user report):** every YouTube video showed the same note. Page keys drop the query, and YouTube names the
+  video there (watch?v=…), so all videos were the one page "youtube.com/watch".
+- **Chosen by the user:** keep only the part of the query that names the page, on a short list of sites: YouTube's
+  `v` (watch) and `search_query` (results), Google's `q` (/search, any google.* domain). Everything else is
+  unchanged, so existing notes stay where they are. Value encoded like encodeURIComponent: "?v=9GHCiiDLHQ4".
+  The same rule lives in `Note.pageTarget` (Mac, iPhone share sheet, MCP, address bar) and extension/content.js.
+- **Rejected:** keeping every query minus tracking parameters (notes would get lost on pages whose query keeps
+  changing, and existing notes on such pages would stop matching).
+- **Chosen by the user:** the existing note on "youtube.com/watch" no longer shows on videos; they move it by hand.
+  To make that easy, the Mac's "Edit Address…" field turns a pasted link into this key when editing ends.
+- **Needs:** a new extension version in the Chrome Web Store.

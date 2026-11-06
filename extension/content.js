@@ -2,10 +2,19 @@
 if (window.top === window && !window.__memoryNotes) (() => {
   window.__memoryNotes = true; // background.js may inject this again into tabs opened before install
   const host = () => location.host.replace(/^www\./, "");
+  // Sites whose address names the page after "?": a YouTube video or search, a Google search (D70). Mirrors
+  // Note.pageTarget in the Mac app.
+  const queryName = (h, path) => h === "youtube.com" ? { "/watch": "v", "/results": "search_query" }[path]
+    : h.startsWith("google.") && path === "/search" ? "q" : undefined;
+  const query = () => {
+    const name = queryName(host(), location.pathname.replace(/\/$/, ""));
+    const value = name && new URLSearchParams(location.search).get(name);
+    return value ? `?${name}=${encodeURIComponent(value)}` : "";
+  };
   const page = () => ({
-    url: host() + location.pathname,
+    url: host() + location.pathname + query(),
     host: host(),
-    page: location.pathname === "/" ? host() : host() + location.pathname.replace(/\/$/, ""),
+    page: (location.pathname === "/" ? host() : host() + location.pathname.replace(/\/$/, "")) + query(),
     title: document.title,
   });
   let openOnReady = false;
