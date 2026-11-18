@@ -19,6 +19,11 @@
     --mist: #f5f5f7;
     --blue: #0071e3;
     --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    /* One spacing scale for the whole page. */
+    --section: 160px;   /* between sections */
+    --to-sub: 16px;     /* headline to its line */
+    --to-shot: 56px;    /* text to its picture */
+    --stack: 40px;      /* picture to picture */
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -29,22 +34,23 @@
   h1, h2, h3, p { margin: 0; }
   kbd { font: inherit; }
 
-  .top { display: flex; align-items: center; justify-content: space-between; max-width: 1000px; margin: 0 auto; padding: 14px 22px; font-size: 13px; }
+  .top { display: flex; align-items: center; justify-content: space-between; max-width: 1000px; margin: 0 auto; padding: 14px 22px; font-size: 14px; }
   .top a { color: var(--ink); }
   .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; }
   .brand img { width: 22px; height: 22px; }
-  .gh { display: flex; align-items: center; gap: 6px; padding: 4px; color: var(--ink); opacity: .8; }
-  .shot.graph { max-width: 640px; }
-  .gh:hover { opacity: 1; }
-  .gh svg { width: 20px; height: 20px; }
+  .gh { display: flex; align-items: center; gap: 6px; opacity: .8; }
+  .gh:hover { opacity: 1; text-decoration: none; }
+  .gh svg { width: 18px; height: 18px; }
 
-  section { padding: 110px 22px 0; text-align: center; }
-  section.mist { background: var(--mist); margin-top: 110px; padding-bottom: 110px; }
+  section { padding: var(--section) 22px 0; text-align: center; }
+  section.hero { padding-top: 72px; }
+  section.mist { background: var(--mist); margin-top: var(--section); padding-bottom: var(--section); }
+  section.last { padding-bottom: var(--section); }
   h1 { font-size: clamp(48px, 8vw, 80px); font-weight: 700; letter-spacing: -.015em; line-height: 1.05; }
-  h2 { font-size: clamp(36px, 5.6vw, 56px); font-weight: 600; letter-spacing: -.005em; line-height: 1.07; }
-  .tagline { margin-top: 10px; font-size: clamp(22px, 3vw, 28px); font-weight: 500; }
-  .sub { margin: 14px auto 0; max-width: 28em; font-size: clamp(19px, 2.2vw, 21px); color: var(--muted); }
-  .icon { width: 96px; height: 96px; margin-bottom: 18px; }
+  h2 { font-size: clamp(36px, 5.6vw, 56px); font-weight: 600; letter-spacing: -.005em; line-height: 1.07; text-wrap: balance; }
+  .tagline { margin-top: 12px; font-size: clamp(22px, 3vw, 28px); font-weight: 500; }
+  .sub { margin: var(--to-sub) auto 0; max-width: 30em; font-size: clamp(19px, 2.2vw, 21px); color: var(--muted); text-wrap: balance; }
+  .icon { display: block; width: 96px; height: 96px; margin: 0 auto 20px; }
 
   .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin-top: 32px; }
   .pill { display: inline-block; padding: 12px 24px; border-radius: 980px; font-size: 17px; }
@@ -55,27 +61,29 @@
   .line:hover { background: var(--blue); color: #fff; }
   .fine { margin-top: 16px; font-size: 14px; color: var(--muted); }
 
-  .shot { display: block; width: 100%; max-width: 1000px; height: auto; margin: 64px auto 0; border-radius: 18px; }
-  .shot.framed { box-shadow: 0 0 0 1px rgba(0, 0, 0, .06), 0 30px 60px -20px rgba(0, 0, 0, .25); }
+  .shots { display: grid; gap: var(--stack); max-width: 1000px; margin: var(--to-shot) auto 0; }
+  .shots img { display: block; width: 100%; height: auto; }
+  .page { border-radius: 14px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .06), 0 30px 60px -24px rgba(0, 0, 0, .3); }
+  .photo { border-radius: 18px; }
 
   .three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px; max-width: 1000px; margin: 0 auto; }
   .three h3 { font-size: 24px; font-weight: 600; }
   .three p { margin-top: 8px; color: var(--muted); }
 
-  footer { max-width: 1000px; margin: 110px auto 0; padding: 20px 22px 40px; border-top: 1px solid #d2d2d7; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  footer { max-width: 1000px; margin: 0 auto; padding: 20px 22px 40px; border-top: 1px solid #d2d2d7; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; font-size: 12px; color: var(--muted); }
   footer a { color: var(--muted); }
 
   @media (prefers-reduced-motion: no-preference) {
-    .hero .shot { animation: rise 1s cubic-bezier(.2, .7, .2, 1) both .2s; }
+    .hero .shots { animation: rise 1s cubic-bezier(.2, .7, .2, 1) both .2s; }
     @keyframes rise { from { opacity: 0; transform: translateY(30px); } }
   }
   @media (max-width: 734px) {
-    section { padding-top: 80px; }
-    section.mist { margin-top: 80px; padding-bottom: 80px; }
-    .three { grid-template-columns: minmax(0, 1fr); gap: 36px; }
-    .shot { margin-top: 44px; border-radius: 12px; }
+    :root { --section: 100px; --to-shot: 36px; --stack: 24px; }
+    section.hero { padding-top: 48px; }
+    .three { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+    .photo { border-radius: 12px; }
+    .page { border-radius: 10px; }
     .actions .pill { flex: 1 1 100%; }
-    footer { margin-top: 80px; }
   }
 </style>
 </head>
@@ -97,38 +105,48 @@
       <a class="pill line" href="https://chromewebstore.google.com/detail/noteanywhere/fngldbimlphnokkkkodneojgbdnofjha">Add to Chrome</a>
     </div>
     <p class="fine">Free and open source. Requires macOS 15 or later.</p>
-    <img class="shot" src="img/chat-channel.webp" width="1600" height="1000"
-         alt="A note for the design-review channel, open in NoteAnywhere's panel beside the chat.">
+    <div class="shots">
+      <img class="photo" src="img/chat-channel.webp" width="1600" height="1000"
+           alt="A note for the design-review channel, open in NoteAnywhere's panel beside the chat.">
+    </div>
   </section>
 
   <section>
     <h2>Every chat has its own notes.</h2>
     <p class="sub">In WhatsApp, Slack and more. Open the chat, and its notes are there.</p>
-    <img class="shot" src="img/chat-group.webp" width="1600" height="1000" loading="lazy"
-         alt="The Family group chat with its own notes in the panel.">
+    <div class="shots">
+      <img class="photo" src="img/chat-group.webp" width="1600" height="1000" loading="lazy"
+           alt="The Family group chat with its own notes in the panel.">
+    </div>
   </section>
 
   <section>
     <h2>So does every web page.</h2>
     <p class="sub">Notes on the lecture you're watching, and on the study session that follows. In Chrome and Brave.</p>
-    <img class="shot framed" src="img/youtube.webp" width="1600" height="1000" loading="lazy"
-         alt="NoteAnywhere's panel on a YouTube lecture about Mel spectrograms, with a checklist for that video.">
-    <img class="shot framed" src="img/gemini.webp" width="1600" height="1000" loading="lazy"
-         alt="NoteAnywhere's panel on Gemini, with a study-session checklist.">
+    <div class="shots">
+      <img class="page" src="img/youtube.webp" width="1600" height="1000" loading="lazy"
+           alt="NoteAnywhere's panel on 3Blue1Brown's video about attention in transformers, with a checklist for that video.">
+      <img class="page" src="img/gemini.webp" width="1600" height="1000" loading="lazy"
+           alt="NoteAnywhere's panel on a Gemini chat about attention, with a study-session checklist.">
+    </div>
   </section>
 
   <section class="mist">
     <h2>All in one place.</h2>
     <p class="sub">With a calendar for your dates and tasks.</p>
-    <img class="shot framed" src="img/calendar.webp" width="1600" height="1047" loading="lazy"
-         alt="A month calendar with notes and tasks on their days.">
+    <div class="shots">
+      <img src="img/calendar.webp" width="1348" height="868" loading="lazy"
+           alt="NoteAnywhere's window: notes in the sidebar, and a month calendar with tasks on their days.">
+    </div>
   </section>
 
   <section>
     <h2>See how it connects.</h2>
     <p class="sub">Each note joins its chat, app or site, its #tags and the notes it links to.</p>
-    <img class="shot framed graph" src="img/graph.webp" width="1200" height="1218" loading="lazy"
-         alt="A graph joining notes to their apps, websites and tags.">
+    <div class="shots">
+      <img src="img/graph.webp" width="1348" height="868" loading="lazy"
+           alt="NoteAnywhere's graph: notes joined to Slack, WhatsApp, YouTube, Gemini and their tags.">
+    </div>
   </section>
 
   <section>
@@ -139,7 +157,7 @@
     </div>
   </section>
 
-  <section>
+  <section class="last">
     <h2>Leave a note anywhere.</h2>
     <div class="actions">
       <a class="pill solid" href="https://dl.noteanywhere.app/NoteAnywhere.dmg">Download for Mac</a>
@@ -148,7 +166,7 @@
 </main>
 
 <footer>
-  <span>Free and open source (GPL-3.0).</span>
+  <span>Free and open source (GPL-3.0). Desktop photos: “Himalayas, Nepal” by Vyacheslav Argenberg (CC BY 4.0) and “Kleinarl Jägersee” by Uoaei1 (CC BY-SA 4.0), via Wikimedia Commons.</span>
   <span><a href="https://github.com/Vishwas3000/NoteAnywhere">Source</a> &nbsp;&nbsp; <a href="https://github.com/Vishwas3000/NoteAnywhere/issues">Report a problem</a></span>
 </footer>
 </body>
