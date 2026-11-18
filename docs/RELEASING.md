@@ -18,8 +18,7 @@ extension all get the same number. Internal identifiers (`com.memorynotes.app`, 
 3. Put that id in `BrowserBridge.storeExtensionID` (step 7 of the Web Store section), commit.
 4. [Cut the release](#cutting-a-release) of the app, which now trusts the store extension.
 5. Submit the extension for review.
-6. [Turn on GitHub Pages](#github-pages). Once the store listing is live, point the site's "Add to Chrome" button and the
-   README at it.
+6. [Deploy the website](#website) with the new DMG.
 
 ## One-time notarization setup
 
@@ -150,9 +149,12 @@ deletes the keychain at the end.
 
 If you also have the unpacked development extension loaded, turn it off: both would show a panel on every page.
 
-## GitHub Pages
+## Website
 
-1. Repository Settings → Pages → Build and deployment → Source: **GitHub Actions**.
-2. Push a change under `site/` to `main`, or run Actions → Pages → Run workflow.
-3. The page is at `https://vishwas3000.github.io/NoteAnywhere/`. Add it as the repository's website (the ⚙ next to
-   About on the repository page).
+noteanywhere.app is `site/` on Cloudflare Workers static assets (`wrangler.jsonc`, D71); the DMG is served from it.
+
+1. `cp dist/NoteAnywhere-<version>.dmg site/NoteAnywhere.dmg` (gitignored; must stay under 25 MiB).
+2. Update `softwareVersion` in the JSON-LD in `site/index.html` and `lastmod` in `site/sitemap.xml`.
+3. From outside the repo (npm in the repo trips over a packageManager rule):
+   `cd /tmp && npx wrangler@4 deploy --config <repo>/wrangler.jsonc`.
+4. Check: `curl -I https://noteanywhere.app/NoteAnywhere.dmg` shows `application/x-apple-diskimage`.

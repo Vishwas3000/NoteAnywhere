@@ -3,14 +3,56 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NoteAnywhere: notes that wait for you</title>
-<meta name="description" content="A free, open-source Mac app. Notes open by themselves in the chat, file or web page they're about.">
-<meta property="og:title" content="NoteAnywhere">
-<meta property="og:description" content="Notes that wait for you, in the chat, file or web page they're about. Free for Mac.">
+<title>NoteAnywhere: Sticky Notes for Every Mac App and Web Page</title>
+<meta name="description" content="Free, open-source Mac app and Chrome extension. Leave a note on a Slack or WhatsApp chat, a file or a web page. It opens again when you're back.">
+<link rel="canonical" href="https://noteanywhere.app/">
+<meta name="theme-color" content="#ffffff">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="NoteAnywhere">
 <meta property="og:url" content="https://noteanywhere.app/">
-<meta property="og:image" content="https://noteanywhere.app/img/chat-channel.webp">
-<link rel="icon" href="img/icon.png">
+<meta property="og:title" content="NoteAnywhere: notes that wait for you">
+<meta property="og:description" content="Notes that open by themselves in the chat, file or web page they're about. Free and open source, for Mac and Chrome.">
+<meta property="og:image" content="https://noteanywhere.app/img/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="NoteAnywhere, notes that wait for you: a note panel open beside a team chat on a Mac.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="NoteAnywhere: notes that wait for you">
+<meta name="twitter:description" content="Notes that open by themselves in the chat, file or web page they're about. Free and open source, for Mac and Chrome.">
+<meta name="twitter:image" content="https://noteanywhere.app/img/og.png">
+<meta name="twitter:image:alt" content="NoteAnywhere, notes that wait for you: a note panel open beside a team chat on a Mac.">
+<link rel="icon" type="image/png" href="img/icon.png">
+<link rel="apple-touch-icon" href="img/icon.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "NoteAnywhere",
+  "description": "Notes that attach to the chat, channel, file or web page they're about and open in a floating panel. A Mac app with a Chrome and Brave extension.",
+  "url": "https://noteanywhere.app/",
+  "image": "https://noteanywhere.app/img/og.png",
+  "operatingSystem": "macOS 15 or later",
+  "applicationCategory": "ProductivityApplication",
+  "softwareVersion": "0.1.1",
+  "downloadUrl": "https://noteanywhere.app/NoteAnywhere.dmg",
+  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "screenshot": [
+    "https://noteanywhere.app/img/chat-channel.webp",
+    "https://noteanywhere.app/img/chat-group.webp",
+    "https://noteanywhere.app/img/youtube.webp",
+    "https://noteanywhere.app/img/gemini.webp",
+    "https://noteanywhere.app/img/calendar.webp",
+    "https://noteanywhere.app/img/graph.webp"
+  ],
+  "sameAs": [
+    "https://github.com/Vishwas3000/NoteAnywhere",
+    "https://chromewebstore.google.com/detail/noteanywhere/fngldbimlphnokkkkodneojgbdnofjha"
+  ]
+}
+</script>
 <style>
   :root {
     --ink: #1d1d1f;
@@ -90,7 +132,7 @@
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="./"><img src="img/icon.png" alt="">NoteAnywhere</a>
+  <a class="brand" href="./"><img src="img/icon.png" width="22" height="22" alt="">NoteAnywhere</a>
   <a class="gh" href="https://github.com/Vishwas3000/NoteAnywhere">
     <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>GitHub
   </a>
@@ -98,7 +140,7 @@
 
 <main>
   <section class="hero">
-    <img class="icon" src="img/icon.png" alt="">
+    <img class="icon" src="img/icon.png" width="96" height="96" alt="">
     <h1>NoteAnywhere</h1>
     <p class="tagline">Notes that wait for you.</p>
     <div class="actions">
@@ -107,14 +149,14 @@
     </div>
     <p class="fine">Free and open source. Requires macOS 15 or later.</p>
     <div class="shots">
-      <img class="photo" src="img/chat-channel.webp" width="1600" height="1000"
-           alt="A note for the design-review channel, open in NoteAnywhere's panel beside the chat.">
+      <img class="photo" src="img/chat-channel.webp" width="1600" height="1000" fetchpriority="high"
+           alt="A note pinned to a Slack-style channel, open in NoteAnywhere's floating panel on a Mac.">
     </div>
   </section>
 
   <section>
     <h2>Every chat has its own notes.</h2>
-    <p class="sub">In WhatsApp, Slack and more. Open the chat, and its notes are there.</p>
+    <p class="sub">Every Slack channel, DM and WhatsApp chat. Open it, and its notes are there.</p>
     <div class="shots">
       <img class="photo" src="img/chat-group.webp" width="1600" height="1000" loading="lazy"
            alt="The Family group chat with its own notes in the panel.">
@@ -127,7 +169,7 @@
     <p class="more"><a href="https://chromewebstore.google.com/detail/noteanywhere/fngldbimlphnokkkkodneojgbdnofjha">Get the extension for Chrome and Brave</a></p>
     <div class="shots">
       <img class="page" src="img/youtube.webp" width="1600" height="1000" loading="lazy"
-           alt="NoteAnywhere's panel on 3Blue1Brown's video about attention in transformers, with a checklist for that video.">
+           alt="Notes on a YouTube video in the NoteAnywhere Chrome extension: a checklist for 3Blue1Brown's video on attention in transformers.">
       <img class="page" src="img/gemini.webp" width="1600" height="1000" loading="lazy"
            alt="NoteAnywhere's panel on a Gemini chat about attention, with a study-session checklist.">
     </div>
