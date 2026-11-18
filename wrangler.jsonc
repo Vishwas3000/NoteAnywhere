@@ -1,0 +1,11 @@
+// The website (site/) on Cloudflare Workers static assets, at noteanywhere.app (D71).
+// Deploy: copy the release DMG to site/NoteAnywhere.dmg (gitignored), then `npx wrangler@4 deploy`.
+{
+  "name": "noteanywhere",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./site" },
+  "routes": [
+    { "pattern": "noteanywhere.app", "custom_domain": true },
+    { "pattern": "www.noteanywhere.app", "custom_domain": true }
+  ]
+}

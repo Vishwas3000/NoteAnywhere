@@ -798,3 +798,16 @@ Made by the subagent that wrote the extension:
   @Published announces a value before storing it; the place is now passed in. (2) Switching to a browser whose
   address bar had focus skipped the update, so the panel kept the last app's place and + saved there; now it updates
   with no page.
+
+## D71 — The website and the download live on Cloudflare (2026-11-19)
+
+- **Asked by the user:** distribute the Mac app from noteanywhere.app instead of only GitHub, at no cost.
+- **Domain:** registered at GoDaddy, DNS moved to Cloudflare (nameservers adele/kip.ns.cloudflare.com).
+- **Chosen by Claude:** Cloudflare Workers static assets (`wrangler.jsonc`, assets = `site/`), with the DMG served
+  from the same site at https://noteanywhere.app/NoteAnywhere.dmg. Static asset requests are free and unmetered, and
+  files up to 25 MiB are allowed (the DMG is about 11 MB), so no R2 bucket, card or second domain is needed. The DMG
+  is copied into `site/` at deploy time and gitignored, never committed.
+- **Rejected:** R2 on dl.noteanywhere.app (R2 must be switched on in the dashboard, which may ask for a card);
+  Cloudflare Pages (Wrangler now steers static sites to Workers); GitHub Pages (the DMG would stay on github.com).
+- **Page design (user):** Apple-style, very little text, real screenshots; demo content only (test stores, hidden
+  browser), never the user's notes. Desktop photos from Wikimedia Commons, credited in the footer.

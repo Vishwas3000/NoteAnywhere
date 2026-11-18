@@ -5,8 +5,9 @@
 <p align="center"><b>Notes that show up where they belong:</b> in the chat, channel, project or web page they're about.</p>
 
 <p align="center">
-  <a href="https://github.com/Vishwas3000/NoteAnywhere/releases/latest"><b>Download for Mac</b></a> ·
-  <a href="#install"><b>Get the browser extension</b></a> ·
+  <a href="https://noteanywhere.app"><b>noteanywhere.app</b></a> ·
+  <a href="https://noteanywhere.app/NoteAnywhere.dmg"><b>Download for Mac</b></a> ·
+  <a href="https://chromewebstore.google.com/detail/noteanywhere/fngldbimlphnokkkkodneojgbdnofjha"><b>Get the browser extension</b></a> ·
   Free and open source (GPL-3.0)
 </p>
 
@@ -94,7 +95,7 @@ notes link up.
 Requires macOS 15 or later, and Chrome or Brave for website notes. The ✨ actions need macOS 26 and a Mac that
 supports Apple Intelligence.
 
-1. Download the DMG from [Releases](https://github.com/Vishwas3000/NoteAnywhere/releases/latest), drag NoteAnywhere
+1. Download the DMG from [noteanywhere.app](https://noteanywhere.app) (or [Releases](https://github.com/Vishwas3000/NoteAnywhere/releases/latest)), drag NoteAnywhere
    to Applications and open it. It lives in the menu bar.
 2. Allow **Accessibility** when asked (System Settings ▸ Privacy & Security ▸ Accessibility). This lets NoteAnywhere
    read window titles so notes can follow the channel or file you're in. Without it, notes are per app, and the
