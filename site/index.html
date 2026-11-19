@@ -115,6 +115,28 @@
 
   footer { max-width: 1000px; margin: 0 auto; padding: 20px 22px 40px; border-top: 1px solid #d2d2d7; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; font-size: 12px; color: var(--muted); }
   footer a { color: var(--muted); }
+  footer button { font: inherit; color: var(--muted); background: none; border: 0; padding: 0; cursor: pointer; }
+  footer button:hover { text-decoration: underline; }
+
+  dialog { width: min(440px, calc(100vw - 32px)); padding: 28px; border: 0; border-radius: 18px; color: var(--ink); background: var(--paper);
+    box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .4); }
+  dialog::backdrop { background: rgba(0, 0, 0, .3); }
+  dialog h2 { font-size: 24px; letter-spacing: 0; }
+  dialog form { display: grid; gap: 14px; margin-top: 18px; text-align: left; }
+  .kind { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: var(--mist); }
+  .kind label { flex: 1; text-align: center; padding: 6px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+  .kind input { position: absolute; opacity: 0; }
+  .kind label:has(input:checked) { background: var(--paper); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+  .kind label:has(input:focus-visible) { outline: 2px solid var(--blue); }
+  dialog textarea, dialog input[type=email] { width: 100%; font: inherit; font-size: 15px; padding: 10px 12px; border: 1px solid #d2d2d7; border-radius: 10px; color: var(--ink); background: var(--paper); }
+  dialog textarea { min-height: 140px; resize: vertical; }
+  .trap { position: absolute; left: -9999px; }
+  .status { min-height: 1.4em; font-size: 14px; color: var(--muted); }
+  .status.bad { color: #d70015; }
+  .buttons { display: flex; justify-content: flex-end; gap: 10px; }
+  .buttons .pill { font-size: 15px; padding: 8px 18px; border: 0; cursor: pointer; font-family: inherit; }
+  .buttons .plain { background: var(--mist); color: var(--ink); }
+  .buttons .solid:disabled { opacity: .5; cursor: default; }
 
   @media (prefers-reduced-motion: no-preference) {
     .hero .shots { animation: rise 1s cubic-bezier(.2, .7, .2, 1) both .2s; }
@@ -212,7 +234,51 @@
 
 <footer>
   <span>Free and open source (GPL-3.0). Desktop photos: “Himalayas, Nepal” by Vyacheslav Argenberg (CC BY 4.0) and “Kleinarl Jägersee” by Uoaei1 (CC BY-SA 4.0), via Wikimedia Commons.</span>
-  <span><a href="mailto:timeupvishwa@gmail.com">Contact</a> &nbsp;&nbsp; <a href="https://chromewebstore.google.com/detail/noteanywhere/fngldbimlphnokkkkodneojgbdnofjha">Chrome extension</a> &nbsp;&nbsp; <a href="https://github.com/Vishwas3000/NoteAnywhere">Source</a> &nbsp;&nbsp; <a href="https://github.com/Vishwas3000/NoteAnywhere/issues">Report a problem</a></span>
+  <span><button type="button" id="feedback-open">Send feedback</button> &nbsp;&nbsp; <a href="mailto:timeupvishwa@gmail.com">Contact</a> &nbsp;&nbsp; <a href="https://chromewebstore.google.com/detail/noteanywhere/fngldbimlphnokkkkodneojgbdnofjha">Chrome extension</a> &nbsp;&nbsp; <a href="https://github.com/Vishwas3000/NoteAnywhere">Source</a> &nbsp;&nbsp; <a href="https://github.com/Vishwas3000/NoteAnywhere/issues">Report a problem</a></span>
 </footer>
+
+<dialog id="feedback" aria-labelledby="feedback-title">
+  <h2 id="feedback-title">Send feedback</h2>
+  <form>
+    <div class="kind" role="radiogroup" aria-label="Kind">
+      <label><input type="radio" name="kind" value="problem" checked> Problem</label>
+      <label><input type="radio" name="kind" value="idea"> Suggestion</label>
+    </div>
+    <textarea name="message" required maxlength="5000" aria-label="Message" placeholder="What went wrong, or what would make NoteAnywhere better?"></textarea>
+    <input type="email" name="email" maxlength="254" aria-label="Your email" placeholder="Your email, if you'd like a reply" autocomplete="email">
+    <input class="trap" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <p class="status" role="status"></p>
+    <div class="buttons">
+      <button type="button" class="pill plain" id="feedback-close">Cancel</button>
+      <button type="submit" class="pill solid">Send</button>
+    </div>
+  </form>
+</dialog>
+<script>
+  // Posts to /api/feedback (worker/index.js, D72), which emails it; a failed send keeps the text.
+  const dialog = document.getElementById("feedback"), form = dialog.querySelector("form");
+  const status = form.querySelector(".status"), send = form.querySelector("[type=submit]");
+  const say = (text, bad) => { status.textContent = text; status.classList.toggle("bad", !!bad); };
+  document.getElementById("feedback-open").onclick = () => { say(""); dialog.showModal(); };
+  document.getElementById("feedback-close").onclick = () => dialog.close();
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    const body = Object.fromEntries(new FormData(form));
+    body.app = "website, " + navigator.userAgent.slice(0, 100);
+    send.disabled = true;
+    say("Sending…");
+    try {
+      const response = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const reply = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(reply.error || "The server answered " + response.status + ".");
+      form.reset();
+      say("Sent. Thank you.");
+    } catch (error) {
+      say(error.message + " You can also email timeupvishwa@gmail.com.", true);
+    } finally {
+      send.disabled = false;
+    }
+  };
+</script>
 </body>
 </html>

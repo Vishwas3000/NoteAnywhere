@@ -158,6 +158,18 @@ struct NotesWindow: View {
                                        description: Text("Press ⌘N to write a note. Use + to tie one to a website or an app."))
             }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {  // the corner: which version this is, and a way to say what's wrong
+            HStack {
+                Text("Version \(appVersion)").foregroundStyle(.secondary).textSelection(.enabled)
+                Spacer()
+                Button { openWindow(id: "feedback") } label: { Label("Feedback", systemImage: "envelope") }
+                    .buttonStyle(.borderless)
+                    .help("Report a problem or suggest an idea")
+            }
+            .font(.caption)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+        }
         .searchable(text: $query, isPresented: $searchFocused, placement: .sidebar, prompt: "Search by meaning or keyword")
         .sheet(item: $lockPrompt) { prompt in
             switch prompt {

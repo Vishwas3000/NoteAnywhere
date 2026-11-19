@@ -152,9 +152,11 @@ If you also have the unpacked development extension loaded, turn it off: both wo
 ## Website
 
 noteanywhere.app is `site/` on Cloudflare Workers static assets (`wrangler.jsonc`, D71); the DMG is served from it.
+`/api/feedback` is `worker/index.js` (D72): it needs Email Routing on for the domain with the destination verified.
 
 1. `cp dist/NoteAnywhere-<version>.dmg site/NoteAnywhere.dmg` (gitignored; must stay under 25 MiB).
 2. Update `softwareVersion` in the JSON-LD in `site/index.html` and `lastmod` in `site/sitemap.xml`.
 3. From outside the repo (npm in the repo trips over a packageManager rule):
    `cd /tmp && npx wrangler@4 deploy --config <repo>/wrangler.jsonc`.
 4. Check: `curl -I https://noteanywhere.app/NoteAnywhere.dmg` shows `application/x-apple-diskimage`.
+5. Worker tests: `node --test worker/feedback.test.mjs`. Local run: `wrangler dev` (mails land in `.wrangler/tmp`).

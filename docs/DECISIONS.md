@@ -811,3 +811,23 @@ Made by the subagent that wrote the extension:
   Cloudflare Pages (Wrangler now steers static sites to Workers); GitHub Pages (the DMG would stay on github.com).
 - **Page design (user):** Apple-style, very little text, real screenshots; demo content only (test stores, hidden
   browser), never the user's notes. Desktop photos from Wikimedia Commons, credited in the footer.
+
+## D72 — Version in the corner, feedback without leaving the app, a block menu on ⋮⋮ (2026-11-19)
+
+- **Asked by the user:** show the app's version, and a quick way to email a problem or a suggestion from inside the
+  app and from the website. Placed by the user in the sidebar's bottom corner (plus Help menu and menu bar items).
+- **Chosen:** one endpoint, `POST noteanywhere.app/api/feedback` (`worker/index.js`), used by the Mac app and the
+  website's footer form. Static files are still served before the worker runs, so only feedback counts as a worker
+  request. It emails timeupvishwa@gmail.com through Cloudflare Email Routing's `send_email` binding (free), from
+  feedback@noteanywhere.app, with Reply-To set when the sender gives an address. Guards: 5 messages a minute per IP
+  (rate-limit binding), 5,000 characters, kind must be Problem or Suggestion, CR/LF stripped from header values, and
+  a hidden field bots fill in. A failed send keeps the text and offers Mail (app) or the address (site).
+- **Rejected:** a pre-filled Mail draft (leaves the app, and fails for people without Apple Mail; can't serve the
+  website); a third-party form service (another account, and the messages would pass through it).
+- **Needs (one-time, dashboard):** Email Routing on for noteanywhere.app, with timeupvishwa@gmail.com verified as a
+  destination address.
+- **Version:** `scripts/make_app.sh` stamps the `VERSION` file into Info.plist, so local builds show it too;
+  release.sh still overrides it with the tag.
+- **Asked by the user:** right-click (or Control-click) a block's ⋮⋮ handle to change it: turn into Text, Heading
+  1–3, a list, Quote or Code (its own kind is checked and does nothing), Duplicate or Delete. Tables, pictures,
+  lines and maths only get Duplicate and Delete. In the shared editor, so the extension gets it too.
