@@ -358,7 +358,11 @@ Made by the subagent that wrote the extension:
   in SwiftUI's `webAuthenticationSession` (a secure sheet) and reuses the email link's callback handling. Email link stays.
 - Client id/secret live in the Supabase dashboard (and env vars for `config push`), never in the repo.
 - End-to-end encryption is unchanged: Google only proves who you are; the sync passphrase still unlocks the notes.
-- **Status:** Decided (user asked). Needs a Google OAuth client and the provider enabled by the user.
+- **Status:** Decided (user asked). Live 2026-11-20. Until then, the button shipped in 0.1.2 failed with "provider is
+  not enabled". The user made the Google OAuth client (Web application, project NoteAnywhere, redirect URI
+  `https://strhaqnvxtpmlvcwkkne.supabase.co/auth/v1/callback`) and turned the provider on in Supabase. Checked from
+  outside: Supabase sends the sign-in to Google with scopes `email profile`, and Google shows its sign-in page, not an
+  error. PRIVACY.md and the README say what Google and the sync server receive.
 
 ## D43 — A calendar pop-up for "Pick a date…" and 📅 (2026-10-29)
 - **Why:** user asked that "Pick a date…" open a pop-up to choose the date; it showed a plain date field above the note.

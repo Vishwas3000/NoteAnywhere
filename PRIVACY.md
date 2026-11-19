@@ -78,7 +78,8 @@ NoteAnywhere connects to the internet only for these reasons:
 | Feedback | Only when you press Send in Send Feedback (in the app, or the form on noteanywhere.app) | noteanywhere.app, which emails it to the developer | Your message, the email address you give for a reply (optional), and the NoteAnywhere and macOS versions. Your IP address is used only to allow 5 messages a minute and is not stored. |
 | Web pictures in notes | When a note that shows a picture by its web address (for example from pasted Markdown) is on screen, in the app or the browser panel. Pasted and dropped pictures are kept in the note instead. | That website | A normal request for the picture, as a web page would make |
 | Sync | Only if you turn sync on and sign in | Supabase (see below) | Your notes and your email address |
-| Updates | Once a day if you allow automatic checks (the app asks on its second launch), and when you choose Check for Updates… | noteanywhere.app for the update feed (`https://noteanywhere.app/appcast.xml`); GitHub (Releases) for downloading an update | A request for the feed, with NoteAnywhere's version in the user agent, and a normal download of the new version. No notes, no personal data and no system profile. |
+| Google sign-in | Only if you choose Continue with Google to sign in to sync (Mac app) | Google, whose sign-in page opens in a secure window, then Supabase | What you enter on Google's page goes to Google. Google learns that you signed in to NoteAnywhere and gives Supabase your email address, name and profile picture address. |
+| Updates | From version 0.1.3: once a day if you allow automatic checks (the app asks on its second launch), and when you choose Check for Updates… | noteanywhere.app for the update feed (`https://noteanywhere.app/appcast.xml`); GitHub (Releases) for downloading an update | A request for the feed, with NoteAnywhere's version in the user agent, and a normal download of the new version. No notes, no personal data and no system profile. |
 
 There are no analytics, no telemetry, no crash reporting and no advertising.
 
@@ -104,7 +105,10 @@ that assistant's own privacy terms cover what it sends to its servers. NoteAnywh
 ## Optional sync
 
 Sync is off by default. If you turn it on in Settings, you sign in with your email address: you receive a one-time
-sign-in link or code, and there is no password.
+sign-in link or code, and there is no password. In the Mac app you can sign in with Google instead (Continue with
+Google): Google's sign-in page opens in a secure window, Google learns that you signed in to NoteAnywhere, and it gives
+the sync server your email address, name and profile picture address. NoteAnywhere asks Google for nothing else, not
+your mail, files or contacts, and Google never receives your notes.
 
 With sync on, your notes are copied to a database hosted on [Supabase](https://supabase.com) and operated by the
 NoteAnywhere developer. They are **end-to-end encrypted**: before anything leaves your Mac, a random 256-bit key for
@@ -117,7 +121,8 @@ unaffected.
 What the server can see:
 
 - your email address and account id (managed by Supabase Auth, which also keeps sign-in records such as times and
-  IP addresses, and sends the sign-in emails);
+  IP addresses, and sends the sign-in emails) and, if you signed in with Google, the name, profile picture address and
+  Google account id that Google gave it;
 - each note's id, whether it is an app or website note, its timestamps, whether it was deleted or locked, and its
   folder, pin, star and color label;
 - each image's id, creation time and file type (such as PNG).
