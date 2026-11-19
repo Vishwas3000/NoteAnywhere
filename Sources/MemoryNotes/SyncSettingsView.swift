@@ -9,6 +9,8 @@ struct SyncSettingsView: View {
     @State private var passphrase = ""
     @State private var confirm = ""
     @FocusState private var codeFocused: Bool
+    @FocusState private var passphraseFocus: PassphraseField?
+    private enum PassphraseField { case first, again }
     @Environment(\.webAuthenticationSession) private var webAuthentication
 
     var body: some View {
@@ -28,19 +30,28 @@ struct SyncSettingsView: View {
             if sync.mode == .cloud {
                 if sync.email != nil, sync.vault == .create {
                     Section {
-                        SecureField("Sync passphrase", text: $passphrase)
-                        SecureField("Type it again", text: $confirm)
-                        Button("Turn On Encrypted Sync") { Task { await sync.createVault(passphrase: passphrase); clear() } }
+                        // A placeholder makes the field visible: on the Mac, clicking a form label doesn't focus its field.
+                        SecureField("Sync passphrase", text: $passphrase, prompt: Text("At least 8 characters"))
+                            .focused($passphraseFocus, equals: .first)
+                            .onSubmit { passphraseFocus = .again }
+                        SecureField("Type it again", text: $confirm, prompt: Text("The same passphrase"))
+                            .focused($passphraseFocus, equals: .again)
+                            .onSubmit(create)
+                        if let hint = passphraseHint { Text(hint).foregroundStyle(.secondary) }
+                        Button("Turn On Encrypted Sync", action: create)
                             .buttonStyle(.borderedProminent)
-                            .disabled(passphrase.count < 8 || passphrase != confirm || sync.busy)
+                            .disabled(!passphraseIsValid || sync.busy)
                     } header: {
-                        Text("Encrypt your notes")
+                        Text("Last step: choose a sync passphrase")
                     } footer: {
-                        Text("Your notes are encrypted on this device before they're uploaded; the server can't read them. Use at least 8 characters. Your other devices ask for this passphrase once. If you forget it, the synced copy can't be read (the notes on your devices are fine).")
+                        Text("Your notes are encrypted with it on this device before they're uploaded, so the server can't read them. Each of your other devices asks for it once. Keep it in your password manager: if you forget it, the synced copy can't be opened (the notes on your devices are fine).")
                     }
+                    .onAppear { passphraseFocus = .first }
                 } else if sync.email != nil, sync.vault == .enter {
                     Section {
-                        SecureField("Sync passphrase", text: $passphrase).onSubmit(enter)
+                        SecureField("Sync passphrase", text: $passphrase, prompt: Text("The one you chose before"))
+                            .focused($passphraseFocus, equals: .first)
+                            .onSubmit(enter)
                         Button("Unlock Synced Notes", action: enter)
                             .buttonStyle(.borderedProminent)
                             .disabled(passphrase.isEmpty || sync.busy)
@@ -49,24 +60,27 @@ struct SyncSettingsView: View {
                     } footer: {
                         Text("You chose it when you first turned on sync on another device.")
                     }
+                    .onAppear { passphraseFocus = .first }
                 } else if sync.email != nil, sync.vault == nil {
                     Section { ProgressView("Checking your account…") }
                 }
                 if let account = sync.email {
                     Section("Account") {
                         LabeledContent("Signed in as", value: account)
-                        LabeledContent("Last synced") {
-                            if sync.busy { ProgressView().controlSize(.small) }
-                            else { Text(sync.lastSynced.map { $0.formatted(.relative(presentation: .named)) } ?? "Not yet") }
+                        if sync.vault == .ready {  // before the passphrase there's nothing to sync, so no dead button
+                            LabeledContent("Last synced") {
+                                if sync.busy { ProgressView().controlSize(.small) }
+                                else { Text(sync.lastSynced.map { $0.formatted(.relative(presentation: .named)) } ?? "Not yet") }
+                            }
+                            Button("Sync Now") { sync.syncNow() }.disabled(sync.busy)
                         }
-                        Button("Sync Now") { sync.syncNow() }.disabled(sync.busy)
                         Button("Sign Out", role: .destructive) { sync.signOut() }
                     }
                 } else if let sentTo = sync.pendingEmail {
                     Section {
                         Label("Open the email on this device and click its link. It brings you back here, signed in.",
                               systemImage: "envelope.open")
-                        TextField("Or enter the code from the email", text: $code)
+                        TextField("Or enter the code from the email", text: $code, prompt: Text("Code from the email"))
                             .focused($codeFocused)
                             .textContentType(.oneTimeCode)
                             .onSubmit(verify)
@@ -93,7 +107,7 @@ struct SyncSettingsView: View {
                         .disabled(sync.busy)
                     }
                     Section {
-                        TextField("Email", text: $email)
+                        TextField("Email", text: $email, prompt: Text("you@example.com"))
                             .textContentType(.emailAddress)
                             .autocorrectionDisabled()
                             .onSubmit(sendLink)
@@ -134,6 +148,22 @@ struct SyncSettingsView: View {
     }
 
     private func enter() { Task { await sync.enterVault(passphrase: passphrase); clear() } }
+
+    private var passphraseIsValid: Bool { passphrase.count >= 8 && passphrase == confirm }
+
+    /// Why Turn On is still greyed out, once there's something typed to explain.
+    private var passphraseHint: String? {
+        let missing = 8 - passphrase.count
+        if passphrase.isEmpty { return nil }
+        if missing > 0 { return missing == 1 ? "1 more character to go." : "\(missing) more characters to go." }
+        if !confirm.isEmpty, confirm != passphrase { return "The two passphrases don't match yet." }
+        return nil
+    }
+
+    private func create() {
+        guard passphraseIsValid, !sync.busy else { return }
+        Task { await sync.createVault(passphrase: passphrase); clear() }
+    }
 
     private func clear() {
         if sync.vault == .ready {

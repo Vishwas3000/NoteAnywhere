@@ -134,6 +134,7 @@ private struct MenuContent: View {
     let overlay: OverlayController
     let updater: SPUUpdater
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         Button("Show/Hide Overlay") { overlay.toggle() }
@@ -148,8 +149,11 @@ private struct MenuContent: View {
             openWindow(id: "shortcuts")
             NSApp.activate()
         }
-        SettingsLink { Text("Settings…") }
-            .simultaneousGesture(TapGesture().onEnded { NSApp.activate() })
+        // A menu item runs actions but not gestures, so activating here is what lets Settings take typing.
+        Button("Settings…") {
+            openSettings()
+            NSApp.activate()
+        }
         Button("Send Feedback…") {
             openWindow(id: "feedback")
             NSApp.activate()
