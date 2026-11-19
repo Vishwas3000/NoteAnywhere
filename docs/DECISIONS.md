@@ -902,3 +902,22 @@ Made by the subagent that wrote the extension:
   that Info.plist and refuses the placeholder key (checked outside the app). The real public key is in Info.plist
   (2026-11-20). Not yet: notarization, the menu items on screen, and an update installed from a real feed.
 
+## D76 — Note and folder ids are lowercase; synced duplicates are merged (2026-11-20)
+- **Bug (user reported: "after sync there are duplicates for all the notes"):** the Mac and iPhone made uppercase
+  UUIDs. The sync server's uuid columns return them lowercase, and the pull matched ids exactly, so every note a device
+  pushed came back as a second note (29 of 33 notes and their snapshots on the maintainer's Mac). Deleting one copy
+  would have deleted both: they are one row on the server. Images (lowercase since D53) and Android (lowercase ids)
+  were not affected. Released 0.1.2 has the bug.
+- **Fix:** new note and folder ids are lowercase. Schema v7 merges each uppercase/lowercase pair, keeping the newer
+  edit. It first moves snapshots, tags, embeddings, suggestions, links and attachments to the lowercase id, so ON
+  DELETE CASCADE removes nothing when the extra copy goes. Then it lowercases the remaining ids, folders included;
+  foreign keys are checked at COMMIT. Ids that arrive from outside are lowercased too: browser panels opened before
+  the update, MCP, `note://` links in existing text and restored note windows.
+- **Rejected:** a text id column on the server (the uuid type already lowercased the existing rows, so the Mac's
+  uppercase copies would still not match); lowercasing in every query (many call sites, easy to miss one).
+- **Checked:**
+  - a test that gets 2 notes with uppercase ids and 1 with the fix;
+  - a migration test: both directions of "newer", a snapshot day on only one copy, a tag on both, a folder pair;
+  - the migration SQL on a copy of the maintainer's database: 62 rows became 33 and none went missing. The 2 notes
+    edited after the sync kept their newest text, and no note changed between deleted and not deleted.
+- **Status:** Done.

@@ -176,7 +176,8 @@ private struct EditorWebView: NSViewRepresentable {
                     .prefix(8)
                 call("reply", id, found.map { ["id": $0.id, "title": $0.title, "preview": $0.preview] }, NSNull())
             case "notePreview":
-                guard let id = body["id"] as? Int, let noteID = body["note"] as? String else { return }
+                // Lowercased here and in openNote: note:// links written before D76 hold uppercase ids.
+                guard let id = body["id"] as? Int, let noteID = (body["note"] as? String)?.lowercased() else { return }
                 guard let note = NotesModel.shared.notes.first(where: { $0.id == noteID }) else {
                     return call("reply", id, NSNull(), "This note was deleted.")
                 }
@@ -193,7 +194,7 @@ private struct EditorWebView: NSViewRepresentable {
                 NotesModel.shared.calendarRequest = day
                 parent.showMainWindow?()
             case "openNote":
-                guard let id = body["id"] as? String else { return }
+                guard let id = (body["id"] as? String)?.lowercased() else { return }
                 if let openLink = parent.openLink { openLink(id) } else { NotesModel.shared.openRequest = id }
             default:
                 break

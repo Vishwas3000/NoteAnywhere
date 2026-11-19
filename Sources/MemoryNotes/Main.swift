@@ -48,7 +48,7 @@ struct MemoryNotesApp: App {
 
         // "Open Note in New Window"
         WindowGroup("Note", id: "note", for: String.self) { $id in
-            if let id { NoteWindow(noteID: id) }
+            if let id { NoteWindow(noteID: id.lowercased()) }  // a window restored from before D76 has an uppercase id
         }
         .defaultSize(width: 640, height: 720)
 
