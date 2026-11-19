@@ -160,11 +160,11 @@ struct NotesWindow: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {  // the corner: which version this is, and a way to say what's wrong
             HStack {
-                Text("Version \(appVersion)").foregroundStyle(.secondary).textSelection(.enabled)
-                Spacer()
                 Button { openWindow(id: "feedback") } label: { Label("Feedback", systemImage: "envelope") }
                     .buttonStyle(.borderless)
                     .help("Report a problem or suggest an idea")
+                Spacer()
+                Text("Version \(appVersion)").foregroundStyle(.secondary).textSelection(.enabled)
             }
             .font(.caption)
             .padding(.horizontal, 14)
