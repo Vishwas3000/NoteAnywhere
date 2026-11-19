@@ -123,9 +123,10 @@ enum MCPServer {
             }
         },
         Tool(name: "list_notes",
-             description: "List notes, newest edit first, as summaries. Filter by source (an app or site, e.g. \"Slack\" or \"github.com\"), #tag, folder, pinned, or edits since a date.",
+             description: "List notes, newest edit first, as summaries. Filter by source (an app or site, e.g. \"Slack\" or \"github.com\"), #tag, folder, pinned, starred, or edits since a date.",
              properties: ["source": text("Part of the app or site name or address"), "tag": text("A tag, with or without #"),
                           "folder": text("Folder name or id"), "pinned": ["type": "boolean", "description": "Only pinned (true) or unpinned (false) notes"],
+                          "starred": ["type": "boolean", "description": "Only starred (true) or unstarred (false) notes"],
                           "updated_since": text("YYYY-MM-DD or an ISO 8601 date-time"), "limit": number("Most notes to return, default 30, up to 200")],
              readOnly: true) { args in
             var notes = NoteStore.loadAll()
@@ -141,6 +142,7 @@ enum MCPServer {
                 notes = notes.filter { $0.folderID == id }
             }
             if let pinned = args["pinned"] as? Bool { notes = notes.filter { $0.pinned == pinned } }
+            if let starred = args["starred"] as? Bool { notes = notes.filter { $0.starred == starred } }
             if let since = args["updated_since"] as? String, !since.isEmpty {
                 guard let date = parseDate(since) else { throw ToolError(message: "updated_since must be YYYY-MM-DD or ISO 8601, got \(since)") }
                 notes = notes.filter { $0.updatedAt >= date.timeIntervalSince1970 * 1000 }
@@ -242,16 +244,18 @@ enum MCPServer {
             return try save(note)
         },
         Tool(name: "update_note",
-             description: "Pin or unpin a note, set its colour label, or move it to a folder. Its text is unchanged.",
+             description: "Pin or star a note (or undo either), set its colour label, or move it to a folder. Its text is unchanged.",
              properties: ["id": text("The note's id"), "pinned": ["type": "boolean", "description": "Pin (true) or unpin (false)"],
+                          "starred": ["type": "boolean", "description": "Star (true) or unstar (false)"],
                           "color": ["type": "string", "enum": NoteColor.allCases.map(\.rawValue) + ["none"], "description": "Colour label, or none"],
                           "folder": text("Folder name or id; empty string for no folder")],
              required: ["id"]) { args in
             var note = try fetch(try string(args, "id"))  // a locked note can be pinned or moved, as in the app
-            guard ["pinned", "color", "folder"].contains(where: { args[$0] != nil }) else {
-                throw ToolError(message: "Give pinned, color or folder to change")
+            guard ["pinned", "starred", "color", "folder"].contains(where: { args[$0] != nil }) else {
+                throw ToolError(message: "Give pinned, starred, color or folder to change")
             }
             if let pinned = args["pinned"] as? Bool { note.pinned = pinned }
+            if let starred = args["starred"] as? Bool { note.starred = starred }
             if let color = args["color"] as? String {
                 guard color == "none" || NoteColor(rawValue: color) != nil else {
                     throw ToolError(message: "color is one of \((NoteColor.allCases.map(\.rawValue) + ["none"]).joined(separator: ", "))")
@@ -339,6 +343,7 @@ enum MCPServer {
         var s: [String: Any] = ["id": note.id, "title": note.title, "updated": iso(note.updatedAt)]
         if note.hasSource { s["source"] = note.shortSource }
         if note.pinned { s["pinned"] = true }
+        if note.starred { s["starred"] = true }
         if let color = note.color { s["color"] = color.rawValue }
         if let folder = note.folderID.flatMap({ folders[$0] }) { s["folder"] = folder }
         if note.locked { s["locked"] = true }

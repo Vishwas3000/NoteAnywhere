@@ -831,3 +831,18 @@ Made by the subagent that wrote the extension:
 - **Asked by the user:** right-click (or Control-click) a block's ⋮⋮ handle to change it: turn into Text, Heading
   1–3, a list, Quote or Code (its own kind is checked and does nothing), Duplicate or Delete. Tables, pictures,
   lines and maths only get Duplicate and Delete. In the shared editor, so the extension gets it too.
+- The block menu has a search field on top: typing filters the actions by name or other words ("remove" finds
+  Delete), ↑/↓ pick and Return runs.
+
+## D73: Starred notes, and bringing iPhone and Android up to the Mac (2026-11-19)
+
+- **Asked by the user:** star and pin on every platform. **Pin** keeps its meaning: pinned notes sit in a "Pinned"
+  section at the top. **Star** doesn't move a note; a "Starred" filter (Mac sidebar under All Notes, iPhone list
+  filter, Android chip) shows only starred notes. Chosen over "star replaces pin" so both stay useful.
+- **Data:** `notes.starred` (SQLite schema v6; Supabase migration `20261119120000_starred.sql`), saved with the
+  other metadata (updated_at + 1 ms) and synced like pinned. Older apps don't send it; a PostgREST upsert leaves
+  columns it doesn't name alone, so their edits keep the star. The migration must be applied before releasing an
+  app that selects the column, or that app's pull fails.
+- **Parity, phased:** A = star everywhere + Android basics (pin, colour, duplicate, share, sections); B = iPhone
+  gaps (tag list, tap a tag, folder rename/delete, creating note links, block menu by touch). C (Android rich
+  editor, images) and D (locked notes on phones, Trash, Android calendar/graph) wait for the user's go-ahead.
