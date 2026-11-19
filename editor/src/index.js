@@ -1159,7 +1159,9 @@ function selectionMenu(editor, body, { onAddPage, onFindNotes, onLinkNote }) {
     input.value = "";
     results = [];
     bar.replaceChildren(input, list);
-    input.focus();
+    // The search is wider than the buttons were: keep it inside the editor (a phone's narrow page would scroll sideways).
+    bar.style.left = `${Math.max(0, Math.min(parseFloat(bar.style.left) || 0, body.clientWidth - bar.offsetWidth))}px`;
+    input.focus({ preventScroll: true });
     search();
     return true;
   };
