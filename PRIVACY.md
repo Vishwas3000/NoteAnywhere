@@ -23,8 +23,9 @@ you turn it on. There are no analytics, no ads, no tracking and no account unles
 - icons of the websites you have notes for.
 
 The same folder holds images you paste into notes (`images/`) and the search model once it is downloaded (`models/`). A few settings (such as whether sync is on
-and where the floating panel sits) are kept in the app's standard macOS preferences. If you sign in to sync, the
-sign-in session is kept in your macOS Keychain, never in the database.
+and where the floating panel sits) are kept in the app's standard macOS preferences. Your macOS Keychain, never the
+database, holds the sync sign-in session and your sync encryption key if you sync, and the password for locked notes
+if you lock any, so Touch ID can unlock them. A locked note's text is stored encrypted with that password (AES-GCM).
 
 **In your browser.** The extension stores no notes. It keeps three settings in Chrome's extension storage: whether you
 widened the panel, where you moved it and how big you made it. Notes you write in the browser are handed to the NoteAnywhere app on your Mac, which saves them in
@@ -37,16 +38,20 @@ everything.
 ## What the app reads to know where you are
 
 NoteAnywhere shows notes for the app, chat or project in front of you. To do that it asks for the macOS
-**Accessibility** permission and uses it for exactly two things:
+**Accessibility** permission and uses it for exactly three things:
 
 1. **The title of the front window** of the app you're using (for example "Q4 plan - Acme - Slack"), read when the
    front window or its title changes.
 2. **For WhatsApp only**, whose window title is just "WhatsApp": the name shown on the open chat's header, checked
    once a second while WhatsApp is in front. The search for that header skips the message list.
+3. **In Chrome, Chromium, Brave, Edge and Vivaldi only:** the address in the browser's address bar, so the Mac panel
+   can show that page's notes. It is turned into the page's domain and path (and, on a YouTube video or a YouTube or
+   Google search, the video id or the search words), as the browser extension does. It is not read while you type in
+   the address bar.
 
 It never reads message contents, what you type, or what's on your screen, and it does not use Screen Recording.
-Window titles are used in memory to pick which notes to show. A title becomes part of your data only when you create
-a note there: the note then remembers its place, for example "Slack › Acme › #design-review".
+Window titles and addresses are used in memory to pick which notes to show. They become part of your data only when
+you create a note there: the note then remembers its place, for example "Slack › Acme › #design-review".
 
 Without the permission, NoteAnywhere still works, with notes per app instead of per window.
 
@@ -55,8 +60,8 @@ Without the permission, NoteAnywhere still works, with notes per app instead of 
 On each page you open, the extension sends the page's address to the NoteAnywhere app on your Mac through Chrome's
 native messaging, so the app can tell whether you have notes for that page. The address is the domain and path,
 without the query string or `#` fragment, except where the part after "?" names the page: on a YouTube video it
-includes the video's id, and on a YouTube or Google search, the search words. When you create a note on a page, the page's title is saved with it. The extension does not
-read page contents, does not track your browsing, and sends nothing to any server. The address lookup happens on your
+includes the video's id, and on a YouTube or Google search, the search words. The extension also reads the page's title, to show it in the panel and to save it with a note you create there. It
+does not read the page's contents, does not track your browsing, and sends nothing to any server. The address lookup happens on your
 Mac and is not stored.
 
 To show the page's icon in its panel, the extension loads `/favicon.ico` from the site you are already on.
@@ -71,6 +76,7 @@ NoteAnywhere connects to the internet only for these reasons:
 | Search model | Your first search, once (about 87 MB) | Hugging Face (huggingface.co) | A download request for the public model `sentence-transformers/all-MiniLM-L6-v2`. No notes or queries are sent. |
 | Link previews | Only when you paste a link into a note and choose Mention or Card | That website itself | A normal request for the page, and for its preview picture and icon, which are kept as images in the note |
 | Feedback | Only when you press Send in Send Feedback (in the app, or the form on noteanywhere.app) | noteanywhere.app, which emails it to the developer | Your message, the email address you give for a reply (optional), and the NoteAnywhere and macOS versions. Your IP address is used only to allow 5 messages a minute and is not stored. |
+| Web pictures in notes | When a note that shows a picture by its web address (for example from pasted Markdown) is on screen, in the app or the browser panel. Pasted and dropped pictures are kept in the note instead. | That website | A normal request for the picture, as a web page would make |
 | Sync | Only if you turn sync on and sign in | Supabase (see below) | Your notes and your email address |
 
 There are no analytics, no telemetry, no crash reporting, no advertising and no update checks.
@@ -86,6 +92,13 @@ actions from the browser panel, the text goes to the NoteAnywhere app on your Ma
 
 **Writing Tools.** NoteAnywhere's editor allows macOS Writing Tools, a system feature that Apple provides and
 controls. When you use it, Apple's privacy terms for Apple Intelligence apply.
+
+## AI assistants you connect
+
+NoteAnywhere can act as an MCP server for AI assistants such as Claude, Codex or Gemini, but only if you add it to
+that assistant yourself. The server runs on your Mac. It can search and read your notes (not locked ones), list
+tasks, and create or change notes; it can't delete notes. What it returns goes to the assistant you connected, and
+that assistant's own privacy terms cover what it sends to its servers. NoteAnywhere itself sends nothing anywhere.
 
 ## Optional sync
 
