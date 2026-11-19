@@ -69,11 +69,14 @@ actor SearchIndex {
 
     func search(_ query: String, in notes: [Note], limit: Int = 20) async -> [Hit] {
         let notes = notes.filter { !$0.locked }
-        // "#ml" lists exactly the notes with that tag (or one nested under it), newest first, like Obsidian.
+        // "#ml" lists the notes with that tag (or one nested under it), then those with a tag that starts with it, so
+        // "#note" finds #noteanywhere while you type (D77); newest first in each.
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         if trimmed.wholeMatch(of: #/#[^\s#]+/#) != nil {
             let tag = trimmed.dropFirst().lowercased()
-            return notes.filter { $0.hasTag(tag) }.sorted { $0.updatedAt > $1.updatedAt }.map { Hit(note: $0, score: 1) }
+            return notes.filter { $0.tags.contains { $0.hasPrefix(tag) } }
+                .sorted { ($0.hasTag(tag) ? 1 : 0, $0.updatedAt) > ($1.hasTag(tag) ? 1 : 0, $1.updatedAt) }
+                .map { Hit(note: $0, score: 1) }
         }
         let words = query.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
         guard !words.isEmpty else { return [] }

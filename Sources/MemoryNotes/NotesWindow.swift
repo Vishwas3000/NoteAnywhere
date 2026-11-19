@@ -22,6 +22,7 @@ struct NotesWindow: View {
     @ObservedObject private var model = NotesModel.shared
     @AppStorage("windowMode") private var mode = WindowMode.notes
     @AppStorage("welcomeShown") private var welcomeShown = false
+    @AppStorage("inspectorShown") private var inspectorShown = false  // tags and related notes (D77)
     @State private var selection: String?
     @State private var query = ""
     @State private var hits: [SearchIndex.Hit] = []
@@ -73,7 +74,10 @@ struct NotesWindow: View {
             switch mode {
             case .calendar: CalendarView().onAppear(perform: Perf.end)
             case .graph: GraphView().onAppear(perform: Perf.end)
-            case .notes: detail.onAppear(perform: Perf.end)
+            case .notes:
+                detail
+                    .onAppear(perform: Perf.end)
+                    .inspector(isPresented: $inspectorShown) { inspector.inspectorColumnWidth(min: 220, ideal: 260, max: 360) }
             }
         }
         .toolbar {
@@ -89,6 +93,13 @@ struct NotesWindow: View {
                 ToolbarItem {
                     Button { pendingDelete = note } label: { Label("Delete Note", systemImage: "trash") }
                         .help("Delete Note")
+                }
+            }
+            if mode == .notes {
+                ToolbarItem {
+                    Button { inspectorShown.toggle() } label: { Label("Inspector", systemImage: "info.circle") }
+                        .keyboardShortcut("i", modifiers: [.command, .option])
+                        .help(inspectorShown ? "Hide Inspector (⌥⌘I)" : "Show Inspector: tags and related notes (⌥⌘I)")
                 }
             }
         }
@@ -380,6 +391,19 @@ struct NotesWindow: View {
 
     // MARK: Detail
 
+    /// The inspector beside the note (⌥⌘I): its tags and the notes that share them (D77).
+    @ViewBuilder
+    private var inspector: some View {
+        if let note = selectedNote, !note.locked {
+            NoteInspector(note: note, open: { selection = $0 }, search: { query = "#" + $0 })
+        } else if selectedNote != nil {
+            ContentUnavailableView("Locked Note", systemImage: "lock", description: Text("Unlock it to see its tags."))
+        } else {
+            ContentUnavailableView("No Note Selected", systemImage: "note.text",
+                                   description: Text("Select a note to see its tags and related notes."))
+        }
+    }
+
     @ViewBuilder
     private var detail: some View {
         if let note = selectedNote {
@@ -387,7 +411,6 @@ struct NotesWindow: View {
                 VStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 10) {
                         header(note)
-                        if !note.locked { TagBar(note: note, open: { peekID = $0 }, search: { query = "#" + $0 }) }
                         Text("Edited \(note.edited.formatted(date: .long, time: .shortened))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
