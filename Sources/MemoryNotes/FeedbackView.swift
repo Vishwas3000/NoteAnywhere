@@ -4,7 +4,7 @@ import SwiftUI
 let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
 
 /// Sends a problem or a suggestion to the developer without leaving the app: noteanywhere.app/api/feedback emails it
-/// (worker/index.js, D72). A failed send keeps the text and offers Mail instead. Shared with the iPhone app (Settings).
+/// (the website's worker, in the private site repo; D72). A failed send keeps the text and offers Mail instead. Shared with the iPhone app (Settings).
 struct FeedbackView: View {
     static let endpoint = URL(string: "https://noteanywhere.app/api/feedback")!
     #if os(iOS)

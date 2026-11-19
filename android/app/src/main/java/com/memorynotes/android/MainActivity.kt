@@ -9,7 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.ui.platform.LocalContext
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,6 +62,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -111,6 +112,18 @@ object App {
     fun delete(id: String) {
         store.delete(id)
         scope.launch { cloud.sync(pull = false) }
+    }
+
+    /** Pin, star or colour (Store.setMeta), after any unsaved typing; pushed right away like a delete. */
+    fun setMeta(id: String, change: (Note) -> Note) {
+        flush()
+        store.setMeta(id, change)
+        scope.launch { cloud.sync(pull = false) }
+    }
+
+    fun duplicate(id: String): String? {
+        flush()
+        return store.duplicate(id)?.also { scope.launch { cloud.sync(pull = false) } }
     }
 }
 
@@ -258,7 +271,7 @@ private fun Notes() {
     val id = open
     if (id == null) NotesList(onOpen = { open = it }) else {
         BackHandler { open = null }
-        Editor(id, onClose = { open = null })
+        Editor(id, onClose = { open = null }, onOpen = { open = it })
     }
 }
 
@@ -269,6 +282,7 @@ private fun NotesList(onOpen: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     var query by rememberSaveable { mutableStateOf("") }
     var folder by rememberSaveable { mutableStateOf<String?>(null) }
+    var starred by rememberSaveable { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     var feedback by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
@@ -277,8 +291,10 @@ private fun NotesList(onOpen: (String) -> Unit) {
     val folderNames = folders.associate { it.id to it.name }
     val notes = App.store.liveNotes()
         .filter { folder == null || it.folderId == folder }
+        .filter { !starred || it.starred }
         .filter { query.isBlank() || (it.title + "\n" + if (it.locked) "" else it.text).contains(query.trim(), ignoreCase = true) }
-        .sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updatedAt })
+        .sortedByDescending { it.updatedAt }
+    val (pinned, rest) = notes.partition { it.pinned }
 
     Scaffold(
         topBar = {
@@ -300,17 +316,23 @@ private fun NotesList(onOpen: (String) -> Unit) {
                 placeholder = { Text("Search") }, singleLine = true)
             LazyRow(Modifier.padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 item { Spacer(Modifier.width(8.dp)) }
-                item { FilterChip(folder == null, { folder = null }, { Text("All Notes") }) }
-                items(folders, key = { it.id }) { f -> FilterChip(folder == f.id, { folder = f.id }, { Text(f.name) }) }
+                item { FilterChip(folder == null && !starred, { folder = null; starred = false }, { Text("All Notes") }) }
+                item { FilterChip(starred, { folder = null; starred = true }, { Text("⭐ Starred") }) }
+                items(folders, key = { it.id }) { f -> FilterChip(folder == f.id, { folder = f.id; starred = false }, { Text(f.name) }) }
             }
             cloud.error?.let { Text(it, Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error) }
             PullToRefreshBox(cloud.busy, { scope.launch { cloud.sync(pull = true) } }, Modifier.fillMaxSize()) {
                 LazyColumn(Modifier.fillMaxSize()) {
                     if (notes.isEmpty()) item {
-                        Text(if (query.isBlank()) "No notes yet." else "No matches.", Modifier.padding(16.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (query.isNotBlank()) "No matches." else if (starred) "No starred notes." else "No notes yet.",
+                            Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    items(notes, key = { it.id }) { note -> NoteRow(note, folderNames[note.folderId], onOpen) }
+                    if (pinned.isNotEmpty()) {
+                        item { Section("Pinned") }
+                        items(pinned, key = { it.id }) { note -> NoteRow(note, folderNames[note.folderId], onOpen) }
+                        if (rest.isNotEmpty()) item { Section("Notes") }
+                    }
+                    items(rest, key = { it.id }) { note -> NoteRow(note, folderNames[note.folderId], onOpen) }
                 }
             }
         }
@@ -318,37 +340,87 @@ private fun NotesList(onOpen: (String) -> Unit) {
 }
 
 @Composable
+private fun Section(title: String) {
+    Text(title, Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp), style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary)
+}
+
+@Composable
 private fun NoteRow(note: Note, folder: String?, onOpen: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable { onOpen(note.id) }.padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        val color = noteColors[note.color]
-        Box(Modifier.size(10.dp).background(if (color != null) Color(color) else Color.Transparent, CircleShape))
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text((if (note.pinned) "📌 " else "") + (if (note.locked) "🔒 " else "") + note.title,
-                fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            val details = listOfNotNull(DateFormat.getDateInstance(DateFormat.SHORT).format(Date(note.updatedAt.toLong())),
-                folder, note.preview.ifEmpty { null }).joinToString("  ·  ")
-            Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
+    var menu by remember { mutableStateOf(false) }
+    // Long press: the note's menu (pin, star, colour, duplicate, share), anchored to the row.
+    Box(Modifier.fillMaxWidth().combinedClickable(onLongClick = { menu = true }) { onOpen(note.id) }) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            val color = noteColors[note.color]
+            Box(Modifier.size(10.dp).background(if (color != null) Color(color) else Color.Transparent, CircleShape))
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text((if (note.pinned) "📌 " else "") + (if (note.starred) "⭐ " else "") + (if (note.locked) "🔒 " else "") +
+                    note.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val details = listOfNotNull(DateFormat.getDateInstance(DateFormat.SHORT).format(Date(note.updatedAt.toLong())),
+                    folder, note.preview.ifEmpty { null }).joinToString("  ·  ")
+                Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
+        NoteMenu(note.id, menu, { menu = false }, onOpen)
     }
     HorizontalDivider()
 }
 
+/** Pin, star, colour, duplicate and share; a locked note gets only the first three (its text never leaves it). */
+@Composable
+private fun NoteMenu(id: String, expanded: Boolean, onDismiss: () -> Unit, onOpen: (String) -> Unit) {
+    val note = App.version.let { App.store.note(id) } ?: return  // a new note has no menu until its first text is saved
+    val context = LocalContext.current
+    var colors by remember { mutableStateOf(false) }
+    val close = { colors = false; onDismiss() }
+    DropdownMenu(expanded, close) {
+        if (colors) {
+            DropdownMenuItem({ Text("No Colour") }, { close(); App.setMeta(id) { it.copy(color = null) } })
+            for ((name, argb) in noteColors) {
+                DropdownMenuItem({ Text(name.replaceFirstChar { it.uppercase() }) }, { close(); App.setMeta(id) { it.copy(color = name) } },
+                    leadingIcon = { Box(Modifier.size(12.dp).background(Color(argb), CircleShape)) })
+            }
+        } else {
+            DropdownMenuItem({ Text(if (note.pinned) "Unpin" else "Pin") }, { close(); App.setMeta(id) { it.copy(pinned = !it.pinned) } })
+            DropdownMenuItem({ Text(if (note.starred) "Unstar" else "Star") }, { close(); App.setMeta(id) { it.copy(starred = !it.starred) } })
+            DropdownMenuItem({ Text("Colour…") }, { colors = true })
+            if (!note.locked) {
+                DropdownMenuItem({ Text("Duplicate") }, { close(); App.duplicate(id)?.let(onOpen) })
+                DropdownMenuItem({ Text("Share") }, {
+                    close()
+                    App.flush()  // share what's typed, not what was last saved
+                    App.store.note(id)?.takeIf { !it.locked }?.let { n ->
+                        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, n.text)
+                        context.startActivity(Intent.createChooser(send, null))
+                    }
+                })
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Editor(id: String, onClose: () -> Unit) {
+private fun Editor(id: String, onClose: () -> Unit, onOpen: (String) -> Unit) {
     val note = remember(id) { App.store.note(id) }
     var text by remember(id) { mutableStateOf(note?.text ?: "") }
     var confirmDelete by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
     DisposableEffect(id) { onDispose { App.flush() } }
 
     Scaffold(topBar = {
         TopAppBar(
             title = {},
             navigationIcon = { TextButton(onClose) { Text("‹ Notes") } },
-            actions = { if (note != null && !note.locked) TextButton({ confirmDelete = true }) { Text("Delete") } },
+            actions = {
+                if (note != null && !note.locked) TextButton({ confirmDelete = true }) { Text("Delete") }
+                Box {
+                    TextButton({ App.flush(); menu = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
+                    NoteMenu(id, menu, { menu = false }, onOpen)
+                }
+            },
         )
     }) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {

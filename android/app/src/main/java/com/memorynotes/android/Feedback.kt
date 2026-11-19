@@ -39,7 +39,7 @@ fun appVersion(context: Context): String =
 
 /**
  * Sends a problem or a suggestion to the developer without leaving the app: noteanywhere.app/api/feedback emails it
- * (worker/index.js, D72). A failed send keeps the text and offers the email app instead.
+ * (the website's worker, in the private site repo; D72). A failed send keeps the text and offers the email app instead.
  */
 @Composable
 fun FeedbackDialog(onDismiss: () -> Unit) {
