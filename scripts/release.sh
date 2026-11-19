@@ -22,6 +22,10 @@ NOTARY_PROFILE=${NOTARY_PROFILE:-NoteAnywhere}
 VERSION=$(git describe --tags --exact-match --match 'v*' 2>/dev/null | sed 's/^v//' || true)
 [ -n "$VERSION" ] || VERSION=$(cat VERSION)
 echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "Version must be X.Y.Z, got '$VERSION'" >&2; exit 1; }
+# Sparkle installs only updates signed with this key's private half, which generate_keys keeps in the maintainer's
+# keychain (D75). A placeholder would ship an app that can never update.
+plutil -extract SUPublicEDKey raw Info.plist | grep -Eqx '[A-Za-z0-9+/]{43}=' ||
+  { echo "Info.plist: SUPublicEDKey is not a real key; paste the public key that Sparkle's generate_keys prints" >&2; exit 1; }
 
 notarize() {  # notarize + staple one .zip/.dmg; stapler fails if Apple didn't accept it
   xcrun notarytool submit "$1" --wait --keychain-profile "$NOTARY_PROFILE"
@@ -42,7 +46,11 @@ plutil -replace CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
 
 # Hardened runtime, no entitlements: no sandbox, JIT, unsigned libraries or Apple Events. WebKit's JIT runs in its own
 # processes; Accessibility, the Keychain (file-based) and Foundation Models need none.
-codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$APP"
+# Inside out, in the order Sparkle documents for signing outside Xcode (never --deep): its helpers, the framework, the app.
+FW=$APP/Contents/Frameworks/Sparkle.framework
+for code in "$FW/Versions/B/Autoupdate" "$FW/Versions/B/Updater.app" "$FW" "$APP"; do
+  codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$code"
+done
 codesign --verify --deep --strict --verbose=2 "$APP"
 codesign -dvv "$APP" 2>&1 | grep -qx "TeamIdentifier=$TEAM" || { echo "Signed by a team other than $TEAM" >&2; exit 1; }
 if [ -n "$NOTARIZE" ]; then

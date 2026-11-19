@@ -10,6 +10,7 @@ pkill -x MemoryNotes || true
 # Called MemoryNotes.app before the rename. Same bundle id and certificate, so the Accessibility permission carries over.
 rm -rf "$HOME/Applications/MemoryNotes.app"
 scripts/make_app.sh .build/release/MemoryNotes "$APP"
+plutil -remove SUFeedURL "$APP/Contents/Info.plist"  # no feed: a dev build never replaces itself with a release (D75)
 
 # macOS ties the Accessibility permission to the signature. An ad-hoc signature changes with every build, so each
 # reinstall would look like a new app and ask again; a real certificate keeps it. Override with MEMORYNOTES_SIGN_ID.
@@ -29,7 +30,9 @@ if [ -z "$SIGN_ID" ]; then
   echo "No Apple Development certificate of team $TEAM: signing ad-hoc, so Accessibility must be re-allowed after each install."
   SIGN_ID=-
 fi
-codesign --force --sign "$SIGN_ID" "$APP"
+# Inside out, in the order Sparkle documents for signing outside Xcode: its helpers, the framework, then the app.
+FW=$APP/Contents/Frameworks/Sparkle.framework
+for code in "$FW/Versions/B/Autoupdate" "$FW/Versions/B/Updater.app" "$FW" "$APP"; do codesign --force --sign "$SIGN_ID" "$code"; done
 
 open "$APP"
 echo "Installed $APP. Now load $(pwd)/extension as an unpacked extension."

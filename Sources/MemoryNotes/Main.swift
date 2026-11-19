@@ -1,4 +1,5 @@
 import AppKit
+import Sparkle
 import SwiftUI
 
 @main
@@ -16,6 +17,9 @@ enum Main {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let overlay = OverlayController()
+    // scripts/install.sh removes SUFeedURL, so a dev build never starts Sparkle and never replaces itself with a release.
+    let updaterController = SPUStandardUpdaterController(
+        startingUpdater: Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") != nil, updaterDelegate: nil, userDriverDelegate: nil)
     func applicationDidFinishLaunching(_ notification: Notification) {
         BrowserBridge.registerThisApp()
         overlay.start()
@@ -37,7 +41,10 @@ struct MemoryNotesApp: App {
             NotesWindow()
         }
         .defaultSize(width: 960, height: 640)
-        .commands { NotesCommands() }
+        .commands {
+            NotesCommands()
+            CommandGroup(after: .appInfo) { CheckForUpdatesButton(updater: delegate.updaterController.updater) }
+        }
 
         // "Open Note in New Window"
         WindowGroup("Note", id: "note", for: String.self) { $id in
@@ -75,7 +82,7 @@ struct MemoryNotesApp: App {
         .defaultPosition(.center)
 
         MenuBarExtra("NoteAnywhere", systemImage: "note.text") {
-            MenuContent(overlay: delegate.overlay)
+            MenuContent(overlay: delegate.overlay, updater: delegate.updaterController.updater)
         }
     }
 }
@@ -125,6 +132,7 @@ private struct NotesCommands: Commands {
 
 private struct MenuContent: View {
     let overlay: OverlayController
+    let updater: SPUUpdater
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -146,7 +154,28 @@ private struct MenuContent: View {
             openWindow(id: "feedback")
             NSApp.activate()
         }
+        CheckForUpdatesButton(updater: updater)
         Divider()
         Button("Quit NoteAnywhere") { NSApp.terminate(nil) }.keyboardShortcut("q")
+    }
+}
+
+/// Greyed out while Sparkle is busy, and in dev builds, whose updater never starts. Sparkle's documented SwiftUI pattern.
+private struct CheckForUpdatesButton: View {
+    @ObservedObject private var model: Model
+    init(updater: SPUUpdater) { model = Model(updater: updater) }
+
+    var body: some View {
+        Button("Check for Updates…") { model.updater.checkForUpdates() }
+            .disabled(!model.canCheck)
+    }
+
+    final class Model: ObservableObject {
+        let updater: SPUUpdater
+        @Published var canCheck = false
+        init(updater: SPUUpdater) {
+            self.updater = updater
+            updater.publisher(for: \.canCheckForUpdates).assign(to: &$canCheck)
+        }
     }
 }

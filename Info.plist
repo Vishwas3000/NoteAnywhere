@@ -12,6 +12,10 @@
 	<key>CFBundleVersion</key><string>1</string>
 	<key>LSMinimumSystemVersion</key><string>15.0</string>
 	<key>NSHighResolutionCapable</key><true/>
+	<!-- Sparkle updates (docs/DECISIONS.md D75). scripts/install.sh removes SUFeedURL, so dev builds don't update. -->
+	<key>SUFeedURL</key><string>https://noteanywhere.app/appcast.xml</string>
+	<!-- PLACEHOLDER until the maintainer runs Sparkle's generate_keys; scripts/release.sh refuses to build with it. -->
+	<key>SUPublicEDKey</key><string>PLACEHOLDER-run-Sparkle-generate_keys-and-paste-the-public-key-here</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
