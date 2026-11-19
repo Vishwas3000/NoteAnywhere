@@ -304,7 +304,7 @@ enum MCPServer {
 
     // shortcut: reads every note to find one; fine for thousands of notes, add a by-id query if that ever shows up.
     private static func fetch(_ id: String) throws -> Note {
-        guard let note = NoteStore.loadAll().first(where: { $0.id == id }) else {
+        guard let note = NoteStore.loadAll().first(where: { $0.id == id.lowercased() }) else {  // ids given out before D76 were uppercase
             throw ToolError(message: "No note with id \(id). Find ids with search_notes or list_notes.")
         }
         return note
@@ -332,7 +332,7 @@ enum MCPServer {
 
     private static func folderID(_ nameOrID: String) throws -> String {
         let folders = NoteStore.folders()
-        guard let folder = folders.first(where: { $0.id == nameOrID })
+        guard let folder = folders.first(where: { $0.id == nameOrID.lowercased() })
                 ?? folders.first(where: { $0.name.caseInsensitiveCompare(nameOrID) == .orderedSame }) else {
             throw ToolError(message: "No folder \"\(nameOrID)\". Folders: \(folders.map(\.name).joined(separator: ", "))")
         }

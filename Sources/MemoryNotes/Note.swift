@@ -5,7 +5,7 @@ import notify
 struct Note: Codable, Identifiable, Hashable {
     enum Kind: String, Codable { case app, url }
 
-    var id = UUID().uuidString
+    var id = UUID().uuidString.lowercased()  // as the sync server's uuid columns return ids (D76)
     var kind: Kind
     var target: String  // bundle id for apps, "host/path" for websites
     var label: String
@@ -34,13 +34,14 @@ extension Note {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(id: try c.decode(String.self, forKey: .id), kind: try c.decode(Kind.self, forKey: .kind),
+        // Lowercased: a browser panel opened before D76 may send an uppercase id, which would save as a second note.
+        self.init(id: try c.decode(String.self, forKey: .id).lowercased(), kind: try c.decode(Kind.self, forKey: .kind),
                   target: try c.decode(String.self, forKey: .target), label: try c.decode(String.self, forKey: .label),
                   text: try c.decodeIfPresent(String.self, forKey: .text) ?? "",
                   createdAt: try c.decode(Double.self, forKey: .createdAt), updatedAt: try c.decode(Double.self, forKey: .updatedAt),
                   pinned: try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false,
                   starred: try c.decodeIfPresent(Bool.self, forKey: .starred) ?? false,
-                  folderID: try c.decodeIfPresent(String.self, forKey: .folderID),
+                  folderID: try c.decodeIfPresent(String.self, forKey: .folderID)?.lowercased(),
                   color: try c.decodeIfPresent(NoteColor.self, forKey: .color),
                   locked: try c.decodeIfPresent(Bool.self, forKey: .locked) ?? false)
     }
@@ -48,7 +49,7 @@ extension Note {
 
 /// A folder, like Apple Notes'. Deleting one is a tombstone (for sync); its notes go back to All Notes.
 struct Folder: Identifiable, Hashable {
-    var id = UUID().uuidString
+    var id = UUID().uuidString.lowercased()  // as Note.id (D76)
     var name: String
     var updatedAt = Date().timeIntervalSince1970 * 1000
 }
@@ -807,7 +808,7 @@ enum NoteStore {
         """
 
     /// Schema version lives in PRAGMA user_version. BEGIN IMMEDIATE + re-check, since the app and host may start together.
-    private static func migrate(_ handle: OpaquePointer) throws {
+    static func migrate(_ handle: OpaquePointer) throws {  // internal for its test
         var imported = false
         try exec(handle, "BEGIN IMMEDIATE")
         do {
@@ -858,6 +859,43 @@ enum NoteStore {
                 try exec(handle, """
                     ALTER TABLE notes ADD COLUMN starred INTEGER NOT NULL DEFAULT 0;
                     PRAGMA user_version = 6;
+                    """)
+            }
+            if try userVersion(handle) < 7 {
+                // Ids are lowercase (D76). The Mac made uppercase ones, and the sync server's uuid columns return them
+                // lowercase, so a sync pulled each note back as a second copy. Merge each pair (the newer edit wins), then
+                // lowercase the rest. Rows pointing at a note move to its lowercase id first, so ON DELETE CASCADE takes
+                // nothing when the extra copy goes; foreign keys are checked at COMMIT, once every id has moved.
+                try exec(handle, """
+                    PRAGMA defer_foreign_keys = ON;
+                    DELETE FROM snapshots WHERE rowid IN (
+                        SELECT l.rowid FROM snapshots u JOIN snapshots l ON l.note_id = lower(u.note_id) AND l.day = u.day
+                        WHERE u.note_id <> l.note_id AND u.updated_at > l.updated_at);
+                    UPDATE OR IGNORE snapshots SET note_id = lower(note_id) WHERE note_id <> lower(note_id);
+                    DELETE FROM snapshots WHERE note_id <> lower(note_id);
+                    UPDATE OR IGNORE embeddings SET note_id = lower(note_id) WHERE note_id <> lower(note_id);
+                    DELETE FROM embeddings WHERE note_id <> lower(note_id);
+                    UPDATE OR IGNORE suggestions SET note_id = lower(note_id) WHERE note_id <> lower(note_id);
+                    DELETE FROM suggestions WHERE note_id <> lower(note_id);
+                    UPDATE OR IGNORE tags SET note_id = lower(note_id) WHERE note_id <> lower(note_id);
+                    DELETE FROM tags WHERE note_id <> lower(note_id);
+                    UPDATE OR IGNORE links SET from_note = lower(from_note), to_note = lower(to_note)
+                        WHERE from_note <> lower(from_note) OR to_note <> lower(to_note);
+                    DELETE FROM links WHERE from_note <> lower(from_note) OR to_note <> lower(to_note);
+                    UPDATE attachments SET note_id = lower(note_id) WHERE note_id <> lower(note_id);
+                    UPDATE notes AS l SET kind = u.kind, target = u.target, title = u.title, body_md = u.body_md,
+                        folder_id = u.folder_id, pinned = u.pinned, created_at = u.created_at, updated_at = u.updated_at,
+                        deleted_at = u.deleted_at, dirty = u.dirty, color = u.color, locked = u.locked, starred = u.starred
+                        FROM notes AS u WHERE u.id <> lower(u.id) AND l.id = lower(u.id) AND u.updated_at > l.updated_at;
+                    DELETE FROM notes WHERE id <> lower(id) AND lower(id) IN (SELECT id FROM notes);
+                    UPDATE notes SET id = lower(id) WHERE id <> lower(id);
+                    UPDATE folders AS l SET name = u.name, updated_at = u.updated_at, deleted_at = u.deleted_at, dirty = u.dirty
+                        FROM folders AS u WHERE u.id <> lower(u.id) AND l.id = lower(u.id) AND u.updated_at > l.updated_at;
+                    UPDATE notes SET folder_id = lower(folder_id) WHERE folder_id <> lower(folder_id);
+                    UPDATE folders SET parent_id = lower(parent_id) WHERE parent_id <> lower(parent_id);
+                    DELETE FROM folders WHERE id <> lower(id) AND lower(id) IN (SELECT id FROM folders);
+                    UPDATE folders SET id = lower(id) WHERE id <> lower(id);
+                    PRAGMA user_version = 7;
                     """)
             }
             try exec(handle, "COMMIT")

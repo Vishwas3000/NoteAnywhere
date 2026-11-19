@@ -35,7 +35,8 @@ struct Graph {
 
         for (i, note) in notes.enumerated() {
             for match in note.text.matches(of: #/note://([0-9A-Fa-f-]+)/#) {
-                guard let j = index[String(match.1)], j != i, paired.insert([min(i, j), max(i, j)]).inserted else { continue }
+                // Lowercased: links written before D76 hold uppercase ids.
+                guard let j = index[match.1.lowercased()], j != i, paired.insert([min(i, j), max(i, j)]).inserted else { continue }
                 edges.append(Edge(a: min(i, j), b: max(i, j), kind: .link))
             }
         }
