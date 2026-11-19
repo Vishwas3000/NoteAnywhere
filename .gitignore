@@ -12,6 +12,7 @@ dist/
 *.provisionprofile
 *.mobileprovision
 .env*
+secret/
 # Android (android/): build outputs and the local SDK path
 android/.gradle/
 android/.kotlin/
