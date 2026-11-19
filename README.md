@@ -11,7 +11,7 @@
   Free and open source (GPL-3.0)
 </p>
 
-![A note for the #design-review channel, waiting in NoteAnywhere's floating panel next to a chat app](docs/images/chat-channel.png)
+![A note for the #design-review channel, waiting in NoteAnywhere's floating panel next to a chat app](docs/images/chat-channel.webp)
 <sub>Illustration with a made-up chat app. The panel and the notes in it are NoteAnywhere's.</sub>
 
 ## How it works
@@ -21,8 +21,10 @@ there, it's waiting in a small floating panel.
 
 | Every chat has its own notes | So does every web page |
 |---|---|
-| ![The Family group chat with its own notes in the panel](docs/images/chat-group.png) | ![The NoteAnywhere panel on a Wikipedia page, with two notes for that page](docs/images/browser-page.png) |
-| Open the Family chat and its notes are there. Switch chats, and the notes switch too. | The browser extension shows a page's notes right on the page, in Chrome and Brave. |
+| ![The Family group chat with its own notes in the panel](docs/images/chat-group.webp) | ![Notes on a 3Blue1Brown video about attention, in the NoteAnywhere panel on YouTube](docs/images/youtube.webp) |
+| Open the Family chat and its notes are there. Switch chats, and the notes switch too. | The browser extension shows a page's notes right on the page, in Chrome and Brave. Each video has its own. |
+| ![Reading notes and reading-group questions on the arXiv page for Attention Is All You Need](docs/images/arxiv.webp) | ![Study-session notes on a Gemini chat about attention](docs/images/gemini.webp) |
+| Notes on the paper you're reading, on its arXiv page. | And on the AI chat where you work through it. |
 
 Everything is also in one Apple Notes–style window, with on-device search, a calendar, #tags and a graph of how your
 notes link up.
@@ -31,7 +33,7 @@ notes link up.
 
 | Dated lines and tasks, in a calendar | How your notes connect |
 |---|---|
-| ![The month view: checklist tasks and dated lines from notes on their days](docs/images/calendar.png) | ![The graph: notes joined to their chats, apps, websites and #tags](docs/images/graph.png) |
+| ![The month view: checklist tasks and dated lines from notes on their days](docs/images/calendar.webp) | ![The graph: notes joined to their chats, apps, websites and #tags](docs/images/graph.webp) |
 | Type `@` for a date, or `@fri`. The line shows up on that day, and its circle ticks the task in the note. | Each note joins its chat, app or site, the notes it links to and its #tags. Drag, zoom and filter. |
 
 ## Features
