@@ -892,6 +892,7 @@ Made by the subagent that wrote the extension:
   Sparkle refuses to start with the placeholder key, with an alert at every launch).
 - **Status:** Proposed. Checked: `swift test`; an ad hoc build loads the embedded framework; release.sh with a
   throwaway test key builds a Developer ID app that passes `codesign --verify --deep --strict` ("Unnotarized
-  Developer ID" until notarized); a `sign_update` signature of its DMG verifies with CryptoKit. Not yet: a real key,
-  notarization, and an update installed from a real feed.
+  Developer ID" until notarized); a `sign_update` signature of its DMG verifies with CryptoKit; Sparkle starts with
+  that Info.plist and refuses the placeholder key (checked outside the app). Not yet: a real key, notarization, the
+  menu items on screen, and an update installed from a real feed.
 
