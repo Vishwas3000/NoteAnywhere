@@ -6,7 +6,7 @@ enum BrowserBridge {
     static let hostName = "com.memorynotes.host"
     /// The unpacked extension's id, pinned by the "key" in extension/manifest.json (D3).
     static let devExtensionID = "fmjimldgmehkakonbffiaacmpijhajop"
-    /// The id the Chrome Web Store assigned (docs/RELEASING.md); apps from before it was set only trust the unpacked one.
+    /// The id the Chrome Web Store assigned; apps from before it was set only trust the unpacked one.
     static let storeExtensionID = "fngldbimlphnokkkkodneojgbdnofjha"
     /// Set once the store approves the listing; until then its page says "not found".
     static let storeListed = false

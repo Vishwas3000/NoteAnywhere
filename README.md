@@ -231,8 +231,8 @@ messaging host) with every installed Chromium browser. It signs with an Apple De
 (remembered in an untracked `.signing-identity`), so the Accessibility permission survives rebuilds; otherwise it signs
 ad hoc and macOS asks again after each install. Set `MEMORYNOTES_SIGN_ID` to pick a certificate.
 
-Releases (a notarized DMG and the Chrome Web Store zip) are cut with `scripts/release.sh`; see
-[docs/RELEASING.md](docs/RELEASING.md).
+Releases (the notarized DMG and the Chrome Web Store package) are built with `scripts/release.sh` and published by
+the maintainer only.
 
 Then in `chrome://extensions` (or `brave://extensions`), turn on Developer mode, click **Load unpacked** and pick
 `extension/`. The manifest's `key` keeps the unpacked extension's id stable, so the bridge recognises it.
@@ -309,7 +309,9 @@ See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+This repo is NoteAnywhere's apps: macOS, iPhone and Android, plus the browser extension and the editor they share.
+Anyone can contribute: `main` is what ships, and it changes only through pull requests, which the maintainer reviews
+and merges. Issues are welcome too. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

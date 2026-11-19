@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds dist/NoteAnywhere-<version>.dmg (Developer ID signed, notarized, stapled) and the Chrome Web Store zip
-# dist/NoteAnywhere-extension-<version>.zip. Steps and one-time setup: docs/RELEASING.md.
+# dist/NoteAnywhere-extension-<version>.zip. Run by the maintainer, who publishes releases.
 # Usage: scripts/release.sh [--skip-notarize]
 #   NOTEANYWHERE_SIGN_ID  signing identity (default: the Developer ID below, by SHA-1)
 #   NOTEANYWHERE_TEAM_ID  team the signature must belong to (default GH5YVSN865)

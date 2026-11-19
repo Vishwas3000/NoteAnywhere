@@ -853,4 +853,11 @@ Made by the subagent that wrote the extension:
   (launch-post drafts) live in the private repo `Vishwas3000/NoteAnywhere_personal`; this repo keeps the apps, the
   extension and the editor. What was already pushed here stays in this repo's history.
 - **Asked by the user:** `main` is the production branch in both repos and changes only through a pull request.
+  Anyone can contribute to this repo through pull requests; the maintainer reviews and merges, and is the only one who
+  publishes releases (the DMG is signed with the maintainer's Developer ID).
+- **Chosen by Claude, asked to decide what else moves:** the `launch/` kit (posts and the Web Store listing) and
+  `docs/RELEASING.md` (the maintainer's release runbook, with account steps) moved to the private repo too. Staying
+  here: `PRIVACY.md` (the Chrome Web Store links to it), `docs/DECISIONS.md` and `docs/ROADMAP.md` (contributors need
+  them), `supabase/` (the sync schema the apps use) and `docs/images/` (the README's pictures). Website decisions
+  from now on are recorded in the private repo.
 
