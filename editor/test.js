@@ -149,6 +149,44 @@ check("the drag handle is in the editor", () => {
   ed.editor.commands.insertContent("y"); // any update attaches it
   assert.equal(ed.editor.view.dom.parentElement.querySelector(".mn-drag")?.draggable, true);
 });
+// The block starting at the first text node containing `text` (a list item, or else the top-level block).
+function blockPos(ed, text) {
+  let at = -1;
+  ed.editor.state.doc.descendants((node, pos) => {
+    if (at < 0 && node.isText && node.text.includes(text)) {
+      const $pos = ed.editor.state.doc.resolve(pos);
+      for (let d = $pos.depth; d > 0 && at < 0; d--) if (/^(listItem|taskItem)$/.test($pos.node(d).type.name)) at = $pos.before(d);
+      if (at < 0) at = $pos.before(1);
+    }
+  });
+  return at;
+}
+const act = (ed, text, label) => MNEditor.blockActions(ed.editor, blockPos(ed, text)).find((a) => a?.label === label).run();
+check("the handle menu checks the block's own kind and turns it into another", () => {
+  const ed = mount("plain\n\n- item");
+  assert.equal(MNEditor.blockActions(ed.editor, blockPos(ed, "plain")).find((a) => a?.label === "Text").hint, "✓");
+  assert.equal(MNEditor.blockActions(ed.editor, blockPos(ed, "item")).find((a) => a?.label === "Bulleted list").hint, "✓");
+  act(ed, "plain", "Heading 2");
+  act(ed, "item", "Numbered list");
+  assert.equal(ed.getMarkdown().trim(), "## plain\n\n1. item");
+  act(ed, "item", "Text");
+  act(ed, "plain", "Quote");
+  assert.equal(ed.getMarkdown().trim(), "> plain\n\nitem");
+  act(ed, "plain", "Text");
+  assert.equal(ed.getMarkdown().trim(), "plain\n\nitem");
+  act(ed, "item", "Text");  // already text: nothing changes
+  assert.equal(ed.getMarkdown().trim(), "plain\n\nitem");
+});
+check("the handle menu duplicates and deletes a block; a table only gets those two", () => {
+  const ed = mount("- a\n- b\n\nend");
+  act(ed, "a", "Duplicate");
+  assert.equal(ed.getMarkdown().trim(), "- a\n- a\n- b\n\nend");
+  act(ed, "b", "Delete");
+  act(ed, "end", "Delete");
+  assert.equal(ed.getMarkdown().trim(), "- a\n- a");
+  const table = mount("| A | B |\n| --- | --- |\n| 1 | 2 |");
+  assert.deepEqual(Array.from(MNEditor.blockActions(table.editor, 0), (a) => a?.label), ["Duplicate", "Delete"]);
+});
 check("@tomorrow + space becomes a real date chip, and ⌘-click reports the day", () => {
   let got;
   const ed = mount("", { onDate: (d) => (got = d) });

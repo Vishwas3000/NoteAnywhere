@@ -67,16 +67,55 @@ function dragHandle() {
   let handleView;
   return Extension.create({
     name: "mnDragHandle",
-    addProseMirrorPlugins: () => [new Plugin({
-      view: (view) => (handleView = dragHandleView(view)),
-      props: { handleDrop: (view, event) => handleView?.drop(event) ?? false },
-    })],
+    addProseMirrorPlugins() {
+      const editor = this.editor;
+      return [new Plugin({
+        view: (view) => (handleView = dragHandleView(view, editor)),
+        props: { handleDrop: (view, event) => handleView?.drop(event) ?? false },
+      })];
+    },
   });
 }
 
-function dragHandleView(view) {
+// Blocks whose kind the handle's menu can change; the rest (tables, pictures, lines, maths) only duplicate or delete.
+const TURNABLE = new Set(["paragraph", "heading", "codeBlock", "blockquote", ...ITEMS]);
+const LISTS = { bulletList: "Bulleted list", orderedList: "Numbered list", taskList: "To-do list" };
+
+/**
+ * What right-clicking a block's ⋮⋮ handle offers: turn it into another kind of block (its own kind is checked),
+ * duplicate it or delete it. `pos` is where the block starts, as the handle tracks it. [{label, hint, run}], null = a line.
+ */
+export function blockActions(editor, pos) {
+  const { doc } = editor.state;
+  const node = doc.nodeAt(pos);
+  if (!node) return [];
+  const item = ITEMS.has(node.type.name);
+  const kind = item ? LISTS[doc.resolve(pos).parent.type.name]
+    : { paragraph: "Text", codeBlock: "Code", blockquote: "Quote" }[node.type.name]
+      ?? (node.type.name === "heading" ? `Heading ${node.attrs.level}` : null);
+  const turn = (option) => () => {
+    if (option.label === kind) return;
+    const chain = editor.chain().focus().setTextSelection(TextSelection.near(editor.state.doc.resolve(pos + 1)).from);
+    // Out of its list or quote first, unless it's only changing list type (toggling the same kind would undo it).
+    if (item && !Object.values(LISTS).includes(option.label)) chain.liftListItem(node.type.name);
+    if (node.type.name === "blockquote") chain.toggleBlockquote();
+    // A heading or code becomes text before it's quoted or listed, as in Notion.
+    if (["heading", "codeBlock"].includes(node.type.name) && /list|Quote/.test(option.label)) chain.setParagraph();
+    option.run(chain).run();
+  };
+  const turnInto = TURNABLE.has(node.type.name)
+    ? SLASH_COMMANDS.slice(0, 9).map((o) => ({ label: o.label, hint: o.label === kind ? "✓" : "", run: turn(o) })).concat(null)
+    : [];
+  return [
+    ...turnInto,
+    { label: "Duplicate", hint: "", run: () => editor.chain().focus().insertContentAt(pos + node.nodeSize, node.toJSON()).run() },
+    { label: "Delete", hint: "", run: () => { editor.view.dispatch(editor.state.tr.deleteRange(pos, pos + node.nodeSize)); editor.view.focus(); } },
+  ];
+}
+
+function dragHandleView(view, editor) {
   const handle = Object.assign(document.createElement("div"), { className: "mn-drag", draggable: true, textContent: "⋮⋮",
-    title: "Drag to move · ⌘⇧↑ ⌘⇧↓" });
+    title: "Drag to move · Right-click for more · ⌘⇧↑ ⌘⇧↓" });
   handle.setAttribute("aria-hidden", "true"); // keyboard users have ⌘⇧↑/↓
   const line = Object.assign(document.createElement("div"), { className: "mn-drop" });
   let current = null, dragged = null;
@@ -145,11 +184,55 @@ function dragHandleView(view) {
     body.append(line);
   });
   view.dom.addEventListener("dragleave", (event) => { if (!view.dom.contains(event.relatedTarget)) line.remove(); });
+
+  // Right-click (or Control-click) the handle: the block's menu (blockActions), at the pointer.
+  const menu = Object.assign(document.createElement("div"), { className: "mn-at-menu mn-block-menu" });
+  menu.setAttribute("role", "menu");
+  const closeMenu = () => {
+    menu.remove();
+    document.removeEventListener("mousedown", outside, true);
+    document.removeEventListener("keydown", onKey, true);
+    const root = view.dom.closest(".mn-editor");
+    if (root) root.style.minHeight = "";
+  };
+  const outside = (event) => { if (!menu.contains(event.target)) closeMenu(); };
+  const onKey = (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    closeMenu();
+    view.focus();
+  };
+  handle.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    const body = attach();
+    if (current == null || !body) return;
+    const actions = blockActions(editor, current);
+    if (!actions.length) return;
+    view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, current)));  // shows which block
+    menu.replaceChildren(...actions.map((a) => {
+      if (!a) return Object.assign(document.createElement("div"), { className: "mn-menu-sep" });
+      const row = Object.assign(document.createElement("div"), { className: "mn-at-item" });
+      row.setAttribute("role", "menuitem");
+      row.append(Object.assign(document.createElement("span"), { textContent: a.label }),
+        Object.assign(document.createElement("span"), { className: "mn-at-hint", textContent: a.hint }));
+      row.onmousedown = (e) => { e.preventDefault(); closeMenu(); a.run(); };
+      return row;
+    }));
+    body.append(menu);
+    const frame = body.getBoundingClientRect();
+    menu.style.top = `${event.clientY - frame.top}px`;
+    menu.style.left = `${Math.max(0, Math.min(event.clientX - frame.left, body.clientWidth - menu.offsetWidth))}px`;
+    // An editor sized to its content (the panel) grows so the menu isn't cut off below a short note.
+    const root = view.dom.closest(".mn-editor");
+    if (root) root.style.minHeight = `${menu.offsetTop + menu.offsetHeight + 8}px`;
+    document.addEventListener("mousedown", outside, true);
+    document.addEventListener("keydown", onKey, true);
+  });
   attach();
 
   return {
     update: attach,
-    destroy: () => { handle.remove(); line.remove(); },
+    destroy: () => { handle.remove(); line.remove(); closeMenu(); },
     drop(event) {
       const spot = dragged && target(event);
       if (!spot) return false;
