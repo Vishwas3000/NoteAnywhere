@@ -14,7 +14,7 @@ android {
         minSdk = 26 // java.util.Base64
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = rootProject.file("../VERSION").readText().trim() // one version for every app
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

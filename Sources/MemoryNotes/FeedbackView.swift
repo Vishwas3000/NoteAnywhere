@@ -4,10 +4,14 @@ import SwiftUI
 let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
 
 /// Sends a problem or a suggestion to the developer without leaving the app: noteanywhere.app/api/feedback emails it
-/// (worker/index.js, D72). A failed send keeps the text and offers Mail instead.
+/// (worker/index.js, D72). A failed send keeps the text and offers Mail instead. Shared with the iPhone app (Settings).
 struct FeedbackView: View {
     static let endpoint = URL(string: "https://noteanywhere.app/api/feedback")!
+    #if os(iOS)
+    static let about = "NoteAnywhere \(appVersion), iOS \(ProcessInfo.processInfo.operatingSystemVersionString)"
+    #else
     static let about = "NoteAnywhere \(appVersion), macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"
+    #endif
 
     enum Kind: String, CaseIterable { case problem = "Problem", idea = "Suggestion" }
     private enum Status: Equatable { case editing, sending, sent, failed(String) }
@@ -16,7 +20,7 @@ struct FeedbackView: View {
     @State private var message = ""
     @State private var email = ""
     @State private var status = Status.editing
-    @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.dismiss) private var dismiss  // closes the Mac window, or goes back in iPhone Settings
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -27,14 +31,20 @@ struct FeedbackView: View {
                 } description: {
                     Text(email.isEmpty ? "Thank you." : "Thank you. Replies go to \(email).")
                 } actions: {
-                    Button("Done") { reset(); dismissWindow(id: "feedback") }.keyboardShortcut(.defaultAction)
+                    Button("Done") { reset(); dismiss() }.keyboardShortcut(.defaultAction)
                 }
             } else {
                 form
             }
         }
+        #if os(macOS)
         .padding(20)
         .frame(width: 440)
+        #else
+        .padding()
+        .navigationTitle("Send Feedback")
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 
     private var form: some View {
@@ -63,6 +73,11 @@ struct FeedbackView: View {
             TextField("Your email, if you'd like a reply", text: $email)
                 .textFieldStyle(.roundedBorder)
                 .textContentType(.emailAddress)
+                #if os(iOS)
+                .keyboardType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                #endif
 
             Text("Sent with \(Self.about).").font(.caption).foregroundStyle(.secondary)
 
@@ -77,7 +92,7 @@ struct FeedbackView: View {
                     Button("Email Instead") { openURL(mailto) }
                 }
                 Spacer()
-                Button("Cancel") { dismissWindow(id: "feedback") }.keyboardShortcut(.cancelAction)
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(status == .sending ? "Sending…" : "Send") { Task { await send() } }
                     .keyboardShortcut(.defaultAction)
                     .disabled(message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || status == .sending)

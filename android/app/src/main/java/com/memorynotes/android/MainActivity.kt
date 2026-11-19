@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.ui.platform.LocalContext
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -171,6 +172,10 @@ private fun Form(content: @Composable () -> Unit) {
         content()
         App.cloud.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (App.cloud.busy) CircularProgressIndicator()
+        // Signing in is where people get stuck, so feedback is here too, not only in the notes list's menu.
+        var feedback by rememberSaveable { mutableStateOf(false) }
+        if (feedback) FeedbackDialog { feedback = false }
+        TextButton({ feedback = true }) { Text("Send feedback · Version ${appVersion(LocalContext.current)}") }
     }
 }
 
@@ -265,6 +270,9 @@ private fun NotesList(onOpen: (String) -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var folder by rememberSaveable { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf(false) }
+    var feedback by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    if (feedback) FeedbackDialog { feedback = false }
     val folders = App.version.let { App.store.liveFolders() }  // reading version re-reads the store when it changes
     val folderNames = folders.associate { it.id to it.name }
     val notes = App.store.liveNotes()
@@ -277,7 +285,9 @@ private fun NotesList(onOpen: (String) -> Unit) {
             TopAppBar(title = { Text("Notes") }, actions = {
                 TextButton({ menu = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
                 DropdownMenu(menu, { menu = false }) {
+                    DropdownMenuItem({ Text("Send feedback") }, { menu = false; feedback = true })
                     DropdownMenuItem({ Text("Sign out ${cloud.email ?: ""}") }, { menu = false; cloud.signOut() })
+                    DropdownMenuItem({ Text("Version ${appVersion(context)}") }, {}, enabled = false)
                 }
             })
         },
