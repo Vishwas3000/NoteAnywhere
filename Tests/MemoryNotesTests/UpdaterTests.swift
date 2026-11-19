@@ -6,5 +6,6 @@ import Testing
     let url = URL(fileURLWithPath: #filePath).appendingPathComponent("../../../Info.plist").standardized
     let plist = try #require(try PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
     #expect(plist["SUFeedURL"] as? String == "https://noteanywhere.app/appcast.xml")
-    #expect((plist["SUPublicEDKey"] as? String)?.isEmpty == false)
+    // An Ed25519 public key is 32 bytes; a placeholder or a truncated paste isn't.
+    #expect(Data(base64Encoded: plist["SUPublicEDKey"] as? String ?? "")?.count == 32)
 }

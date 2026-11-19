@@ -877,8 +877,10 @@ Made by the subagent that wrote the extension:
   Sparkle's `sign_update`. Sparkle compares `CFBundleVersion`; release.sh sets it and `CFBundleShortVersionString` to
   X.Y.Z, and the appcast uses X.Y.Z for both.
 - **Key:** the EdDSA private key exists only in the maintainer's keychain (Sparkle's `generate_keys`); Info.plist has
-  only the public key (`SUPublicEDKey`). Until the key is generated, Info.plist holds a placeholder and release.sh
-  refuses to build. The tools are in `.build/artifacts/sparkle/Sparkle/bin/` once the package resolves.
+  only the public key (`SUPublicEDKey`). The maintainer generated it on 2026-11-20. The private key must be backed up
+  (`generate_keys -x`): installed copies accept only updates it signs, so losing it ends their updates. release.sh
+  refuses to build with a placeholder. The tools are in `.build/artifacts/sparkle/Sparkle/bin/` once the package
+  resolves.
 - **Chosen by Claude:** Sparkle 2.10.1 through SwiftPM, pinned exactly (the newest stable 2.x that was two weeks old).
   `make_app.sh` embeds Sparkle.framework in Contents/Frameworks (the binary's rpath `@executable_path/../Frameworks`
   comes from Package.swift) and removes its XPC services, which only sandboxed apps use; Sparkle's docs allow removing
@@ -893,6 +895,6 @@ Made by the subagent that wrote the extension:
 - **Status:** Proposed. Checked: `swift test`; an ad hoc build loads the embedded framework; release.sh with a
   throwaway test key builds a Developer ID app that passes `codesign --verify --deep --strict` ("Unnotarized
   Developer ID" until notarized); a `sign_update` signature of its DMG verifies with CryptoKit; Sparkle starts with
-  that Info.plist and refuses the placeholder key (checked outside the app). Not yet: a real key, notarization, the
-  menu items on screen, and an update installed from a real feed.
+  that Info.plist and refuses the placeholder key (checked outside the app). The real public key is in Info.plist
+  (2026-11-20). Not yet: notarization, the menu items on screen, and an update installed from a real feed.
 
