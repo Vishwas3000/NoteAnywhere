@@ -294,12 +294,17 @@ function dragHandleView(view, editor) {
 
 // Obsidian-style #tags, same rule as Note.tags in Swift: needs a letter, may nest with "/".
 const TAG = /(^|[\s(\[{,;:!?])#([\p{L}\p{N}_\-/]*[\p{L}_\-][\p{L}\p{N}_\-/]*)/gu;
+// "#" and what's typed after it, where a tag can start: "#", "#note", "#project/no".
+const TAG_QUERY = /(?:^|[\s(\[{,;:!?])#([\p{L}\p{N}_\-/]*)$/u;
 
-/** Highlights #tags as you type (outside code and links); ⌘-click one (a plain tap with tapTags) to see every note with it (onTag). */
-function tagHighlighter(onTag, tapTags) {
+/**
+ * Highlights #tags as you type (outside code and links); ⌘-click one (a plain tap with tapTags) to see every note with it (onTag).
+ * With onFindTags, typing "#" offers the tags in use (tagMenu).
+ */
+function tagHighlighter(onTag, tapTags, onFindTags, say) {
   return Extension.create({
     name: "mnTags",
-    addProseMirrorPlugins: () => [new Plugin({
+    addProseMirrorPlugins: () => [...(onFindTags ? [tagMenu(onFindTags, say)] : []), new Plugin({
       props: {
         decorations(state) {
           const found = [];
@@ -323,6 +328,43 @@ function tagHighlighter(onTag, tapTags) {
         },
       },
     })],
+  });
+}
+
+/** Tags ({tag, count}) matching what's typed after "#", case aside: the exact tag, then ones starting with it, then ones containing it; 8 at most. */
+export function matchTags(tags, query) {
+  const q = query.toLowerCase();
+  const rank = ({ tag }) => (tag === q ? 0 : tag.startsWith(q) ? 1 : tag.includes(q) ? 2 : 3);
+  return tags.filter((t) => rank(t) < 3).sort((a, b) => rank(a) - rank(b)).slice(0, 8);
+}
+
+/**
+ * The "#" menu, like Bear's: typing "#" asks the host for the tags in use (onFindTags, most used first) and offers
+ * them with how many notes have each, narrowed as you type; picking one types "#tag ". A new tag finds none: no menu.
+ */
+function tagMenu(onFindTags, say) {
+  let tags = [], asked = 0, open = false;
+  return suggestMenu({
+    find: TAG_QUERY,
+    label: "Tags",
+    choices: (query, { $from, fresh, refresh }) => {
+      if (fresh) {
+        // It opens on a bare "#", as it's typed: not when the caret lands on a tag, or a paste or the host's text ends in one.
+        open = query === "";
+        if (open) {
+          const n = ++asked;  // only the latest answer counts
+          onFindTags(query).then((found) => { if (n === asked) { tags = found; refresh(); } },
+            (e) => { if (n === asked) say(`Tags not suggested: ${e.message}`); });
+        }
+      }
+      // Not in a link (the highlighter skips those) or before a word, where picking would leave the rest of it behind.
+      if (!open || $from.marks().some((m) => m.type.name === "link") || /^[\p{L}\p{N}_\-/]/u.test($from.nodeAfter?.text ?? "")) return [];
+      return matchTags(tags, query).map(({ tag, count }) => ({ label: `#${tag}`, hint: String(count), tag }));
+    },
+    apply: (option, view, range) => {
+      view.dispatch(view.state.tr.insertText(`#${option.tag} `, range.from, range.to));
+      view.focus();
+    },
   });
 }
 
@@ -983,6 +1025,8 @@ function slashMenu(editor, pickDate) {
 /**
  * A menu that follows the caret while the text before it matches `find` (group 1 is the query): arrows move,
  * Return/Tab picks, Esc dismisses it for that trigger. apply(option, view, {from, to}) replaces the trigger text.
+ * choices(query, {$from, fresh, refresh}): fresh when the caret has just come into this trigger; refresh() redraws
+ * the menu, for an answer from the host that comes later.
  */
 function suggestMenu({ find, label, choices, apply }) {
   let menuView;
@@ -996,7 +1040,7 @@ function suggestMenuView(view, find, label, choices, apply) {
   const menu = Object.assign(document.createElement("div"), { className: "mn-at-menu" });
   menu.setAttribute("role", "listbox");
   menu.setAttribute("aria-label", label);
-  let options = [], active = 0, at = null, dismissed = null;
+  let options = [], active = 0, at = null, dismissed = null, trigger = null;
 
   const close = () => { menu.remove(); at = null; const root = view.dom.closest(".mn-editor"); if (root) root.style.minHeight = ""; };
   const choose = (option) => {
@@ -1030,10 +1074,12 @@ function suggestMenuView(view, find, label, choices, apply) {
     const before = empty && !inCode ? $from.parent.textBetween(Math.max(0, $from.parentOffset - 30), $from.parentOffset, null, "￼") : "";
     const match = before.match(find);
     const start = match ? $from.pos - match[1].length - 1 : null;
+    const fresh = start !== trigger;
+    trigger = start;
     if (start == null || start === dismissed) return close();
     if (start !== at) active = 0;
     at = start;
-    options = choices(match[1]);
+    options = choices(match[1], { $from, fresh, refresh: update });
     if (!options.length) return close();
     active = Math.min(active, options.length - 1);
     render();
@@ -1343,10 +1389,12 @@ const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.0
  * onAddPage / onFindNotes add "Add page" and "Link to a note…" on highlighted text (see selectionMenu); onNotePreview(id)
  * => Promise<{title, preview}> shows a card when hovering a note link. onAddImage / imageURL: pasted and dropped images
  * (see images). onLinkPreview(url) => Promise<{title, description, icon, image}>: the menu on a pasted link (see
- * linkPreviews).
+ * linkPreviews). onFindTags(query) => Promise<[{tag, count}]>: every tag in use, most used first, for the "#" menu
+ * (see tagMenu); without it there's no menu.
  */
 export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
-  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview, onAddImage, imageURL, onLinkPreview, tapTags = false } = {}) {
+  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview, onAddImage, imageURL, onLinkPreview,
+  onFindTags, tapTags = false } = {}) {
   const root = document.createElement("div");
   root.className = "mn-editor" + (titleLine ? " mn-title-line" : "");
   if (fontSize) root.style.setProperty("--mn-font-size", `${fontSize}px`);
@@ -1417,7 +1465,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   const editor = new Editor({
     element: body,
     extensions: [
-      tagHighlighter(onTag, tapTags),
+      tagHighlighter(onTag, tapTags, onFindTags, say),
       dates(onDate, () => pickDate?.(), datePattern),
       ...maths(() => editor),
       Extension.create({ name: "mnSlash", addProseMirrorPlugins() { return [slashMenu(this.editor, () => pickDate?.())]; } }),

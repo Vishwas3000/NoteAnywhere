@@ -175,6 +175,11 @@ private struct EditorWebView: NSViewRepresentable {
                     .sorted { $0.updatedAt > $1.updatedAt }
                     .prefix(8)
                 call("reply", id, found.map { ["id": $0.id, "title": $0.title, "preview": $0.preview] }, NSNull())
+            case "findTags":
+                // The "#" menu: every tag in use, most used first, then A to Z; the editor narrows them as you type.
+                guard let id = body["id"] as? Int else { return }
+                let counts = NotesModel.shared.notes.flatMap(\.tags).reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+                call("reply", id, counts.sorted { ($1.value, $0.key) < ($0.value, $1.key) }.map { ["tag": $0.key, "count": $0.value] as [String: Any] }, NSNull())
             case "notePreview":
                 // Lowercased here and in openNote: note:// links written before D76 hold uppercase ids.
                 guard let id = body["id"] as? Int, let noteID = (body["note"] as? String)?.lowercased() else { return }
