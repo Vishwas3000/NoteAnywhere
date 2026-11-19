@@ -44,11 +44,16 @@ struct SettingsView: View {
 
                 Section {
                     LabeledContent("Notes", value: model.notes.count.formatted())
-                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+                    LabeledContent("Version", value: appVersion)
+                    NavigationLink(value: "feedback") { Label("Send Feedback", systemImage: "envelope") }
+                } footer: {
+                    Text("Report a problem or suggest an idea. It goes straight to the developer.")
                 }
             }
             .navigationTitle("Settings")
-            .navigationDestination(for: String.self) { _ in SyncSettingsView().navigationTitle("Sync") }
+            .navigationDestination(for: String.self) { page in
+                if page == "feedback" { FeedbackView() } else { SyncSettingsView().navigationTitle("Sync") }
+            }
             #if DEBUG
             .task { if UserDefaults.standard.bool(forKey: "openSync") { path = ["sync"] } }  // screenshots
             #endif

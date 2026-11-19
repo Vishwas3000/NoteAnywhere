@@ -10,6 +10,9 @@ struct NoteMenu: View {
         Button { model.update(note.id) { $0.pinned.toggle() } } label: {
             Label(note.pinned ? "Unpin Note" : "Pin Note", systemImage: note.pinned ? "pin.slash" : "pin")
         }
+        Button { model.update(note.id) { $0.starred.toggle() } } label: {
+            Label(note.starred ? "Unstar Note" : "Star Note", systemImage: note.starred ? "star.slash" : "star")
+        }
         Menu {
             Button("All Notes (No Folder)") { model.update(note.id) { $0.folderID = nil } }.disabled(note.folderID == nil)
             ForEach(model.folders) { folder in

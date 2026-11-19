@@ -13,7 +13,7 @@ class StoreTest {
     private val key = ByteArray(32) { it.toByte() }
     private fun remote(updated: Double, text: String = "remote", deleted: Double? = null, locked: Boolean = false) =
         Note(id = id, text = text, createdAt = 1.0, updatedAt = updated, deletedAt = deleted, locked = locked,
-            target = "github.com/demo", label = "Demo", pinned = true, folderId = "f0", color = "blue")
+            target = "github.com/demo", label = "Demo", pinned = true, starred = true, folderId = "f0", color = "blue")
 
     @Test fun newerWinsOlderIsIgnored() {
         val store = Store(null)
@@ -104,7 +104,7 @@ class StoreTest {
         val note = remote(1761700000123.456).copy(folderId = null, color = null)
         val row = note.row(key)
         assertEquals(setOf("id", "kind", "target", "label", "body_md", "created_at", "updated_at", "deleted_at",
-            "pinned", "folder_id", "color", "locked"), row.keys().asSequence().toSet())
+            "pinned", "starred", "folder_id", "color", "locked"), row.keys().asSequence().toSet())
         assertTrue(row.isNull("deleted_at") && row.isNull("folder_id") && row.isNull("color"))
         for (field in listOf("target", "label", "body_md")) assertTrue(row.getString(field).startsWith("mne2e:v1:"))
         assertFalse(row.toString().contains("github.com/demo"))
@@ -112,6 +112,34 @@ class StoreTest {
         assertEquals(note, JSONObject(row.toString()).openedNote(key))
         val folder = Folder("f0", "Work", 5.0)
         assertEquals(folder, JSONObject(folder.row(key).toString()).openedFolder(key))
+    }
+
+    @Test fun oldFilesWithoutStarredLoadUnstarred() {
+        val file = File.createTempFile("notes", ".json").apply { delete() }
+        file.writeText("""{"notes":[{"id":"$id","kind":"url","target":"","label":"","text":"x","created_at":1,
+            "updated_at":2,"deleted_at":null,"pinned":true,"folder_id":null,"color":null,"locked":false,"dirty":false}]}""")
+        val note = Store(file).note(id)!!
+        assertTrue(note.pinned)
+        assertFalse(note.starred)
+        file.delete()
+    }
+
+    @Test fun metaChangesAddOneMillisecondEvenWhenLocked() {
+        val store = Store(null)
+        store.applyRemote(listOf(remote(100.0, "mnlock:v1:AAAA", locked = true)), emptyList())
+        store.setMeta(id) { it.copy(pinned = false, starred = false, color = "red") }
+        val expected = remote(101.0, "mnlock:v1:AAAA", locked = true).copy(pinned = false, starred = false, color = "red", dirty = true)
+        assertEquals(expected, store.note(id))
+        assertNull(store.duplicate(id))  // a locked note's text is never copied
+    }
+
+    @Test fun duplicateCopiesTextPlaceFolderAndColourOnly() {
+        val store = Store(null)
+        store.applyRemote(listOf(remote(100.0)), emptyList())
+        val copyID = store.duplicate(id, now = 500.0)!!
+        assertTrue(Store.validID(copyID) && copyID == copyID.lowercase() && copyID != id)
+        val expected = remote(500.0).copy(id = copyID, createdAt = 500.0, pinned = false, starred = false, dirty = true)
+        assertEquals(expected, store.note(copyID))
     }
 
     @Test fun pulledIdsAreLowercased() {

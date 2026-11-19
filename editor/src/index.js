@@ -67,16 +67,62 @@ function dragHandle() {
   let handleView;
   return Extension.create({
     name: "mnDragHandle",
-    addProseMirrorPlugins: () => [new Plugin({
-      view: (view) => (handleView = dragHandleView(view)),
-      props: { handleDrop: (view, event) => handleView?.drop(event) ?? false },
-    })],
+    addProseMirrorPlugins() {
+      const editor = this.editor;
+      return [new Plugin({
+        view: (view) => (handleView = dragHandleView(view, editor)),
+        props: { handleDrop: (view, event) => handleView?.drop(event) ?? false },
+      })];
+    },
   });
 }
 
-function dragHandleView(view) {
+// Blocks whose kind the handle's menu can change; the rest (tables, pictures, lines, maths) only duplicate or delete.
+const TURNABLE = new Set(["paragraph", "heading", "codeBlock", "blockquote", ...ITEMS]);
+const LISTS = { bulletList: "Bulleted list", orderedList: "Numbered list", taskList: "To-do list" };
+
+/**
+ * What right-clicking a block's ⋮⋮ handle offers: turn it into another kind of block (its own kind is checked),
+ * duplicate it or delete it. `pos` is where the block starts, as the handle tracks it. [{label, hint, run}], null = a line.
+ */
+export function blockActions(editor, pos) {
+  const { doc } = editor.state;
+  const node = doc.nodeAt(pos);
+  if (!node) return [];
+  const item = ITEMS.has(node.type.name);
+  const kind = item ? LISTS[doc.resolve(pos).parent.type.name]
+    : { paragraph: "Text", codeBlock: "Code", blockquote: "Quote" }[node.type.name]
+      ?? (node.type.name === "heading" ? `Heading ${node.attrs.level}` : null);
+  const turn = (option) => () => {
+    if (option.label === kind) return;
+    const chain = editor.chain().focus().setTextSelection(TextSelection.near(editor.state.doc.resolve(pos + 1)).from);
+    // Out of its list or quote first, unless it's only changing list type (toggling the same kind would undo it).
+    if (item && !Object.values(LISTS).includes(option.label)) chain.liftListItem(node.type.name);
+    if (node.type.name === "blockquote") chain.toggleBlockquote();
+    // A heading or code becomes text before it's quoted or listed, as in Notion.
+    if (["heading", "codeBlock"].includes(node.type.name) && /list|Quote/.test(option.label)) chain.setParagraph();
+    option.run(chain).run();
+  };
+  const turnInto = TURNABLE.has(node.type.name)
+    ? SLASH_COMMANDS.slice(0, 9).map((o) => ({ label: o.label, hint: o.label === kind ? "✓" : "", words: o.words, run: turn(o) })).concat(null)
+    : [];
+  return [
+    ...turnInto,
+    { label: "Duplicate", hint: "", words: ["copy", "clone"], run: () => editor.chain().focus().insertContentAt(pos + node.nodeSize, node.toJSON()).run() },
+    { label: "Delete", hint: "", words: ["remove", "trash"], run: () => { editor.view.dispatch(editor.state.tr.deleteRange(pos, pos + node.nodeSize)); editor.view.focus(); } },
+  ];
+}
+
+/** The block menu's search: actions whose name contains the query or with a word starting with it; no lines while searching. */
+export function matchActions(actions, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return actions;
+  return actions.filter((a) => a && (a.label.toLowerCase().includes(q) || (a.words ?? []).some((w) => w.startsWith(q))));
+}
+
+function dragHandleView(view, editor) {
   const handle = Object.assign(document.createElement("div"), { className: "mn-drag", draggable: true, textContent: "⋮⋮",
-    title: "Drag to move · ⌘⇧↑ ⌘⇧↓" });
+    title: "Drag to move · Right-click for more · ⌘⇧↑ ⌘⇧↓" });
   handle.setAttribute("aria-hidden", "true"); // keyboard users have ⌘⇧↑/↓
   const line = Object.assign(document.createElement("div"), { className: "mn-drop" });
   let current = null, dragged = null;
@@ -145,11 +191,90 @@ function dragHandleView(view) {
     body.append(line);
   });
   view.dom.addEventListener("dragleave", (event) => { if (!view.dom.contains(event.relatedTarget)) line.remove(); });
+
+  // Right-click (or Control-click) the handle: the block's menu (blockActions), at the pointer.
+  const menu = Object.assign(document.createElement("div"), { className: "mn-at-menu mn-block-menu" });
+  menu.setAttribute("role", "menu");
+  const closeMenu = () => {
+    menu.remove();
+    document.removeEventListener("mousedown", outside, true);
+    document.removeEventListener("keydown", onKey, true);
+    const root = view.dom.closest(".mn-editor");
+    if (root) root.style.minHeight = "";
+  };
+  const outside = (event) => { if (!menu.contains(event.target)) closeMenu(); };
+  // A search field on top filters the actions; ↑/↓ pick one, Return runs it.
+  const search = Object.assign(document.createElement("input"), { className: "mn-block-search", type: "search", placeholder: "Search actions" });
+  search.setAttribute("aria-label", "Search block actions");
+  const list = document.createElement("div");
+  let actions = [], shown = [], active = 0;
+  const pick = (a) => { closeMenu(); a.run(); };
+  const render = () => {
+    shown = matchActions(actions, search.value);
+    const rows = shown.filter(Boolean);
+    active = Math.min(active, Math.max(0, rows.length - 1));
+    if (!rows.length) {
+      list.replaceChildren(Object.assign(document.createElement("div"), { className: "mn-at-item mn-at-hint", textContent: "No matching action" }));
+      return;
+    }
+    let i = 0;
+    list.replaceChildren(...shown.map((a) => {
+      if (!a) return Object.assign(document.createElement("div"), { className: "mn-menu-sep" });
+      const n = i++;
+      const row = Object.assign(document.createElement("div"), { className: "mn-at-item" + (n === active ? " active" : "") });
+      row.setAttribute("role", "menuitem");
+      row.append(Object.assign(document.createElement("span"), { textContent: a.label }),
+        Object.assign(document.createElement("span"), { className: "mn-at-hint", textContent: a.hint }));
+      row.onmousedown = (e) => { e.preventDefault(); pick(a); };
+      return row;
+    }));
+  };
+  search.addEventListener("input", () => { active = 0; render(); });
+  const onKey = (event) => {
+    const rows = shown.filter(Boolean);
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeMenu();
+      view.focus();
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (rows.length) active = (active + (event.key === "ArrowDown" ? 1 : rows.length - 1)) % rows.length;
+      render();
+    } else if (event.key === "Enter" && rows[active]) {
+      event.preventDefault();
+      pick(rows[active]);
+    }
+  };
+  let touch = false; // the last press on the handle was a finger: tap opens the menu, and no keyboard pops for its search
+  handle.addEventListener("pointerdown", (event) => { touch = event.pointerType === "touch"; });
+  handle.addEventListener("click", (event) => { if (touch) openMenu(event); });
+  handle.addEventListener("contextmenu", (event) => openMenu(event));
+  const openMenu = (event) => {
+    event.preventDefault();
+    const body = attach();
+    if (current == null || !body) return;
+    actions = blockActions(editor, current);
+    if (!actions.length) return;
+    view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, current)));  // shows which block
+    search.value = ""; active = 0;
+    render();
+    menu.replaceChildren(search, list);
+    body.append(menu);
+    const frame = body.getBoundingClientRect();
+    menu.style.top = `${event.clientY - frame.top}px`;
+    menu.style.left = `${Math.max(0, Math.min(event.clientX - frame.left, body.clientWidth - menu.offsetWidth))}px`;
+    // An editor sized to its content (the panel) grows so the menu isn't cut off below a short note.
+    const root = view.dom.closest(".mn-editor");
+    if (root) root.style.minHeight = `${menu.offsetTop + menu.offsetHeight + 8}px`;
+    document.addEventListener("mousedown", outside, true);
+    document.addEventListener("keydown", onKey, true);
+    if (!touch) search.focus({ preventScroll: true });
+  };
   attach();
 
   return {
     update: attach,
-    destroy: () => { handle.remove(); line.remove(); },
+    destroy: () => { handle.remove(); line.remove(); closeMenu(); },
     drop(event) {
       const spot = dragged && target(event);
       if (!spot) return false;
@@ -170,8 +295,8 @@ function dragHandleView(view) {
 // Obsidian-style #tags, same rule as Note.tags in Swift: needs a letter, may nest with "/".
 const TAG = /(^|[\s(\[{,;:!?])#([\p{L}\p{N}_\-/]*[\p{L}_\-][\p{L}\p{N}_\-/]*)/gu;
 
-/** Highlights #tags as you type (outside code and links); ⌘-click one to see every note with it (onTag). */
-function tagHighlighter(onTag) {
+/** Highlights #tags as you type (outside code and links); ⌘-click one (a plain tap with tapTags) to see every note with it (onTag). */
+function tagHighlighter(onTag, tapTags) {
   return Extension.create({
     name: "mnTags",
     addProseMirrorPlugins: () => [new Plugin({
@@ -184,14 +309,14 @@ function tagHighlighter(onTag) {
               const from = pos + m.index + m[1].length;
               found.push(Decoration.inline(from, from + 1 + m[2].length, {
                 class: "mn-tag", "data-tag": m[2].toLowerCase().replace(/^\/+|\/+$/g, ""),
-                title: onTag ? "⌘-click to see every note with this tag" : "",
+                title: onTag && !tapTags ? "⌘-click to see every note with this tag" : "",
               }));
             }
           });
           return DecorationSet.create(state.doc, found);
         },
         handleClick(view, pos, event) {
-          const tag = event.metaKey && event.target.closest?.(".mn-tag")?.dataset.tag;
+          const tag = (tapTags || event.metaKey) && event.target.closest?.(".mn-tag")?.dataset.tag;
           if (!tag || !onTag) return false;
           onTag(tag);
           return true;
@@ -1034,7 +1159,9 @@ function selectionMenu(editor, body, { onAddPage, onFindNotes, onLinkNote }) {
     input.value = "";
     results = [];
     bar.replaceChildren(input, list);
-    input.focus();
+    // The search is wider than the buttons were: keep it inside the editor (a phone's narrow page would scroll sideways).
+    bar.style.left = `${Math.max(0, Math.min(parseFloat(bar.style.left) || 0, body.clientWidth - bar.offsetWidth))}px`;
+    input.focus({ preventScroll: true });
     search();
     return true;
   };
@@ -1219,7 +1346,7 @@ const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.0
  * linkPreviews).
  */
 export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
-  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview, onAddImage, imageURL, onLinkPreview } = {}) {
+  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview, onAddImage, imageURL, onLinkPreview, tapTags = false } = {}) {
   const root = document.createElement("div");
   root.className = "mn-editor" + (titleLine ? " mn-title-line" : "");
   if (fontSize) root.style.setProperty("--mn-font-size", `${fontSize}px`);
@@ -1290,7 +1417,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   const editor = new Editor({
     element: body,
     extensions: [
-      tagHighlighter(onTag),
+      tagHighlighter(onTag, tapTags),
       dates(onDate, () => pickDate?.(), datePattern),
       ...maths(() => editor),
       Extension.create({ name: "mnSlash", addProseMirrorPlugins() { return [slashMenu(this.editor, () => pickDate?.())]; } }),

@@ -15,8 +15,10 @@ struct NoteEditor: View {
         if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
             // Body text follows Dynamic Type, starting from the iPhone's 17 pt.
             let fontSize = Int(UIFontMetrics(forTextStyle: .body).scaledValue(for: 17).rounded())
-            EditorWebView(dir: dir, markdown: model.binding(noteID, \.text),
-                          options: ["toolbar": true, "fontSize": fontSize, "titleLine": true, "datePattern": DateStyle.pattern],
+            EditorWebView(dir: dir, noteID: noteID, markdown: model.binding(noteID, \.text),
+                          // tapTags: no ⌘ to click with; pages: "Add page" / "Link to a note…" on highlighted text, like the Mac
+                          options: ["toolbar": true, "fontSize": fontSize, "titleLine": true, "datePattern": DateStyle.pattern,
+                                    "tapTags": true, "pages": true],
                           openNote: openNote)
                 .id("\(noteID)/\(dateFormat)")  // a fresh editor per note keeps undo history per note; new date format redraws
         } else {
@@ -27,13 +29,14 @@ struct NoteEditor: View {
 
 private struct EditorWebView: UIViewRepresentable {
     let dir: URL
+    let noteID: String
     @Binding var markdown: String
     let options: [String: Any]
     let openNote: (String) -> Void
 
     /// iPhone-only styling on top of the shared page: side margins, no text inflation on rotation, one scrolling row
-    /// of finger-sized toolbar buttons, a ✨ button that's always visible and no block-drag gutter (both are hover UI), and no ✨ menu before
-    /// iOS 26 (Apple Intelligence's on-device model needs it).
+    /// of finger-sized toolbar buttons, a ✨ button and a block handle that are always visible (both are hover UI; the handle sits
+    /// in the side margin beside the last tapped block, and a tap opens its menu), and no ✨ menu before iOS 26 (Apple Intelligence's on-device model needs it).
     private static var css: String {
         var css = """
             body { padding: 0 20px 48px; -webkit-text-size-adjust: 100%; }
@@ -42,7 +45,7 @@ private struct EditorWebView: UIViewRepresentable {
             .mn-toolbar button { min-width: 36px; height: 36px; flex: none; }
             .mn-editor:has(.mn-ai) .mn-toolbar { padding-right: 0; margin-right: 44px; }
             .mn-ai > button { width: 36px; height: 36px; opacity: 1; }
-            .mn-content { padding-left: 0; } .mn-drag { display: none; } .mn-content .mn-date { white-space: nowrap; }
+            .mn-content { padding-left: 0; } .mn-drag { margin-left: -20px; opacity: 0.6; pointer-events: auto; transition: none; } .mn-content .mn-date { white-space: nowrap; }
             """
         if #unavailable(iOS 26) { css += " .mn-ai { display: none; } .mn-editor:has(.mn-ai) .mn-toolbar { margin-right: 0; }" }
         return css
@@ -147,6 +150,22 @@ private struct EditorWebView: UIViewRepresentable {
                         call("reply", id, NSNull(), error.localizedDescription)
                     }
                 }
+            case "addPage":
+                guard let id = body["id"] as? Int, let text = body["text"] as? String else { return }
+                call("reply", id, NotesModel.shared.addPage(titled: text, from: parent.noteID), NSNull())
+            case "findNotes":  // the Mac's: titles and first lines with the words, newest first
+                guard let id = body["id"] as? Int else { return }
+                let query = (body["query"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+                let found = NotesModel.shared.notes
+                    .filter { $0.id != parent.noteID && !$0.locked }
+                    .filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) || $0.preview.localizedCaseInsensitiveContains(query) }
+                    .sorted { $0.updatedAt > $1.updatedAt }
+                    .prefix(8)
+                call("reply", id, found.map { ["id": $0.id, "title": $0.title, "preview": $0.preview] }, NSNull())
+            case "notePreview":
+                guard let id = body["id"] as? Int, let noteID = body["note"] as? String else { return }
+                guard let note = NotesModel.shared.note(noteID) else { return call("reply", id, NSNull(), "This note was deleted.") }
+                call("reply", id, ["title": note.title, "preview": note.locked ? "Unlock it to read it." : String(note.preview.prefix(320))], NSNull())
             case "date":  // ⌘-click, so only with a hardware keyboard on the phone
                 if let day = body["day"] as? String { NotesModel.shared.calendarRequest = day }
             case "tag":

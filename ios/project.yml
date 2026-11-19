@@ -7,7 +7,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.1"
+    MARKETING_VERSION: "0.1.2"  # keep equal to ../VERSION
     CURRENT_PROJECT_VERSION: "1"
     GENERATE_INFOPLIST_FILE: YES
     CODE_SIGN_STYLE: Automatic
@@ -48,6 +48,8 @@ targets:
       - path: ../Sources/MemoryNotes/ImageScheme.swift
         group: Shared
       - path: ../Sources/MemoryNotes/LinkPreview.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/FeedbackView.swift
         group: Shared
     dependencies:
       - package: swift-embeddings

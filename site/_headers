@@ -1,6 +1,0 @@
-/NoteAnywhere.dmg
-  Content-Type: application/x-apple-diskimage
-  Content-Disposition: attachment; filename="NoteAnywhere.dmg"
-
-/img/*
-  Cache-Control: public, max-age=86400, stale-while-revalidate=604800

@@ -90,6 +90,30 @@ final class NotesModel: ObservableObject {
         return folder
     }
 
+    func renameFolder(_ id: String, to name: String) {
+        guard let i = folders.firstIndex(where: { $0.id == id }) else { return }
+        folders[i].name = name
+        do { try NoteStore.saveFolder(folders[i]) } catch { NSLog("MemoryNotes: folder save failed: \(error)") }
+    }
+
+    /// Like the Mac: the folder goes, its notes return to All Notes.
+    func deleteFolder(_ id: String) {
+        folders.removeAll { $0.id == id }
+        for i in notes.indices where notes[i].folderID == id { notes[i].folderID = nil }
+        do { try NoteStore.deleteFolder(id) } catch { NSLog("MemoryNotes: folder delete failed: \(error)") }
+    }
+
+    /// The Mac's "Add page" on highlighted text: a note titled with it, in the same folder, with a ↖ link back.
+    func addPage(titled title: String, from parentID: String) -> String {
+        let parent = note(parentID)
+        let line = title.split(whereSeparator: \.isNewline).joined(separator: " ")
+        let back = parent.map { "\n\n↖ [\($0.title.replacingOccurrences(of: "]", with: "\\]"))](note://\($0.id))" } ?? ""
+        let id = add().id
+        binding(id, \.text).wrappedValue = line + back + "\n\n"
+        if let folder = parent?.folderID { update(id) { $0.folderID = folder } }
+        return id
+    }
+
     func delete(_ id: String) {
         notes.removeAll { $0.id == id }
         snapshots.removeAll { $0.note.id == id }

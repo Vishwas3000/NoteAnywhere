@@ -31,6 +31,7 @@ struct NotesWindow: View {
     @State private var editingAddress = false  // shows the address field for a note that already has one
     @FocusState private var targetFocused: Bool
     @State private var folderFilter: String?  // nil: All Notes
+    @State private var starredOnly = false  // the "Starred" row: starred notes in any folder
     @State private var folderPrompt: FolderPrompt?
     @State private var folderName = ""
     @State private var lockPrompt: LockPrompt?
@@ -51,8 +52,10 @@ struct NotesWindow: View {
         var renaming: Folder?
     }
 
-    /// The notes in the selected folder (all of them in All Notes).
-    private var visibleNotes: [Note] { model.notes.filter { folderFilter == nil || $0.folderID == folderFilter } }
+    /// The notes in the selected folder (all of them in All Notes), or the starred ones.
+    private var visibleNotes: [Note] {
+        model.notes.filter { (folderFilter == nil || $0.folderID == folderFilter) && (!starredOnly || $0.starred) }
+    }
 
     /// Every switch between Notes, Calendar and Graph comes through here, so Perf can time it.
     private func switchTo(_ new: WindowMode) {
@@ -158,6 +161,19 @@ struct NotesWindow: View {
                                        description: Text("Press ⌘N to write a note. Use + to tie one to a website or an app."))
             }
         }
+        .hardScrollEdges()
+        .bottomBar {  // the corner: which version this is, and a way to say what's wrong
+            HStack {
+                Button { openWindow(id: "feedback") } label: { Label("Feedback", systemImage: "envelope") }
+                    .buttonStyle(.borderless)
+                    .help("Report a problem or suggest an idea")
+                Spacer()
+                Text("Version \(appVersion)").foregroundStyle(.secondary).textSelection(.enabled)
+            }
+            .font(.caption)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+        }
         .searchable(text: $query, isPresented: $searchFocused, placement: .sidebar, prompt: "Search by meaning or keyword")
         .sheet(item: $lockPrompt) { prompt in
             switch prompt {
@@ -196,7 +212,9 @@ struct NotesWindow: View {
         .onChange(of: model.openRequest, initial: true) { _, id in  // initial: a request made while the window was closed
             guard let id else { return }
             query = ""
-            if folderFilter != nil, model.notes.first(where: { $0.id == id })?.folderID != folderFilter { folderFilter = nil }  // so its row shows too
+            let opened = model.notes.first { $0.id == id }
+            if folderFilter != nil, opened?.folderID != folderFilter { folderFilter = nil }  // so its row shows too
+            if starredOnly, opened?.starred != true { starredOnly = false }
             switchTo(.notes)
             selection = id
             model.focusRequest = model.canEdit(id) ? id : nil  // a locked note shows no editor to take it
@@ -241,6 +259,9 @@ struct NotesWindow: View {
         Button { model.update(note.id) { $0.pinned.toggle() } } label: {
             Label(note.pinned ? "Unpin Note" : "Pin Note", systemImage: note.pinned ? "pin.slash" : "pin")
         }
+        Button { model.update(note.id) { $0.starred.toggle() } } label: {
+            Label(note.starred ? "Unstar Note" : "Star Note", systemImage: note.starred ? "star.slash" : "star")
+        }
         if note.locked {
             Button { if lockSession.isUnlocked { model.removeLock(note.id) } else { lockPrompt = .unlock(note.id) } } label: {
                 Label("Remove Lock", systemImage: "lock.open")
@@ -282,6 +303,7 @@ struct NotesWindow: View {
     private var folderSection: some View {
         Section {
             folderRow(nil, name: "All Notes", count: model.notes.count)
+            starredRow
             ForEach(model.folders) { folder in
                 folderRow(folder, name: folder.name, count: model.notes.filter { $0.folderID == folder.id }.count)
                     .contextMenu {
@@ -298,9 +320,26 @@ struct NotesWindow: View {
         } header: { sectionHeader("Folders") }
     }
 
+    private var starredRow: some View {
+        Button { folderFilter = nil; starredOnly = true } label: {
+            LabeledContent {
+                Text("\(model.notes.filter(\.starred).count)").monospacedDigit().foregroundStyle(.secondary)
+            } label: {
+                Label("Starred", systemImage: "star").fontWeight(starredOnly ? .semibold : .regular)
+            }
+            .padding(.vertical, 2)
+            .padding(.horizontal, 6)
+            .background(starredOnly ? AnyShapeStyle(Color.notesAccent.opacity(0.18)) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(starredOnly ? .isSelected : [])
+        .accessibilityHint("Shows the starred notes")
+    }
+
     private func folderRow(_ folder: Folder?, name: String, count: Int) -> some View {
-        let current = folderFilter == folder?.id
-        return Button { folderFilter = folder?.id } label: {
+        let current = !starredOnly && folderFilter == folder?.id
+        return Button { folderFilter = folder?.id; starredOnly = false } label: {
             LabeledContent {
                 Text("\(count)").monospacedDigit().foregroundStyle(.secondary)
             } label: {
@@ -495,6 +534,7 @@ struct NotesWindow: View {
         query = ""
         editingAddress = false
         selection = model.add(kind: .url, target: "", label: "", folderID: folderFilter).id  // in the folder you're looking at
+        if starredOnly, let id = selection { model.update(id) { $0.starred = true } }  // or it would vanish from Starred
     }
 
     private func newWebsiteNote() {
@@ -538,6 +578,9 @@ struct NoteRow: View {
             HStack(spacing: 5) {
                 if note.locked { Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary) }
                 Text(note.title).font(.headline).lineLimit(1)
+                if note.starred {
+                    Image(systemName: "star.fill").font(.caption).foregroundStyle(Color.notesAccent).accessibilityLabel("Starred")
+                }
             }
             (Text(date) + Text("  ") + Text(note.preview.isEmpty ? "No additional text" : note.preview).foregroundStyle(.secondary))
                 .font(.subheadline)
@@ -611,5 +654,29 @@ struct ColorLabelMenu: View {
         }
         image.isTemplate = false
         return image
+    }
+}
+
+extension View {
+    /// macOS 26's soft scroll edges let rows show through the sidebar's search field and its bottom bar, where both
+    /// become hard to read; hard edges hide them behind the bars instead.
+    @ViewBuilder
+    func hardScrollEdges() -> some View {
+        if #available(macOS 26, *) {
+            scrollEdgeEffectStyle(.hard, for: .vertical)
+        } else {
+            self
+        }
+    }
+
+    /// A bar pinned under a list: on macOS 26 a safe-area bar, so the list's scroll edge covers it; before that, a
+    /// bar-coloured inset rows can't show through.
+    @ViewBuilder
+    func bottomBar(@ViewBuilder _ bar: () -> some View) -> some View {
+        if #available(macOS 26, *) {
+            safeAreaBar(edge: .bottom, spacing: 0, content: bar)
+        } else {
+            safeAreaInset(edge: .bottom, spacing: 0) { bar().background(.bar) }
+        }
     }
 }

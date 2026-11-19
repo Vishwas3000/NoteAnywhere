@@ -9,6 +9,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/editor"
 cp "$BIN" "$APP/Contents/MacOS/MemoryNotes"
 cp Info.plist "$APP/Contents/"
+plutil -replace CFBundleShortVersionString -string "$(cat VERSION)" "$APP/Contents/Info.plist"  # release.sh overrides with a tag
 # Dependencies' resources (swift-transformers' fallback tokenizer configs); Bundle.module looks in Contents/Resources.
 for bundle in "$(dirname "$BIN")"/*.bundle; do [ ! -d "$bundle" ] || cp -R "$bundle" "$APP/Contents/Resources/"; done
 

@@ -62,6 +62,12 @@ struct MemoryNotesApp: App {
         }
         .defaultSize(width: 480, height: 560)
 
+        Window("Send Feedback", id: "feedback") {
+            FeedbackView()
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
         Window("Welcome to NoteAnywhere", id: "welcome") {
             WelcomeView()
         }
@@ -111,6 +117,8 @@ private struct NotesCommands: Commands {
             Button("Welcome to NoteAnywhere") { openWindow(id: "welcome") }
             Button("Keyboard Shortcuts") { openWindow(id: "shortcuts") }
                 .keyboardShortcut("/", modifiers: [.command, .shift])
+            Divider()
+            Button("Send Feedback…") { openWindow(id: "feedback") }
         }
     }
 }
@@ -134,6 +142,10 @@ private struct MenuContent: View {
         }
         SettingsLink { Text("Settings…") }
             .simultaneousGesture(TapGesture().onEnded { NSApp.activate() })
+        Button("Send Feedback…") {
+            openWindow(id: "feedback")
+            NSApp.activate()
+        }
         Divider()
         Button("Quit NoteAnywhere") { NSApp.terminate(nil) }.keyboardShortcut("q")
     }
