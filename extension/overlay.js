@@ -1,7 +1,8 @@
 // The overlay UI. It runs in an extension frame, so the page never sees its keystrokes, focus or styles.
 // Page context comes from content.js via extension messaging (the page can't forge it, unlike postMessage).
 const HOST = "com.memorynotes.host";
-const MISSING = "Install NoteAnywhere for Mac and open it once: vishwas3000.github.io/NoteAnywhere";
+const SITE = "https://noteanywhere.app"; // the download page, also the manifest's homepage_url
+const MISSING = "Install NoteAnywhere for Mac and open it once.";
 
 let tabId, page = {};
 let notes = [], visible = false, dismissed = false, collapsed = false, forced = false, error = "";
@@ -215,8 +216,7 @@ function render() {
   $(".expand").setAttribute("aria-pressed", String(expanded));
   $(".expand").setAttribute("aria-label", expanded ? "Shrink panel" : "Expand panel");
   $(".expand").title = expanded ? "Shrink panel" : "Expand panel";
-  errBox.textContent = error;
-  errBox.hidden = !error;
+  showError();
   const searching = query !== "";
   list.hidden = searching || !help.hidden;
   footer.hidden = searching || !help.hidden;
@@ -363,11 +363,20 @@ function noteRow(note) {
   return row;
 }
 
+// The error line. Without the Mac app it links to the download page: that's what a new store user sees first.
+function showError() {
+  errBox.textContent = error;
+  if (error === MISSING) {
+    errBox.append(" ", Object.assign(document.createElement("a"),
+      { href: SITE, target: "_blank", rel: "noopener", textContent: "Download it from noteanywhere.app" }));
+  }
+  errBox.hidden = !error;
+}
+
 async function save(note) {
   const r = await send({ op: "save", note });
   error = r.ok ? "" : r.error;
-  errBox.textContent = error;
-  errBox.hidden = !error;
+  showError();
 }
 
 async function add() {
