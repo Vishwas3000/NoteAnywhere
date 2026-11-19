@@ -87,7 +87,8 @@ notes link up.
   move it to a folder, give it a color label (like Chrome's tab groups) or delete it. The sidebar has Folders, a
   Pinned section and notes grouped by Today, Yesterday, Previous 7 Days and so on; the window shows how many notes
   there are. A menu-bar icon is always there.
-- **Optional sync** through Supabase, signing in with a link sent to your email. Folders, pins and colors sync too.
+- **Optional sync** through Supabase, signing in with a link sent to your email, or with Google on the Mac. Folders,
+  pins and colors sync too.
 - **Light on your Mac**: about 0% CPU when idle and 37–65 MB of memory (measured).
 
 </details>
@@ -186,7 +187,7 @@ Tools: `search_notes`, `list_notes`, `get_note`, `list_tasks`, `list_tags`, `lis
   its header. Never message contents, keystrokes or the screen.
 - The extension asks the app on your Mac whether the current page has notes. It sends nothing to any server.
 - Network: site icons from the sites themselves, the search model from Hugging Face once, Supabase only if you turn
-  sync on, and update checks: `noteanywhere.app/appcast.xml` once a day if you allow it (or when you choose Check for
+  sync on (and Google's sign-in page if you sign in with Google), and update checks: `noteanywhere.app/appcast.xml` once a day if you allow it (or when you choose Check for
   Updates…), with updates downloaded from GitHub Releases. Update checks send no personal data and no system profile.
   No analytics.
 
