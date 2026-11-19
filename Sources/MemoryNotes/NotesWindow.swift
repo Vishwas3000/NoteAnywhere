@@ -158,7 +158,8 @@ struct NotesWindow: View {
                                        description: Text("Press ⌘N to write a note. Use + to tie one to a website or an app."))
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {  // the corner: which version this is, and a way to say what's wrong
+        .hardScrollEdges()
+        .bottomBar {  // the corner: which version this is, and a way to say what's wrong
             HStack {
                 Button { openWindow(id: "feedback") } label: { Label("Feedback", systemImage: "envelope") }
                     .buttonStyle(.borderless)
@@ -623,5 +624,29 @@ struct ColorLabelMenu: View {
         }
         image.isTemplate = false
         return image
+    }
+}
+
+extension View {
+    /// macOS 26's soft scroll edges let rows show through the sidebar's search field and its bottom bar, where both
+    /// become hard to read; hard edges hide them behind the bars instead.
+    @ViewBuilder
+    func hardScrollEdges() -> some View {
+        if #available(macOS 26, *) {
+            scrollEdgeEffectStyle(.hard, for: .vertical)
+        } else {
+            self
+        }
+    }
+
+    /// A bar pinned under a list: on macOS 26 a safe-area bar, so the list's scroll edge covers it; before that, a
+    /// bar-coloured inset rows can't show through.
+    @ViewBuilder
+    func bottomBar(@ViewBuilder _ bar: () -> some View) -> some View {
+        if #available(macOS 26, *) {
+            safeAreaBar(edge: .bottom, spacing: 0, content: bar)
+        } else {
+            safeAreaInset(edge: .bottom, spacing: 0) { bar().background(.bar) }
+        }
     }
 }
