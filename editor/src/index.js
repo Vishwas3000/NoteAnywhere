@@ -104,13 +104,20 @@ export function blockActions(editor, pos) {
     option.run(chain).run();
   };
   const turnInto = TURNABLE.has(node.type.name)
-    ? SLASH_COMMANDS.slice(0, 9).map((o) => ({ label: o.label, hint: o.label === kind ? "✓" : "", run: turn(o) })).concat(null)
+    ? SLASH_COMMANDS.slice(0, 9).map((o) => ({ label: o.label, hint: o.label === kind ? "✓" : "", words: o.words, run: turn(o) })).concat(null)
     : [];
   return [
     ...turnInto,
-    { label: "Duplicate", hint: "", run: () => editor.chain().focus().insertContentAt(pos + node.nodeSize, node.toJSON()).run() },
-    { label: "Delete", hint: "", run: () => { editor.view.dispatch(editor.state.tr.deleteRange(pos, pos + node.nodeSize)); editor.view.focus(); } },
+    { label: "Duplicate", hint: "", words: ["copy", "clone"], run: () => editor.chain().focus().insertContentAt(pos + node.nodeSize, node.toJSON()).run() },
+    { label: "Delete", hint: "", words: ["remove", "trash"], run: () => { editor.view.dispatch(editor.state.tr.deleteRange(pos, pos + node.nodeSize)); editor.view.focus(); } },
   ];
+}
+
+/** The block menu's search: actions whose name contains the query or with a word starting with it; no lines while searching. */
+export function matchActions(actions, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return actions;
+  return actions.filter((a) => a && (a.label.toLowerCase().includes(q) || (a.words ?? []).some((w) => w.startsWith(q))));
 }
 
 function dragHandleView(view, editor) {
@@ -196,28 +203,58 @@ function dragHandleView(view, editor) {
     if (root) root.style.minHeight = "";
   };
   const outside = (event) => { if (!menu.contains(event.target)) closeMenu(); };
+  // A search field on top filters the actions; ↑/↓ pick one, Return runs it.
+  const search = Object.assign(document.createElement("input"), { className: "mn-block-search", type: "search", placeholder: "Search actions" });
+  search.setAttribute("aria-label", "Search block actions");
+  const list = document.createElement("div");
+  let actions = [], shown = [], active = 0;
+  const pick = (a) => { closeMenu(); a.run(); };
+  const render = () => {
+    shown = matchActions(actions, search.value);
+    const rows = shown.filter(Boolean);
+    active = Math.min(active, Math.max(0, rows.length - 1));
+    if (!rows.length) {
+      list.replaceChildren(Object.assign(document.createElement("div"), { className: "mn-at-item mn-at-hint", textContent: "No matching action" }));
+      return;
+    }
+    let i = 0;
+    list.replaceChildren(...shown.map((a) => {
+      if (!a) return Object.assign(document.createElement("div"), { className: "mn-menu-sep" });
+      const n = i++;
+      const row = Object.assign(document.createElement("div"), { className: "mn-at-item" + (n === active ? " active" : "") });
+      row.setAttribute("role", "menuitem");
+      row.append(Object.assign(document.createElement("span"), { textContent: a.label }),
+        Object.assign(document.createElement("span"), { className: "mn-at-hint", textContent: a.hint }));
+      row.onmousedown = (e) => { e.preventDefault(); pick(a); };
+      return row;
+    }));
+  };
+  search.addEventListener("input", () => { active = 0; render(); });
   const onKey = (event) => {
-    if (event.key !== "Escape") return;
-    event.preventDefault();
-    closeMenu();
-    view.focus();
+    const rows = shown.filter(Boolean);
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeMenu();
+      view.focus();
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (rows.length) active = (active + (event.key === "ArrowDown" ? 1 : rows.length - 1)) % rows.length;
+      render();
+    } else if (event.key === "Enter" && rows[active]) {
+      event.preventDefault();
+      pick(rows[active]);
+    }
   };
   handle.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     const body = attach();
     if (current == null || !body) return;
-    const actions = blockActions(editor, current);
+    actions = blockActions(editor, current);
     if (!actions.length) return;
     view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, current)));  // shows which block
-    menu.replaceChildren(...actions.map((a) => {
-      if (!a) return Object.assign(document.createElement("div"), { className: "mn-menu-sep" });
-      const row = Object.assign(document.createElement("div"), { className: "mn-at-item" });
-      row.setAttribute("role", "menuitem");
-      row.append(Object.assign(document.createElement("span"), { textContent: a.label }),
-        Object.assign(document.createElement("span"), { className: "mn-at-hint", textContent: a.hint }));
-      row.onmousedown = (e) => { e.preventDefault(); closeMenu(); a.run(); };
-      return row;
-    }));
+    search.value = ""; active = 0;
+    render();
+    menu.replaceChildren(search, list);
     body.append(menu);
     const frame = body.getBoundingClientRect();
     menu.style.top = `${event.clientY - frame.top}px`;
@@ -227,6 +264,7 @@ function dragHandleView(view, editor) {
     if (root) root.style.minHeight = `${menu.offsetTop + menu.offsetHeight + 8}px`;
     document.addEventListener("mousedown", outside, true);
     document.addEventListener("keydown", onKey, true);
+    search.focus({ preventScroll: true });
   });
   attach();
 

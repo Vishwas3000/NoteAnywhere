@@ -158,6 +158,9 @@
 .mn-block-menu .mn-at-item:hover { background: var(--mn-check); color: #1d1d1f; }
 .mn-block-menu .mn-at-item:hover .mn-at-hint { color: #1d1d1f; opacity: 0.7; }
 .mn-menu-sep { height: 1px; margin: 4px 6px; background: var(--mn-line); }
+.mn-block-search { box-sizing: border-box; width: 100%; margin: 0 0 4px; padding: 5px 8px; border: 1px solid var(--mn-line);
+  border-radius: 6px; background: transparent; color: var(--mn-fg); font: inherit; outline: none; }
+.mn-block-search:focus { border-color: var(--mn-accent); }
 .mn-at-item.active .mn-at-hint { color: #1d1d1f; opacity: 0.7; }
 /* On highlighted text: Add page, Link to a note… */
 .mn-bubble { position: absolute; z-index: 4; display: flex; flex-direction: column; gap: 2px; padding: 3px; border-radius: 9px;

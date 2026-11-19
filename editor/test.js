@@ -187,6 +187,16 @@ check("the handle menu duplicates and deletes a block; a table only gets those t
   const table = mount("| A | B |\n| --- | --- |\n| 1 | 2 |");
   assert.deepEqual(Array.from(MNEditor.blockActions(table.editor, 0), (a) => a?.label), ["Duplicate", "Delete"]);
 });
+check("the handle menu's search finds actions by name or other words, without lines", () => {
+  const ed = mount("plain");
+  const all = MNEditor.blockActions(ed.editor, blockPos(ed, "plain"));
+  const labels = (q) => Array.from(MNEditor.matchActions(all, q), (a) => a?.label);
+  assert.equal(MNEditor.matchActions(all, "  ").length, all.length);
+  assert.deepEqual(labels("quo"), ["Quote"]);
+  assert.deepEqual(labels("remove"), ["Delete"]);
+  assert.deepEqual(labels("head"), ["Heading 1", "Heading 2", "Heading 3"]);
+  assert.deepEqual(labels("zzz"), []);
+});
 check("@tomorrow + space becomes a real date chip, and ⌘-click reports the day", () => {
   let got;
   const ed = mount("", { onDate: (d) => (got = d) });
