@@ -63,10 +63,11 @@ extension Note {
     /// A note can stand alone: no app or website, stored as a website note without an address.
     var hasSource: Bool { !target.isEmpty }
 
+    var tags: [String] { locked ? [] : Self.tags(in: text) }
+
     /// Obsidian-style #tags, lowercased and in order of first use: "#ML", "#project/notes". A tag needs a letter
     /// ("#2024" isn't one) and doesn't count inside code or a link's address; "# Heading" has a space, so it's no tag.
-    var tags: [String] {
-        guard !locked else { return [] }
+    static func tags(in text: String) -> [String] {
         var inFence = false, seen = Set<String>(), found: [String] = []
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
             if line.hasPrefix("```") { inFence.toggle(); continue }
@@ -78,6 +79,71 @@ extension Note {
             }
         }
         return found
+    }
+
+    // MARK: Tag chips and related notes (D77). Tags stay "#tag" text, so they sync and show everywhere as before.
+
+    /// What "+ Tag" makes of what you type: "Project X" or "#Project/X" → "project-x", "project/x". Nil if it can't be
+    /// a tag (it needs a letter).
+    static func tagName(_ typed: String) -> String? {
+        let name = typed.trimmingCharacters(in: .whitespaces).drop { $0 == "#" }
+            .split(whereSeparator: \.isWhitespace).joined(separator: "-").lowercased()
+        return tags(in: "#" + name) == [name] ? name : nil
+    }
+
+    /// The text with `#tag` added where it disturbs nothing: after a last line of only tags, else on a new last line,
+    /// so the title and the writing stay as they were. Unchanged if the note has the tag already.
+    static func adding(tag: String, to text: String) -> String {
+        guard !tags(in: text).contains(tag) else { return text }
+        var lines = text.components(separatedBy: "\n")
+        if let last = lines.lastIndex(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }), isTagLine(lines[last]) {
+            lines[last] += " #" + tag
+            return lines.joined(separator: "\n")
+        }
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "#" + tag }
+        return text + (text.hasSuffix("\n") ? "\n" : "\n\n") + "#" + tag
+    }
+
+    /// The text without `#tag`. A line of only tags loses it, and goes (with the blank line above it) once empty; in
+    /// writing only the "#" goes, so the sentence still reads. Code and link addresses are left alone, as in `tags`.
+    static func removing(tag: String, from text: String) -> String {
+        var inFence = false, kept: [String] = []
+        for line in text.components(separatedBy: "\n") {
+            let fence = line.hasPrefix("```")
+            if fence { inFence.toggle() }
+            if fence || inFence || !line.contains("#") { kept.append(line); continue }
+            if isTagLine(line) {
+                let rest = line.split(whereSeparator: \.isWhitespace).filter { tags(in: String($0)) != [tag] }
+                if !rest.isEmpty { kept.append(rest.joined(separator: " ")) }
+                else if kept.last?.trimmingCharacters(in: .whitespaces).isEmpty == true { kept.removeLast() }
+                continue
+            }
+            kept.append(line.replacing(#/(`[^`]*`|\]\([^)]*\)|<[^>]*>)|(^|[\s(\[{,;:!?])#([\w\-/]*[^\W\d][\w\-/]*)/#) { m in
+                guard m.output.1 == nil, let before = m.output.2, let name = m.output.3,
+                      name.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/")) == tag else { return m.output.0 }
+                return before + name
+            })
+        }
+        return kept.joined(separator: "\n")
+    }
+
+    /// "#noteanywhere #bug": a line of only tags, where "+ Tag" adds them.
+    private static func isTagLine(_ line: String) -> Bool {
+        let words = line.split(whereSeparator: \.isWhitespace)
+        return !words.isEmpty && words.allSatisfy { $0.hasPrefix("#") && tags(in: String($0)).count == 1 }
+    }
+
+    /// Other notes with any of this note's tags: most tags in common first, then the most recently edited.
+    /// shortcut: parses every note's tags per call, fine for thousands of notes; keep a tag index if libraries outgrow it.
+    static func related(to note: Note, in notes: [Note], limit: Int = 8) -> [(note: Note, shared: [String])] {
+        let mine = Set(note.tags)
+        guard !mine.isEmpty else { return [] }
+        let matches = notes.compactMap { other -> (note: Note, shared: [String])? in
+            guard other.id != note.id else { return nil }
+            let shared = other.tags.filter(mine.contains)
+            return shared.isEmpty ? nil : (other, shared)
+        }
+        return Array(matches.sorted { ($0.shared.count, $0.note.updatedAt) > ($1.shared.count, $1.note.updatedAt) }.prefix(limit))
     }
 
     /// Lines with a date: "@2026-10-30" (what the editor writes) or Obsidian Tasks' "📅 2026-10-30". A checklist

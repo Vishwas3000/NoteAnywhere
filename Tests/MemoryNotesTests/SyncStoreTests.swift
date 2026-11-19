@@ -198,4 +198,16 @@ import Testing
         #expect(rows("PRAGMA foreign_key_check").isEmpty)
         #expect(rows("PRAGMA user_version") == ["7"])
     }
+
+    /// D77: "#note" finds #noteanywhere while you type; the exact tag (and its nested ones) still comes first.
+    /// Here, not with the other tag tests, because SearchIndex opens the database it finds when it starts.
+    @Test func tagSearchMatchesThePartTyped() async {
+        let partial = Note(kind: .url, target: "", label: "", text: "Bugs\n#noteanywhere", updatedAt: 3)
+        let exact = Note(kind: .url, target: "", label: "", text: "Reading list #note", updatedAt: 1)
+        let nested = Note(kind: .url, target: "", label: "", text: "#note/ideas", updatedAt: 2)
+        let other = Note(kind: .url, target: "", label: "", text: "#flam #notnote", updatedAt: 4)
+        let hits = await SearchIndex.shared.search("#note", in: [partial, exact, nested, other]).map(\.note.id)
+        #expect(hits == [nested.id, exact.id, partial.id])
+        #expect(await SearchIndex.shared.search("#NOTEANY", in: [partial, other]).map(\.note.id) == [partial.id])
+    }
 }

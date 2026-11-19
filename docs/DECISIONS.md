@@ -921,3 +921,29 @@ Made by the subagent that wrote the extension:
   - the migration SQL on a copy of the maintainer's database: 62 rows became 33 and none went missing. The 2 notes
     edited after the sync kept their newest text, and no note changed between deleted and not deleted.
 - **Status:** Done.
+
+## D77 — Tags in an inspector, related notes, partial tag search (2026-11-20)
+- **Asked by the user:** tag notes such as "Bugs" and "Features" with their project, so the app relates them. Then,
+  about a first version with a row of tag chips above the note: "i dont like the tag placement", "search online where
+  can this be better placed"; and "partial search is not working": `#note` found nothing for `#noteanywhere`.
+- **Research:** Bear and Evernote tag by typing # in the text, which suggests existing tags; Evernote's tag button is
+  at the bottom of the note; Obsidian shows tags as Properties at the top and backlinks in the right sidebar by default
+  (at the bottom of the note is an option); Apple's HIG puts the details of the selected item in an inspector. The user
+  chose "Inspector + # typing" from three mockups (inspector, footer, toolbar buttons).
+- **What it does:**
+  - The Inspector (toolbar ⓘ or ⌥⌘I; stays open or closed as left) beside a note lists its #tags (click: the tag's
+    notes; ✕: remove), a field to add one (tags in use that contain what you type, those starting with it first;
+    Return adds exactly what you typed: "Project X" becomes `#project-x`), and its related notes: notes sharing a tag,
+    most tags in common first, then the newest. A click opens one.
+  - Searching `#note` lists notes tagged `#note` (or nested under it) first, then those with a tag starting with
+    "note", such as `#noteanywhere`. The main window, ⌥⇧Space, the browser panel and the iPhone share this search; the
+    MCP tag filter stays exact.
+- **Tags stay text (D32):** the Inspector edits the note's `#tag` text through the same path as typing (edit time,
+  snapshot, sync). It adds `#tag` to a last line of only tags, else on a new last line, so the title and the writing
+  stay as they were. Removing a tag deletes it from a tag line (and the line once it's empty); in a sentence only the
+  "#" goes, so the sentence still reads. Code, link addresses and fenced blocks are never touched, as in `tags`.
+- **Related = exact tags:** `#project/a` and `#project/b` aren't related through `#project`, or every project would be.
+- **Rejected:** the row of chips above the note (the user), a footer, toolbar buttons only; a separate tag field that
+  syncs (D32: text already works on every device and in the browser); deleting the word with the "#".
+- **Not yet:** an inspector on the iPhone, the floating and browser panels, Android (no tags at all).
+- **Status:** Decided by the user.
