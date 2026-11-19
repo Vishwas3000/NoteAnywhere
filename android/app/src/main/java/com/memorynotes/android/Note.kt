@@ -15,6 +15,7 @@ data class Note(
     val updatedAt: Double,
     val deletedAt: Double? = null,
     val pinned: Boolean = false,
+    val starred: Boolean = false,  // a favourite: shown under the Starred filter, not moved like pinned
     val folderId: String? = null,
     val color: String? = null,
     val locked: Boolean = false,  // text is a "mnlock:v1:" envelope: shown as locked, never opened or edited here

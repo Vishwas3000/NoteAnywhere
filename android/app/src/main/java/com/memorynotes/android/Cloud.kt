@@ -168,7 +168,7 @@ class Cloud(private val store: Store, private val secrets: Secrets) {
         val key = vaultKey ?: return
         while (true) {
             val folders = page("folders", "id,name,updated_at,deleted_at")
-            val notes = page("notes", "id,kind,target,label,body_md,created_at,updated_at,deleted_at,pinned,folder_id,color,locked")
+            val notes = page("notes", "id,kind,target,label,body_md,created_at,updated_at,deleted_at,pinned,starred,folder_id,color,locked")
             store.applyRemote(notes.map { it.openedNote(key) }, folders.map { it.openedFolder(key) })
             folders.lastOrNull()?.let { store.setValue("cursor.folders", it.getLong("seq").toString()) }
             notes.lastOrNull()?.let { store.setValue("cursor.notes", it.getLong("seq").toString()) }
