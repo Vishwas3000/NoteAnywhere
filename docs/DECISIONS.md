@@ -834,7 +834,7 @@ Made by the subagent that wrote the extension:
 - The block menu has a search field on top: typing filters the actions by name or other words ("remove" finds
   Delete), ↑/↓ pick and Return runs.
 
-## D73: Starred notes, and bringing iPhone and Android up to the Mac (2026-11-19)
+## D73 — Starred notes, and bringing iPhone and Android up to the Mac (2026-11-19)
 
 - **Asked by the user:** star and pin on every platform. **Pin** keeps its meaning: pinned notes sit in a "Pinned"
   section at the top. **Star** doesn't move a note; a "Starred" filter (Mac sidebar under All Notes, iPhone list
