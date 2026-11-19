@@ -1,6 +1,8 @@
 # NoteAnywhere Privacy Policy
 
-Last updated: 2026-10-29
+Last updated: 2026-11-20
+
+This policy is also published at https://noteanywhere.app/privacy.
 
 NoteAnywhere is a notes app for macOS with a companion extension for Chrome and Brave. It is open source
 (GPL-3.0), so every claim below can be checked in the code at https://github.com/Vishwas3000/NoteAnywhere.
@@ -14,7 +16,7 @@ you turn it on. There are no analytics, no ads, no tracking and no account unles
 `~/Library/Application Support/MemoryNotes/memorynotes.sqlite` (the folder still uses the app's former name). It holds:
 
 - your notes (Markdown text), with the app, chat or web page each one belongs to, when it was created and edited,
-  and its folder, pin and color label;
+  and its folder, pin, star and color label;
 - your folders' names;
 - one snapshot per note for each day you edited it, which the calendar shows;
 - search vectors computed from your notes (see "On-device search");
@@ -66,6 +68,8 @@ NoteAnywhere connects to the internet only for these reasons:
 |------|------|--------------------------|--------------|
 | Website icons | The first time a site you have notes for needs its icon | That website itself | A normal request for its home page and icon. No third-party favicon service is used, so no one else learns which sites you keep notes on. |
 | Search model | Your first search, once (about 87 MB) | Hugging Face (huggingface.co) | A download request for the public model `sentence-transformers/all-MiniLM-L6-v2`. No notes or queries are sent. |
+| Link previews | Only when you paste a link into a note and choose Mention or Card | That website itself | A normal request for the page, and for its preview picture and icon, which are kept as images in the note |
+| Feedback | Only when you press Send in Send Feedback (in the app, or the form on noteanywhere.app) | noteanywhere.app, which emails it to the developer | Your message, the email address you give for a reply (optional), and the NoteAnywhere and macOS versions. Your IP address is used only to allow 5 messages a minute and is not stored. |
 | Sync | Only if you turn sync on and sign in | Supabase (see below) | Your notes and your email address |
 
 There are no analytics, no telemetry, no crash reporting, no advertising and no update checks.
@@ -100,7 +104,7 @@ What the server can see:
 - your email address and account id (managed by Supabase Auth, which also keeps sign-in records such as times and
   IP addresses, and sends the sign-in emails);
 - each note's id, whether it is an app or website note, its timestamps, whether it was deleted or locked, and its
-  folder, pin and color label;
+  folder, pin, star and color label;
 - each image's id, creation time and file type (such as PNG).
 
 Search vectors and website icons are not synced. Data travels over HTTPS, and database rules ensure each account can
@@ -125,8 +129,8 @@ NoteAnywhere is not directed at children under 13 and does not knowingly collect
 
 ## Changes
 
-Changes to this policy are published in this file, with a new date at the top. Its history is in the repository's
-git log.
+Changes to this policy are published at https://noteanywhere.app/privacy and in this file, with a new date at the
+top. Its history is in the repository's git log.
 
 ## Contact
 
