@@ -52,9 +52,10 @@ Without the permission, NoteAnywhere still works, with notes per app instead of 
 
 ## What the browser extension reads
 
-On each page you open, the extension sends the page's address (domain and path, without the query string or `#`
-fragment) to the NoteAnywhere app on your Mac through Chrome's native messaging, so the app can tell whether you
-have notes for that page. When you create a note on a page, the page's title is saved with it. The extension does not
+On each page you open, the extension sends the page's address to the NoteAnywhere app on your Mac through Chrome's
+native messaging, so the app can tell whether you have notes for that page. The address is the domain and path,
+without the query string or `#` fragment, except where the part after "?" names the page: on a YouTube video it
+includes the video's id, and on a YouTube or Google search, the search words. When you create a note on a page, the page's title is saved with it. The extension does not
 read page contents, does not track your browsing, and sends nothing to any server. The address lookup happens on your
 Mac and is not stored.
 
