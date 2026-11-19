@@ -48,6 +48,23 @@ class Store(private val file: File?, private val onChange: () -> Unit = {}) {
         changed()
     }
 
+    /** Pin, star or colour, locked notes too: updated_at + 1 ms rather than now, so sync carries it without the
+     *  change counting as an edit (NoteStore.saveMeta on the Mac). */
+    @Synchronized fun setMeta(id: String, change: (Note) -> Note) {
+        val old = note(id) ?: return
+        notes[id] = change(old).copy(id = id, text = old.text, updatedAt = old.updatedAt + 1, dirty = true)
+        changed()
+    }
+
+    /** A copy with the same text, place, folder and colour, not pinned or starred (NotesModel.duplicate); null for a locked note. */
+    @Synchronized fun duplicate(id: String, now: Double = now()): String? {
+        val old = note(id)?.takeIf { !it.locked } ?: return null
+        val copy = old.copy(id = newID(), createdAt = now, updatedAt = now, pinned = false, starred = false, dirty = true)
+        notes[copy.id] = copy
+        changed()
+        return copy.id
+    }
+
     @Synchronized fun dirtyNotes(limit: Int = 200) = notes.values.filter { it.dirty }.take(limit)
     @Synchronized fun dirtyFolders() = folders.values.filter { it.dirty }
 
@@ -123,13 +140,13 @@ class Store(private val file: File?, private val onChange: () -> Unit = {}) {
 
 private fun Note.toLocal() = JSONObject().put("id", id).put("kind", kind).put("target", target).put("label", label)
     .put("text", text).put("created_at", createdAt).put("updated_at", updatedAt).put("deleted_at", deletedAt ?: JSONObject.NULL)
-    .put("pinned", pinned).put("folder_id", folderId ?: JSONObject.NULL).put("color", color ?: JSONObject.NULL)
+    .put("pinned", pinned).put("starred", starred).put("folder_id", folderId ?: JSONObject.NULL).put("color", color ?: JSONObject.NULL)
     .put("locked", locked).put("dirty", dirty)
 
 private fun JSONObject.localNote() = Note(
     id = getString("id"), kind = getString("kind"), target = getString("target"), label = getString("label"),
     text = getString("text"), createdAt = getDouble("created_at"), updatedAt = getDouble("updated_at"),
-    deletedAt = optDoubleOrNull("deleted_at"), pinned = optBoolean("pinned"), folderId = optStringOrNull("folder_id"),
+    deletedAt = optDoubleOrNull("deleted_at"), pinned = optBoolean("pinned"), starred = optBoolean("starred"), folderId = optStringOrNull("folder_id"),
     color = optStringOrNull("color"), locked = optBoolean("locked"), dirty = optBoolean("dirty"),
 )
 
@@ -150,14 +167,14 @@ fun JSONObject.optStringOrNull(key: String): String? = if (isNull(key)) null els
 fun Note.row(key: ByteArray): JSONObject = JSONObject()
     .put("id", id).put("kind", kind).put("target", Vault.seal(target, key)).put("label", Vault.seal(label, key))
     .put("body_md", Vault.seal(text, key)).put("created_at", createdAt).put("updated_at", updatedAt)
-    .put("deleted_at", deletedAt ?: JSONObject.NULL).put("pinned", pinned).put("folder_id", folderId ?: JSONObject.NULL)
+    .put("deleted_at", deletedAt ?: JSONObject.NULL).put("pinned", pinned).put("starred", starred).put("folder_id", folderId ?: JSONObject.NULL)
     .put("color", color ?: JSONObject.NULL).put("locked", locked)
 
 fun JSONObject.openedNote(key: ByteArray) = Note(
     id = getString("id").lowercase(), kind = getString("kind"), target = Vault.open(getString("target"), key),
     label = Vault.open(getString("label"), key), text = Vault.open(getString("body_md"), key),
     createdAt = getDouble("created_at"), updatedAt = getDouble("updated_at"), deletedAt = optDoubleOrNull("deleted_at"),
-    pinned = optBoolean("pinned"), folderId = optStringOrNull("folder_id")?.lowercase(), color = optStringOrNull("color"),
+    pinned = optBoolean("pinned"), starred = optBoolean("starred"), folderId = optStringOrNull("folder_id")?.lowercase(), color = optStringOrNull("color"),
     locked = optBoolean("locked"),
 )
 
