@@ -867,3 +867,31 @@ Made by the subagent that wrote the extension:
 - **Asked by the user (updates):** Sparkle, so installed copies update themselves. Its EdDSA signing key lives only
   in the maintainer's keychain, like the certificate.
 
+## D75 — Sparkle updates in the Mac app (2026-11-20, subagent)
+
+- **Asked by the user (D74):** Sparkle, so installed copies update themselves. The app side is here; publishing
+  (GitHub Release, website, appcast) is a script in the private repo.
+- **Feed and archives**, fixed because that script relies on them: the feed is `https://noteanywhere.app/appcast.xml`
+  (`SUFeedURL`); each update is the notarized DMG on GitHub Releases,
+  `https://github.com/Vishwas3000/NoteAnywhere/releases/download/vX.Y.Z/NoteAnywhere-X.Y.Z.dmg`, signed with
+  Sparkle's `sign_update`. Sparkle compares `CFBundleVersion`; release.sh sets it and `CFBundleShortVersionString` to
+  X.Y.Z, and the appcast uses X.Y.Z for both.
+- **Key:** the EdDSA private key exists only in the maintainer's keychain (Sparkle's `generate_keys`); Info.plist has
+  only the public key (`SUPublicEDKey`). Until the key is generated, Info.plist holds a placeholder and release.sh
+  refuses to build. The tools are in `.build/artifacts/sparkle/Sparkle/bin/` once the package resolves.
+- **Chosen by Claude:** Sparkle 2.10.1 through SwiftPM, pinned exactly (the newest stable 2.x that was two weeks old).
+  `make_app.sh` embeds Sparkle.framework in Contents/Frameworks (the binary's rpath `@executable_path/../Frameworks`
+  comes from Package.swift) and removes its XPC services, which only sandboxed apps use; Sparkle's docs allow removing
+  them, and it leaves no Downloader.xpc entitlements to keep. install.sh and release.sh sign Autoupdate, Updater.app,
+  the framework and then the app, Sparkle's documented order, never `--deep`. Sparkle's defaults stay: it asks on the
+  second launch whether to check automatically (daily), and sends no system profile. Check for Updates… is after
+  About in the app menu, and in the menu-bar menu.
+- **Dev builds don't update:** install.sh removes `SUFeedURL` from its bundle, and the app starts Sparkle only when
+  the feed is there, so a dev build never replaces itself with a release; its Check for Updates… is greyed out.
+  Rejected: `SUEnableAutomaticChecks` false (a manual check could still install a release over the dev build, and
+  Sparkle refuses to start with the placeholder key, with an alert at every launch).
+- **Status:** Proposed. Checked: `swift test`; an ad hoc build loads the embedded framework; release.sh with a
+  throwaway test key builds a Developer ID app that passes `codesign --verify --deep --strict` ("Unnotarized
+  Developer ID" until notarized); a `sign_update` signature of its DMG verifies with CryptoKit. Not yet: a real key,
+  notarization, and an update installed from a real feed.
+
