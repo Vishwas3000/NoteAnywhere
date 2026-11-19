@@ -260,7 +260,7 @@ final class CloudSync: ObservableObject {
         guard let key = vaultKey else { return }
         while true {
             let folders = try await page("folders", "id,name,updated_at,deleted_at", NoteStore.CloudFolder.self)
-            let notes = try await page("notes", "id,kind,target,label,body_md,created_at,updated_at,deleted_at,pinned,folder_id,color,locked",
+            let notes = try await page("notes", "id,kind,target,label,body_md,created_at,updated_at,deleted_at,pinned,folder_id,color,locked,starred",
                                        NoteStore.CloudNote.self)
             let snapshots = try await page("snapshots", "note_id,day,body_md,updated_at", NoteStore.CloudSnapshot.self)
             try NoteStore.applyRemote(notes: try notes.map { try $0.opened(with: key) },
@@ -422,7 +422,8 @@ extension NoteStore.CloudNote {
         ["id": id, "kind": kind, "target": try SyncVault.seal(target, key), "label": try SyncVault.seal(label, key),
          "body_md": try SyncVault.seal(body_md, key),
          "created_at": created_at, "updated_at": updated_at, "deleted_at": deleted_at ?? NSNull(),
-         "pinned": pinned ?? false, "folder_id": folder_id ?? NSNull(), "color": color ?? NSNull(), "locked": locked ?? false]
+         "pinned": pinned ?? false, "folder_id": folder_id ?? NSNull(), "color": color ?? NSNull(), "locked": locked ?? false,
+         "starred": starred ?? false]
     }
 
     func opened(with key: SymmetricKey) throws -> Self {

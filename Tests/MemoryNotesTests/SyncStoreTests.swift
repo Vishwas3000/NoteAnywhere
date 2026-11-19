@@ -65,6 +65,7 @@ import Testing
         let note = UUID().uuidString, folder = UUID().uuidString, missing = UUID().uuidString
         var pinned = remote(note, "x", at: 10)
         pinned.pinned = true
+        pinned.starred = true
         pinned.color = "blue"
         pinned.folder_id = folder
         var orphan = remote(UUID().uuidString, "y", at: 10)
@@ -72,15 +73,17 @@ import Testing
         try NoteStore.applyRemote(notes: [pinned, orphan], snapshots: [],
                                   folders: [.init(id: folder, name: "Work", updated_at: 1, deleted_at: nil)])
         let local = try #require(NoteStore.loadAll().first { $0.id == note })
-        #expect(local.pinned && local.color == .blue && local.folderID == folder)
+        #expect(local.pinned && local.starred && local.color == .blue && local.folderID == folder)
         #expect(NoteStore.loadAll().first { $0.id == orphan.id }?.folderID == nil)
         #expect(NoteStore.folders().contains { $0.id == folder && $0.name == "Work" })
         // A local pin is a change to push, without counting as an edit.
         var edited = local
         edited.pinned = false
+        edited.starred = false
         try NoteStore.saveMeta(edited)
         let pushed = try #require(NoteStore.dirtyNotes().first { $0.id == note })
-        #expect(pushed.pinned == false && pushed.updated_at == 11)
+        #expect(pushed.pinned == false && pushed.starred == false && pushed.updated_at == 11)
+        #expect(NoteStore.loadAll().first { $0.id == note }?.starred == false)
     }
 
     @Test func lockingLeavesNoReadableCopy() throws {
