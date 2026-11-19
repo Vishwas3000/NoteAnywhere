@@ -21,5 +21,3 @@ android/local.properties
 *.apk
 
 # The website serves the release DMG; it is copied in at deploy time, never committed.
-site/*.dmg
-.wrangler/

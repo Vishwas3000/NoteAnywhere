@@ -144,19 +144,13 @@ deletes the keychain at the end.
    ```
    then cut a new app release. Only apps that know the id let the store extension in; until users have that version,
    the store extension shows "Install NoteAnywhere for Mac and open it once". After the release, also fill in the
-   "Add to Chrome" link in `site/index.html` (marked `FILL IN`) and the README.
+   "Add to Chrome" link in the site repo's `site/index.html` (marked `FILL IN`) and the README.
 8. **Updates:** bump `VERSION`, build, then dashboard → the item → Package → Upload new package.
 
 If you also have the unpacked development extension loaded, turn it off: both would show a panel on every page.
 
 ## Website
 
-noteanywhere.app is `site/` on Cloudflare Workers static assets (`wrangler.jsonc`, D71); the DMG is served from it.
-`/api/feedback` is `worker/index.js` (D72): it needs Email Routing on for the domain with the destination verified.
-
-1. `cp dist/NoteAnywhere-<version>.dmg site/NoteAnywhere.dmg` (gitignored; must stay under 25 MiB).
-2. Update `softwareVersion` in the JSON-LD in `site/index.html` and `lastmod` in `site/sitemap.xml`.
-3. From outside the repo (npm in the repo trips over a packageManager rule):
-   `cd /tmp && npx wrangler@4 deploy --config <repo>/wrangler.jsonc`.
-4. Check: `curl -I https://noteanywhere.app/NoteAnywhere.dmg` shows `application/x-apple-diskimage`.
-5. Worker tests: `node --test worker/feedback.test.mjs`. Local run: `wrangler dev` (mails land in `.wrangler/tmp`).
+noteanywhere.app (the site, the DMG download and the `/api/feedback` endpoint the apps use) lives in the private
+repo `Vishwas3000/NoteAnywhere_personal` since 2026-11-20 (D74). Its README has the deploy steps: copy
+`dist/NoteAnywhere-<version>.dmg` from here into its `site/`, update the version there, deploy with wrangler.

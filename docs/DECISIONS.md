@@ -846,3 +846,11 @@ Made by the subagent that wrote the extension:
 - **Parity, phased:** A = star everywhere + Android basics (pin, colour, duplicate, share, sections); B = iPhone
   gaps (tag list, tap a tag, folder rename/delete, creating note links, block menu by touch). C (Android rich
   editor, images) and D (locked notes on phones, Trash, Android calendar/graph) wait for the user's go-ahead.
+
+## D74 — The website moves to a private repo; main changes only through pull requests (2026-11-20)
+
+- **Asked by the user:** the website (`site/`, the feedback `worker/`, `wrangler.jsonc`) and non-public material
+  (launch-post drafts) live in the private repo `Vishwas3000/NoteAnywhere_personal`; this repo keeps the apps, the
+  extension and the editor. What was already pushed here stays in this repo's history.
+- **Asked by the user:** `main` is the production branch in both repos and changes only through a pull request.
+
