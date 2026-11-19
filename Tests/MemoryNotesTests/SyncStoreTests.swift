@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 @testable import MemoryNotes
 
@@ -142,5 +143,59 @@ import Testing
         try NoteStore.resetSync()
         #expect(NoteStore.syncValue("cursor.notes") == nil)
         #expect(NoteStore.dirtyNotes(limit: 10_000).contains { $0.id == id })
+    }
+
+    /// D76: the server's uuid columns answer in lowercase. The Mac made uppercase ids, so every synced note came back
+    /// as a second copy. A note made here must come back as itself.
+    @Test func aNotePulledBackStaysOneNote() throws {
+        let note = NotesModel.shared.add(kind: .url, target: "example.com", label: "", text: "x")
+        #expect(note.id == note.id.lowercased())
+        try NoteStore.applyRemote(notes: [remote(note.id.lowercased(), "x", at: note.updatedAt + 1)], snapshots: [])
+        #expect(NoteStore.loadAll().filter { $0.id.lowercased() == note.id.lowercased() }.count == 1)
+    }
+
+    /// D76 repairs stores that synced before it: each uppercase/lowercase pair becomes one note (the newer edit wins),
+    /// every snapshot day and tag survives, folders merge too, and all ids end up lowercase.
+    @Test func version7MergesCaseDuplicates() throws {
+        var db: OpaquePointer?
+        try #require(sqlite3_open(Self.dir + "/v7-\(UUID().uuidString).sqlite", &db) == SQLITE_OK)
+        let handle = try #require(db)
+        defer { sqlite3_close(handle) }
+        sqlite3_exec(handle, "PRAGMA foreign_keys = ON", nil, nil, nil)
+        try NoteStore.migrate(handle)  // an empty store at the current version
+        let a = "AAAAAAAA-1111-4111-8111-111111111111", b = "BBBBBBBB-2222-4222-8222-222222222222"
+        let c = "CCCCCCCC-3333-4333-8333-333333333333", f = "FFFFFFFF-4444-4444-8444-444444444444"
+        let (la, lb, lc, lf) = (a.lowercased(), b.lowercased(), c.lowercased(), f.lowercased())
+        // a: edited here after a sync pulled its twin, so the uppercase copy is newer; b: the pulled copy is newer;
+        // c: never synced, so it has no twin.
+        try #require(sqlite3_exec(handle, """
+            INSERT INTO folders (id, name, updated_at, dirty) VALUES ('\(f)', 'Work', 1, 0), ('\(lf)', 'Work', 1, 0);
+            INSERT INTO notes (id, kind, target, body_md, folder_id, created_at, updated_at, dirty) VALUES
+                ('\(a)', 'url', 'x.com', 'a new', '\(f)', 1, 20, 1), ('\(la)', 'url', 'x.com', 'a old', '\(lf)', 1, 10, 0),
+                ('\(b)', 'url', 'x.com', 'b old', NULL, 1, 10, 0), ('\(lb)', 'url', 'x.com', 'b new', NULL, 1, 20, 0),
+                ('\(c)', 'url', 'x.com', 'c', '\(f)', 1, 10, 1);
+            INSERT INTO snapshots (note_id, day, body_md, updated_at, dirty) VALUES
+                ('\(a)', '2026-11-01', 'only here', 5, 0), ('\(a)', '2026-11-02', 'a new', 20, 1),
+                ('\(la)', '2026-11-02', 'a old', 10, 0), ('\(c)', '2026-11-01', 'c', 10, 1);
+            INSERT INTO tags (note_id, tag) VALUES ('\(a)', 'work'), ('\(la)', 'work');
+            PRAGMA user_version = 6;
+            """, nil, nil, nil) == SQLITE_OK)
+        try NoteStore.migrate(handle)
+        func rows(_ sql: String) -> [String] {
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(handle, sql, -1, &statement, nil) == SQLITE_OK else { return ["can't run: \(sql)"] }
+            defer { sqlite3_finalize(statement) }
+            var out: [String] = []
+            while sqlite3_step(statement) == SQLITE_ROW { out.append(sqlite3_column_text(statement, 0).map { String(cString: $0) } ?? "NULL") }
+            return out
+        }
+        #expect(rows("SELECT id || ' ' || body_md || ' ' || dirty || ' ' || ifnull(folder_id, '-') FROM notes ORDER BY id")
+                == ["\(la) a new 1 \(lf)", "\(lb) b new 0 -", "\(lc) c 1 \(lf)"])
+        #expect(rows("SELECT note_id || ' ' || day || ' ' || body_md FROM snapshots ORDER BY note_id, day")
+                == ["\(la) 2026-11-01 only here", "\(la) 2026-11-02 a new", "\(lc) 2026-11-01 c"])
+        #expect(rows("SELECT note_id FROM tags") == [la])
+        #expect(rows("SELECT id FROM folders") == [lf])
+        #expect(rows("PRAGMA foreign_key_check").isEmpty)
+        #expect(rows("PRAGMA user_version") == ["7"])
     }
 }

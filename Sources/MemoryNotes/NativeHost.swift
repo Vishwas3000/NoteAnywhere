@@ -102,7 +102,7 @@ enum NativeHost {
                 let piece = image.data[start..<min(start + imagePiece, image.data.count)]
                 return Reply(data: piece.base64EncodedString(), mime: image.type, size: image.data.count)
             case "delete":
-                try NoteStore.delete(req.id ?? "")
+                try NoteStore.delete((req.id ?? "").lowercased())  // a panel opened before D76 may hold an uppercase id
                 return Reply()
             case "watch":
                 // On a long-lived port (connectNative): push an event whenever the app or any host process saves.

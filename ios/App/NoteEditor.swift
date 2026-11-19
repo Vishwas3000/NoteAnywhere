@@ -163,7 +163,8 @@ private struct EditorWebView: UIViewRepresentable {
                     .prefix(8)
                 call("reply", id, found.map { ["id": $0.id, "title": $0.title, "preview": $0.preview] }, NSNull())
             case "notePreview":
-                guard let id = body["id"] as? Int, let noteID = body["note"] as? String else { return }
+                // Lowercased here and in openNote: note:// links written before D76 hold uppercase ids.
+                guard let id = body["id"] as? Int, let noteID = (body["note"] as? String)?.lowercased() else { return }
                 guard let note = NotesModel.shared.note(noteID) else { return call("reply", id, NSNull(), "This note was deleted.") }
                 call("reply", id, ["title": note.title, "preview": note.locked ? "Unlock it to read it." : String(note.preview.prefix(320))], NSNull())
             case "date":  // ⌘-click, so only with a hardware keyboard on the phone
@@ -171,7 +172,7 @@ private struct EditorWebView: UIViewRepresentable {
             case "tag":
                 if let tag = body["tag"] as? String { NotesModel.shared.searchRequest = "#" + tag }
             case "openNote":
-                if let id = body["id"] as? String { parent.openNote(id) }
+                if let id = body["id"] as? String { parent.openNote(id.lowercased()) }
             default:
                 break
             }
