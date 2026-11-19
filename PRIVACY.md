@@ -24,8 +24,8 @@ The same folder holds images you paste into notes (`images/`) and the search mod
 and where the floating panel sits) are kept in the app's standard macOS preferences. If you sign in to sync, the
 sign-in session is kept in your macOS Keychain, never in the database.
 
-**In your browser.** The extension stores no notes. It keeps one setting in Chrome's extension storage: whether you
-widened the panel. Notes you write in the browser are handed to the NoteAnywhere app on your Mac, which saves them in
+**In your browser.** The extension stores no notes. It keeps three settings in Chrome's extension storage: whether you
+widened the panel, where you moved it and how big you made it. Notes you write in the browser are handed to the NoteAnywhere app on your Mac, which saves them in
 the database above.
 
 **Deleting a note** hides it everywhere in the app and the extension. Its row stays in the database marked as
