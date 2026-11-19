@@ -122,6 +122,16 @@ check("#tags are highlighted, not in code, and ⌘-click reports them", () => {
   const el = ed.editor.view.dom.querySelector(".mn-tag");
   ed.editor.view.someProp("handleClick", (f) => f(ed.editor.view, 0, { metaKey: true, target: el }));
   assert.equal(got, "ml");
+  got = null;  // without ⌘ a click is just a click
+  ed.editor.view.someProp("handleClick", (f) => f(ed.editor.view, 0, { metaKey: false, target: el }));
+  assert.equal(got, null);
+});
+check("tapTags: a plain tap on a #tag reports it (the iPhone)", () => {
+  let got;
+  const ed = mount("plan #ML", { onTag: (t) => (got = t), tapTags: true });
+  const el = ed.editor.view.dom.querySelector(".mn-tag");
+  ed.editor.view.someProp("handleClick", (f) => f(ed.editor.view, 0, { metaKey: false, target: el }));
+  assert.equal(got, "ml");
 });
 // ProseMirror's "Mod" is ⌘ only where the platform says Mac.
 const mac = /Mac|iP(hone|[oa]d)/.test(window.navigator.platform);

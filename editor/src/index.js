@@ -245,7 +245,11 @@ function dragHandleView(view, editor) {
       pick(rows[active]);
     }
   };
-  handle.addEventListener("contextmenu", (event) => {
+  let touch = false; // the last press on the handle was a finger: tap opens the menu, and no keyboard pops for its search
+  handle.addEventListener("pointerdown", (event) => { touch = event.pointerType === "touch"; });
+  handle.addEventListener("click", (event) => { if (touch) openMenu(event); });
+  handle.addEventListener("contextmenu", (event) => openMenu(event));
+  const openMenu = (event) => {
     event.preventDefault();
     const body = attach();
     if (current == null || !body) return;
@@ -264,8 +268,8 @@ function dragHandleView(view, editor) {
     if (root) root.style.minHeight = `${menu.offsetTop + menu.offsetHeight + 8}px`;
     document.addEventListener("mousedown", outside, true);
     document.addEventListener("keydown", onKey, true);
-    search.focus({ preventScroll: true });
-  });
+    if (!touch) search.focus({ preventScroll: true });
+  };
   attach();
 
   return {
@@ -291,8 +295,8 @@ function dragHandleView(view, editor) {
 // Obsidian-style #tags, same rule as Note.tags in Swift: needs a letter, may nest with "/".
 const TAG = /(^|[\s(\[{,;:!?])#([\p{L}\p{N}_\-/]*[\p{L}_\-][\p{L}\p{N}_\-/]*)/gu;
 
-/** Highlights #tags as you type (outside code and links); ⌘-click one to see every note with it (onTag). */
-function tagHighlighter(onTag) {
+/** Highlights #tags as you type (outside code and links); ⌘-click one (a plain tap with tapTags) to see every note with it (onTag). */
+function tagHighlighter(onTag, tapTags) {
   return Extension.create({
     name: "mnTags",
     addProseMirrorPlugins: () => [new Plugin({
@@ -305,14 +309,14 @@ function tagHighlighter(onTag) {
               const from = pos + m.index + m[1].length;
               found.push(Decoration.inline(from, from + 1 + m[2].length, {
                 class: "mn-tag", "data-tag": m[2].toLowerCase().replace(/^\/+|\/+$/g, ""),
-                title: onTag ? "⌘-click to see every note with this tag" : "",
+                title: onTag && !tapTags ? "⌘-click to see every note with this tag" : "",
               }));
             }
           });
           return DecorationSet.create(state.doc, found);
         },
         handleClick(view, pos, event) {
-          const tag = event.metaKey && event.target.closest?.(".mn-tag")?.dataset.tag;
+          const tag = (tapTags || event.metaKey) && event.target.closest?.(".mn-tag")?.dataset.tag;
           if (!tag || !onTag) return false;
           onTag(tag);
           return true;
@@ -1340,7 +1344,7 @@ const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.0
  * linkPreviews).
  */
 export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
-  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview, onAddImage, imageURL, onLinkPreview } = {}) {
+  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview, onAddImage, imageURL, onLinkPreview, tapTags = false } = {}) {
   const root = document.createElement("div");
   root.className = "mn-editor" + (titleLine ? " mn-title-line" : "");
   if (fontSize) root.style.setProperty("--mn-font-size", `${fontSize}px`);
@@ -1411,7 +1415,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   const editor = new Editor({
     element: body,
     extensions: [
-      tagHighlighter(onTag),
+      tagHighlighter(onTag, tapTags),
       dates(onDate, () => pickDate?.(), datePattern),
       ...maths(() => editor),
       Extension.create({ name: "mnSlash", addProseMirrorPlugins() { return [slashMenu(this.editor, () => pickDate?.())]; } }),
