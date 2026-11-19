@@ -55,6 +55,52 @@ func pageTargets(url: String, expected: String) {
     #expect(note.hasTag("project") && note.hasTag("project/notes") && !note.hasTag("proj"))
 }
 
+/// D77: "+ Tag" writes plain #tags where they disturb nothing, and ✕ takes them out again.
+@Test func tagChipsEditTheText() {
+    #expect(Note.tagName(" Project X ") == "project-x")
+    #expect(Note.tagName("#NoteAnywhere/Bugs") == "noteanywhere/bugs")
+    #expect(Note.tagName("2024") == nil && Note.tagName("#") == nil && Note.tagName("") == nil)
+
+    let one = Note.adding(tag: "noteanywhere", to: "Bugs\n- sync doubles notes")
+    #expect(one == "Bugs\n- sync doubles notes\n\n#noteanywhere")
+    let two = Note.adding(tag: "bug", to: one)
+    #expect(two == "Bugs\n- sync doubles notes\n\n#noteanywhere #bug", "joins the line of tags")
+    #expect(Note.adding(tag: "bug", to: two) == two, "already tagged")
+    #expect(Note.adding(tag: "x", to: "") == "#x")
+    #expect(Note.removing(tag: "noteanywhere", from: two) == "Bugs\n- sync doubles notes\n\n#bug")
+    #expect(Note.removing(tag: "bug", from: Note.removing(tag: "noteanywhere", from: two)) == "Bugs\n- sync doubles notes",
+            "back to the text before tagging")
+
+    // In writing only the "#" goes; code, link addresses, fenced blocks and other tags stay as they were.
+    let prose = """
+        Fixed the #NoteAnywhere sync, see `#noteanywhere` and [x](https://a.com/#noteanywhere)
+        ```
+        #noteanywhere
+        ```
+        #noteanywhere/ios
+        """
+    #expect(Note.removing(tag: "noteanywhere", from: prose) == """
+        Fixed the NoteAnywhere sync, see `#noteanywhere` and [x](https://a.com/#noteanywhere)
+        ```
+        #noteanywhere
+        ```
+        #noteanywhere/ios
+        """)
+    #expect(Note.tags(in: Note.removing(tag: "noteanywhere", from: prose)) == ["noteanywhere/ios"])
+}
+
+@Test func relatedNotesShareTags() {
+    let bugs = Note(kind: .url, target: "", label: "", text: "Bugs\n#noteanywhere #bug", updatedAt: 1)
+    let features = Note(kind: .url, target: "", label: "", text: "Features\n#noteanywhere", updatedAt: 3)
+    let elsewhere = Note(kind: .url, target: "", label: "", text: "Bugs elsewhere\n#bug #flam", updatedAt: 2)
+    let triage = Note(kind: .url, target: "", label: "", text: "Triage\n#noteanywhere #bug", updatedAt: 0)
+    let groceries = Note(kind: .url, target: "", label: "", text: "Groceries")
+    let related = Note.related(to: bugs, in: [bugs, features, elsewhere, triage, groceries])
+    #expect(related.map(\.note.id) == [triage.id, features.id, elsewhere.id], "most shared first, then newest")
+    #expect(related.first?.shared == ["noteanywhere", "bug"])
+    #expect(Note.related(to: groceries, in: [bugs, groceries]).isEmpty)
+}
+
 @Test func datedLines() {
     let note = Note(id: "n", kind: .url, target: "", label: "", text: """
         # Launch plan

@@ -387,6 +387,7 @@ struct NotesWindow: View {
                 VStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 10) {
                         header(note)
+                        if !note.locked { TagBar(note: note, open: { peekID = $0 }, search: { query = "#" + $0 }) }
                         Text("Edited \(note.edited.formatted(date: .long, time: .shortened))")
                             .font(.caption)
                             .foregroundStyle(.secondary)

@@ -64,7 +64,8 @@ notes link up.
 - **Plain notes too.** A note doesn't need an app or website: ⌘N writes a plain note, ⇧⌘N a website note, and any
   note can gain or lose its website later (Add Website / Remove Website).
 - **#tags, Obsidian-style.** Type `#tag` anywhere and nest with `#area/topic`. ⌘-click a tag or search `#tag` to see
-  its notes; the sidebar lists every tag with its count.
+  its notes; the sidebar lists every tag with its count. On the Mac, each note shows its tags as chips: **+ Tag** picks
+  from the tags you already use (say, a project), and **related notes** lists the notes that share a tag.
 - **Pages from a highlight.** Highlight a question and choose **Add page**: a new note titled with it, linked from
   the highlight and linking back. Or **Link to a note…** to point it at an answer you already wrote. Hover a link to a
   note for a quick look, like VS Code's hover; click it and the page opens in a side peek next to the note.

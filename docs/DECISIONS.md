@@ -902,3 +902,18 @@ Made by the subagent that wrote the extension:
   that Info.plist and refuses the placeholder key (checked outside the app). The real public key is in Info.plist
   (2026-11-20). Not yet: notarization, the menu items on screen, and an update installed from a real feed.
 
+## D77 — Tag chips and related notes (2026-11-20)
+- **Asked by the user:** tag notes such as "Bugs" and "Features" with their project, so the app relates them.
+- **What it does:** on the Mac, each note shows its #tags as chips under its source. Click a chip to list that
+  tag's notes, or ✕ to remove it. **+ Tag** offers the tags already in use, most used first, narrowed as you type;
+  Return adds exactly what you typed ("Project X" becomes `#project-x`). **N related notes** lists the notes that
+  share a tag, most tags in common first, then the newest; one opens in the side peek.
+- **Tags stay text (D32):** a chip edits the note's `#tag` text, through the same path as typing (edit time,
+  snapshot, sync). It adds `#tag` to a last line of only tags, else on a new last line, so the title and the writing
+  stay as they were. Removing a tag deletes it from a tag line (and the line once it's empty); in a sentence only the
+  "#" goes, so the sentence still reads. Code, link addresses and fenced blocks are never touched, as in `tags`.
+- **Related = exact tags:** `#project/a` and `#project/b` aren't related through `#project`, or every project would be.
+- **Rejected:** a separate tag field that syncs (D32 rejected storing tags; text works on every device and in the
+  browser already); deleting the word with the "#" (it would break the sentence).
+- **Not yet:** the iPhone (a second pull request), the floating panel, the browser panel, Android (no tags at all).
+- **Status:** Decided (user: "go ahead and start the tag feature", options 1 and 2 of the proposal).
