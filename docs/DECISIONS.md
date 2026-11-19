@@ -860,4 +860,10 @@ Made by the subagent that wrote the extension:
   here: `PRIVACY.md` (the Chrome Web Store links to it), `docs/DECISIONS.md` and `docs/ROADMAP.md` (contributors need
   them), `supabase/` (the sync schema the apps use) and `docs/images/` (the README's pictures). Website decisions
   from now on are recorded in the private repo.
+- **Asked by the user (DMG):** releases are built, signed, notarized and published only from the maintainer's Mac;
+  the Developer ID certificate never goes to GitHub. The tag-triggered GitHub release workflow (which never had its
+  secrets and failed on every tag) is deleted. Rejected: building on GitHub Actions with the certificate as a secret
+  behind an approval step. Publishing (GitHub Release, website, update feed) is a script in the private repo.
+- **Asked by the user (updates):** Sparkle, so installed copies update themselves. Its EdDSA signing key lives only
+  in the maintainer's keychain, like the certificate.
 
