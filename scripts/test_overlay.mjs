@@ -71,6 +71,53 @@ try {
   await icon(); await expect("icon hides", false);
   await icon(); await expect("icon shows again", true);
 
+  // Dragging the header moves the panel, it stays on screen, and the next page opens it in the same spot.
+  const spot = () => page.evaluate(() => {
+    const r = document.querySelector("iframe[title=NoteAnywhere]").getBoundingClientRect();
+    return { top: Math.round(r.top), right: Math.round(innerWidth - r.right) };
+  });
+  const before = await spot();
+  const at = { x: page.viewportSize().width - before.right - 200, y: before.top + 20 }; // the header's title, not a button
+  await page.mouse.move(at.x, at.y); await page.mouse.down();
+  await page.mouse.move(at.x - 150, at.y + 100, { steps: 8 }); await page.mouse.up();
+  await page.waitForTimeout(400);
+  const after = await spot();
+  const dragged = after.top === before.top + 100 && after.right === before.right + 150;
+  console.log(`${dragged ? "PASS" : "FAIL"} drag moves the panel: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+  await page.mouse.move(at.x - 150, at.y + 100); await page.mouse.down();
+  await page.mouse.move(page.viewportSize().width - 2, 2, { steps: 8 }); await page.mouse.up(); // far past the top-right corner
+  await page.waitForTimeout(400);
+  const edge = await spot();
+  const kept = edge.top === 0 && edge.right === 0;
+  console.log(`${kept ? "PASS" : "FAIL"} a drag past the edge stops at it: ${JSON.stringify(edge)}`);
+  await page.mouse.move(at.x + 150, 10); await page.mouse.down();  // put it back somewhere distinct
+  await page.mouse.move(at.x - 50, 90, { steps: 8 }); await page.mouse.up();
+  await page.waitForTimeout(400);
+  const placed = await spot();
+  await page.reload(); await page.waitForTimeout(1500); await icon(); await page.waitForTimeout(800);
+  const again = await spot();
+  const remembered = again.top === placed.top && again.right === placed.right;
+  console.log(`${remembered ? "PASS" : "FAIL"} the spot is remembered: ${JSON.stringify(placed)} → ${JSON.stringify(again)}`);
+  failed += !dragged + !kept + !remembered;
+
+  // The bottom-left grip resizes it (top-right corner stays), the frame follows, and the size is remembered.
+  const box = () => page.evaluate(() => {
+    const r = document.querySelector("iframe[title=NoteAnywhere]").getBoundingClientRect();
+    return { left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+  });
+  const b0 = await box();
+  await page.mouse.move(b0.left + 5, b0.top + b0.h - 5); await page.mouse.down();
+  await page.mouse.move(b0.left - 95, b0.top + b0.h + 75, { steps: 8 }); await page.mouse.up();
+  await page.waitForTimeout(600);
+  const b1 = await box();
+  const resized = b1.w === b0.w + 100 && b1.h === b0.h + 80 && b1.right === b0.right && b1.top === b0.top;
+  console.log(`${resized ? "PASS" : "FAIL"} the corner grip resizes the panel: ${JSON.stringify(b0)} → ${JSON.stringify(b1)}`);
+  await page.reload(); await page.waitForTimeout(1500); await icon(); await page.waitForTimeout(800);
+  const b2 = await box();
+  const sizeKept = b2.w === b1.w && b2.h === b1.h;
+  console.log(`${sizeKept ? "PASS" : "FAIL"} the size is remembered: ${JSON.stringify(b2)}`);
+  failed += !resized + !sizeKept;
+
   if (hosted) {
     await page.goto("http://127.0.0.1:8767/notes.html"); // has a note: the panel shows by itself
     await page.waitForTimeout(1500);

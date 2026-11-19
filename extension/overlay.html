@@ -33,11 +33,19 @@
     .panel { --tint: #f6f5f1; --card: #fff; }
     @media (prefers-color-scheme: dark) { .panel { --tint: #1c1c1e; --card: #2c2c2e; } }
   }
+  .panel { position: relative; }
   .panel.expanded { width: 640px; }
+  /* Bottom-left corner: drag to resize (the panel hangs from its top-right corner). */
+  .grip { position: absolute; left: 0; bottom: 0; width: 16px; height: 16px; cursor: nesw-resize; touch-action: none; z-index: 2;
+    background: linear-gradient(45deg, transparent 0 3px, var(--mute) 3px 4px, transparent 4px 7px, var(--mute) 7px 8px, transparent 8px);
+    opacity: .35; border-bottom-left-radius: 14px; }
+  .grip:hover { opacity: .8; }
   .panel.expanded:has(> .body:not([hidden])) { height: calc(var(--host-h) - 16px); }
   .panel .mn-editor { --mn-fg: var(--fg); --mn-muted: var(--mute); }
 
-  header { display: flex; align-items: center; gap: 9px; padding: 10px 8px 8px 12px; }
+  header { display: flex; align-items: center; gap: 9px; padding: 10px 8px 8px 12px; cursor: grab; user-select: none; -webkit-user-select: none; }
+  header.dragging { cursor: grabbing; }
+  header button { cursor: default; }
   .site { width: 20px; height: 20px; flex: none; border-radius: 5px; display: grid; place-items: center; color: var(--mute); }
   .site img { width: 16px; height: 16px; }
   .site img:not([hidden]) + .globe { display: none; }
@@ -116,6 +124,7 @@
 </head>
 <body>
   <div class="panel" role="complementary" aria-label="NoteAnywhere">
+    <div class="grip" title="Drag to resize" aria-hidden="true"></div>
     <header>
       <span class="site" aria-hidden="true"><img alt="" hidden><svg class="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
       <div class="where">

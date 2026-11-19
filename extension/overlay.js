@@ -7,6 +7,8 @@ let tabId, page = {};
 let notes = [], visible = false, dismissed = false, collapsed = false, forced = false, error = "";
 let query = "", results = [], searchSeq = 0, searchTimer, changeTimer;
 let editors = [], stamps = [], toolbarOn = false, expanded = false, watching = false, hostH, lastHeight = 0;
+let size = null, resizing = false; // {w, h}: a size the user dragged the corner grip to; Expand clears it
+function sized() { return !!size && !expanded && !collapsed; }
 let datePattern; // the Mac app's Settings ▸ "Dates in notes", sent with each list
 let autoOpen = true; // the Mac app's Settings ▸ "Open notes by themselves"; off, only ⌥⇧N or the icon opens the panel
 
@@ -80,10 +82,12 @@ function imageURL(src) {
 function report() {
   if (tabId === undefined) return; // not wired up yet; the first load reports
   const shown = query ? resultList : help.hidden ? list : help;
-  let height = expanded && !collapsed && hostH ? hostH : panel.offsetHeight - shown.clientHeight + shown.scrollHeight;
+  let height = expanded && !collapsed && hostH ? hostH
+    : sized() ? panel.offsetHeight // a fixed height: the notes scroll inside it
+    : panel.offsetHeight - shown.clientHeight + shown.scrollHeight;
   // A hidden frame isn't laid out, so the panel measures 0 when reopened: show it at its last size, measure once drawn.
   if (visible && !height) { height = lastHeight; requestAnimationFrame(report); } else if (height) lastHeight = height;
-  chrome.tabs.sendMessage(tabId, { type: "mn:frame", visible, height, width: panel.offsetWidth }, { frameId: 0 })
+  chrome.tabs.sendMessage(tabId, { type: "mn:frame", visible, height, width: panel.offsetWidth, animate: !resizing }, { frameId: 0 })
     .then((h) => {
       if (!h || h === hostH) return;
       hostH = h;
@@ -93,6 +97,58 @@ function report() {
     .catch(() => {});
 }
 new ResizeObserver(report).observe(panel);
+
+// Drag the header (not its buttons) to move the panel. The frame keeps getting the pointer while it moves under it,
+// so it measures in screen coordinates and content.js moves the frame.
+const header = panel.querySelector("header");
+let drag = null;
+const moved = (event, phase) => chrome.tabs.sendMessage(tabId, { type: "mn:drag", phase,
+  dx: event.screenX - drag.x, dy: event.screenY - drag.y }, { frameId: 0 }).catch(() => {});
+header.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0 || event.target.closest("button") || tabId === undefined) return;
+  drag = { x: event.screenX, y: event.screenY };
+  header.setPointerCapture(event.pointerId);
+  header.classList.add("dragging");
+  moved(event, "start");
+});
+header.addEventListener("pointermove", (event) => { if (drag) moved(event, "move"); });
+const endDrag = (event) => {
+  if (!drag) return;
+  moved(event, "end").then(report); // the room below the panel changed
+  drag = null;
+  header.classList.remove("dragging");
+};
+header.addEventListener("pointerup", endDrag);
+header.addEventListener("pointercancel", endDrag);
+
+// The grip in the bottom-left corner resizes the panel (its top-right corner stays put); the size is remembered.
+const grip = $(".grip");
+let gripStart = null;
+grip.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) return;
+  gripStart = { x: event.screenX, y: event.screenY, w: panel.offsetWidth, h: panel.offsetHeight };
+  grip.setPointerCapture(event.pointerId);
+  resizing = true;
+  // The frame grows over the room the panel can grow into, so the pointer stays inside it while dragging.
+  chrome.tabs.sendMessage(tabId, { type: "mn:resizing", on: true }, { frameId: 0 }).catch(() => {});
+});
+grip.addEventListener("pointermove", (event) => {
+  if (!gripStart) return;
+  if (expanded) { expanded = false; store?.set({ expanded }); }
+  const maxH = (hostH || innerHeight) - 16;
+  size = { w: Math.round(Math.min(Math.max(gripStart.w - (event.screenX - gripStart.x), 280), 1000)),
+    h: Math.round(Math.min(Math.max(gripStart.h + (event.screenY - gripStart.y), 120), maxH)) };
+  render();
+});
+const endResize = () => {
+  if (!gripStart) return;
+  gripStart = null;
+  resizing = false;
+  if (size) store?.set({ panelSize: size });
+  chrome.tabs.sendMessage(tabId, { type: "mn:resizing", on: false }, { frameId: 0 }).catch(() => {}).then(report);
+};
+grip.addEventListener("pointerup", endResize);
+grip.addEventListener("pointercancel", endResize);
 
 searchBox.oninput = () => {
   clearTimeout(searchTimer);
@@ -121,7 +177,8 @@ $(".help-toggle").onclick = () => {
 };
 $(".expand").onclick = () => {
   expanded = !expanded;
-  store?.set({ expanded });
+  size = null; // Expand and Shrink go back to the standard sizes
+  store?.set({ expanded, panelSize: null });
   render();
 };
 favicon.onload = () => { favicon.hidden = false; }; // until then (or if the site has none) a globe shows
@@ -153,6 +210,8 @@ function render() {
   $(".collapse").setAttribute("aria-label", collapsed ? "Show notes" : "Collapse notes");
   $(".collapse").title = collapsed ? "Show notes" : "Collapse";
   panel.classList.toggle("expanded", expanded);
+  panel.style.width = size && !expanded ? `${size.w}px` : "";
+  panel.style.height = sized() ? `${size.h}px` : "";
   $(".expand").setAttribute("aria-pressed", String(expanded));
   $(".expand").setAttribute("aria-label", expanded ? "Shrink panel" : "Expand panel");
   $(".expand").title = expanded ? "Shrink panel" : "Expand panel";
@@ -383,7 +442,8 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
   tabId = await chrome.runtime.sendMessage({ type: "mn:whoami" });
   page = await chrome.tabs.sendMessage(tabId, { type: "mn:ready" }, { frameId: 0 });
   forced = page.open;
-  expanded = !!(await store?.get("expanded").catch(() => null))?.expanded;
+  ({ expanded = false, panelSize: size = null } = (await store?.get(["expanded", "panelSize"]).catch(() => null)) ?? {});
+  expanded = !!expanded;
   showPage();
   load(true);
 })();
