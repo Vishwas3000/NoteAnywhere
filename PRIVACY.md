@@ -22,8 +22,8 @@ you turn it on. There are no analytics, no ads, no tracking and no account unles
 - search vectors computed from your notes (see "On-device search");
 - icons of the websites you have notes for.
 
-The same folder holds images you paste into notes (`images/`) and the search model once it is downloaded (`models/`). A few settings (such as whether sync is on
-and where the floating panel sits) are kept in the app's standard macOS preferences. Your macOS Keychain, never the
+The same folder holds images you paste into notes (`images/`) and the search model once it is downloaded (`models/`). A few settings (such as whether sync is on,
+where the floating panel sits and whether to check for updates) are kept in the app's standard macOS preferences. Your macOS Keychain, never the
 database, holds the sync sign-in session and your sync encryption key if you sync, and the password for locked notes
 if you lock any, so Touch ID can unlock them. A locked note's text is stored encrypted with that password (AES-GCM).
 
@@ -78,8 +78,9 @@ NoteAnywhere connects to the internet only for these reasons:
 | Feedback | Only when you press Send in Send Feedback (in the app, or the form on noteanywhere.app) | noteanywhere.app, which emails it to the developer | Your message, the email address you give for a reply (optional), and the NoteAnywhere and macOS versions. Your IP address is used only to allow 5 messages a minute and is not stored. |
 | Web pictures in notes | When a note that shows a picture by its web address (for example from pasted Markdown) is on screen, in the app or the browser panel. Pasted and dropped pictures are kept in the note instead. | That website | A normal request for the picture, as a web page would make |
 | Sync | Only if you turn sync on and sign in | Supabase (see below) | Your notes and your email address |
+| Updates | Once a day if you allow automatic checks (the app asks on its second launch), and when you choose Check for Updates… | noteanywhere.app for the update feed (`https://noteanywhere.app/appcast.xml`); GitHub (Releases) for downloading an update | A request for the feed, with NoteAnywhere's version in the user agent, and a normal download of the new version. No notes, no personal data and no system profile. |
 
-There are no analytics, no telemetry, no crash reporting, no advertising and no update checks.
+There are no analytics, no telemetry, no crash reporting and no advertising.
 
 ## On-device AI
 

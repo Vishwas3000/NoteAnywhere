@@ -185,8 +185,10 @@ Tools: `search_notes`, `list_notes`, `get_note`, `list_tasks`, `list_tags`, `lis
 - The Accessibility permission is used to read the front window's title, and for WhatsApp, the open chat's name from
   its header. Never message contents, keystrokes or the screen.
 - The extension asks the app on your Mac whether the current page has notes. It sends nothing to any server.
-- Network: site icons from the sites themselves, the search model from Hugging Face once, and Supabase only if you
-  turn sync on. No analytics.
+- Network: site icons from the sites themselves, the search model from Hugging Face once, Supabase only if you turn
+  sync on, and update checks: `noteanywhere.app/appcast.xml` once a day if you allow it (or when you choose Check for
+  Updates…), with updates downloaded from GitHub Releases. Update checks send no personal data and no system profile.
+  No analytics.
 
 Details in [PRIVACY.md](PRIVACY.md).
 
@@ -229,7 +231,8 @@ You need Xcode 26 (or its command-line tools) and Node.js 20.19+ or 22.12+.
 This builds `~/Applications/NoteAnywhere.app` and launches it; on launch the app registers its browser bridge (native
 messaging host) with every installed Chromium browser. It signs with an Apple Development certificate if you have one
 (remembered in an untracked `.signing-identity`), so the Accessibility permission survives rebuilds; otherwise it signs
-ad hoc and macOS asks again after each install. Set `MEMORYNOTES_SIGN_ID` to pick a certificate.
+ad hoc and macOS asks again after each install. Set `MEMORYNOTES_SIGN_ID` to pick a certificate. It leaves out the
+update feed, so your build never replaces itself with a release (Check for Updates… stays greyed out).
 
 Releases (the notarized DMG and the Chrome Web Store package) are built with `scripts/release.sh` and published by
 the maintainer only.
@@ -328,6 +331,7 @@ NoteAnywhere is free software under the [GNU General Public License v3.0](LICENS
 | [swift-embeddings](https://github.com/jkrukowski/swift-embeddings) | Running MiniLM in Swift | MIT |
 | Its dependencies: [swift-transformers](https://github.com/huggingface/swift-transformers), swift-huggingface, swift-jinja, swift-collections, swift-crypto, swift-asn1, swift-argument-parser, swift-safetensors, swift-sentencepiece, yyjson, EventSource | Loading and tokenizing the model | Apache-2.0 or MIT |
 | [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) | The search model, downloaded on first use | Apache-2.0 |
+| [Sparkle](https://sparkle-project.org) | Updating the Mac app; embedded in it | MIT (its bundled bsdiff and Ed25519 code: BSD-2-Clause and zlib) |
 | [ui-review-tahoe skill](https://github.com/rshankras/claude-code-apple-skills), vendored in `.claude/skills/ui-review-tahoe` | UI review guidelines used while building | MIT |
 
 NoteAnywhere was built with a lot of help from Claude Code. The decision log records which calls were the author's

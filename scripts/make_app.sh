@@ -6,8 +6,12 @@ cd "$(dirname "$0")/.."
 BIN=$1 APP=$2
 
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/editor"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/editor" "$APP/Contents/Frameworks"
 cp "$BIN" "$APP/Contents/MacOS/MemoryNotes"
+# Sparkle (the updater), found through the binary's @executable_path/../Frameworks rpath (Package.swift). Its XPC
+# services are only for sandboxed apps, and Sparkle's docs say others may remove them.
+ditto "$(dirname "$BIN")/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+rm -rf "$APP/Contents/Frameworks/Sparkle.framework/XPCServices" "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices"
 cp Info.plist "$APP/Contents/"
 plutil -replace CFBundleShortVersionString -string "$(cat VERSION)" "$APP/Contents/Info.plist"  # release.sh overrides with a tag
 # Dependencies' resources (swift-transformers' fallback tokenizer configs); Bundle.module looks in Contents/Resources.

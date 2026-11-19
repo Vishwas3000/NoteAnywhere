@@ -23,7 +23,8 @@ we can agree on the approach before you spend time on it.
 4. The maintainer reviews it, then merges it or asks for changes.
 
 Pull requests that touch release or signing code get a closer look, because that code runs when a release is built.
-That means `scripts/release.sh`, `scripts/make_app.sh`, `.github/` and entitlements.
+That means `scripts/release.sh`, `scripts/make_app.sh`, `.github/` and entitlements, and the update feed and key in
+`Info.plist` (`SUFeedURL`, `SUPublicEDKey`), which decide what installed copies accept as an update.
 
 ## Releases
 
