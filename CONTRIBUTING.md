@@ -85,6 +85,7 @@ swift test                                  # Swift: parsers, dates, tags, graph
 swift build -c release && python3 scripts/test_host.py   # the native messaging host, end to end
 cd editor && npm test                       # the shared editor (happy-dom)
 cd android && ./gradlew testDebugUnitTest   # Android: notes store, sync rows, vault
+MN_UI_PROBE=1 swift test --filter sidebarDrag   # main window off-screen: dragging the sidebar keeps panes in the window
 ```
 
 The iPhone app's UI tests are in `ios/UITests`; run them from Xcode on a simulator.

@@ -951,3 +951,24 @@ Made by the subagent that wrote the extension:
   syncs (D32: text already works on every device and in the browser); deleting the word with the "#".
 - **Not yet:** an inspector on the iPhone, the floating and browser panels, Android (no tags at all).
 - **Status:** Decided by the user.
+
+## D78 — The inspector sits on the split view, not inside the note pane (2026-11-20)
+- **Bug (user reported: "only lines", "when i move the side panel everything flipped", the Mac froze):** on macOS 26
+  the note pane runs under the floating sidebar. With `.inspector` attached inside the note pane (D77), the pane
+  counted the sidebar's width twice (pane = 2 × sidebar + 40), so with a wide sidebar it outgrew the window. In the
+  real window the split view fed that back every frame: a 31-point bar grew ×1.5 a frame until RenderBox logged
+  "unable to create texture" for widths up to 663 million pixels, the window drew rows without text (or nothing),
+  the divider moved the wrong way, and the GPU work stalled the Mac. The sidebar width it saved was corrupt too, so
+  later launches opened blank until that saved layout was reset.
+- **Found by:** the app's log (the first burst at 12:12:14 in the D77 build), then a probe test that hosts the real
+  window off-screen and drags the divider: the pane was 2040 points in a 1400-point window with the inspector, and
+  stayed 1400 without it. A first "without the inspector" check by hand was wrong because the corrupt saved layout
+  still opened blank. `log` in zsh is a built-in, so earlier log checks had read nothing: use `/usr/bin/log`.
+- **Fix:** `.inspector` on the NavigationSplitView, shown only in the Notes view. The macOS 26 sidebar bar and hard
+  scroll edges stay; the probe shows they were not the cause.
+- **Rejected:** removing the sidebar's macOS 26 bar and scroll edge (a first guess, not the cause); a hand-made
+  inspector pane (more code, and the native one works once it sits on the split view).
+- **Checked:** `MN_UI_PROBE=1 swift test --filter sidebarDrag` fails on the old placement (pane 2040 with the
+  inspector hidden, 2300 shown) and passes with the fix, with the inspector still showing as a 220-360 point column;
+  no texture errors; `swift test` 65 passing (the probe is opt-in and skipped there).
+- **Status:** Done.

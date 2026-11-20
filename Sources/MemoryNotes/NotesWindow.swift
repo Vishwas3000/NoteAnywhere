@@ -74,11 +74,13 @@ struct NotesWindow: View {
             switch mode {
             case .calendar: CalendarView().onAppear(perform: Perf.end)
             case .graph: GraphView().onAppear(perform: Perf.end)
-            case .notes:
-                detail
-                    .onAppear(perform: Perf.end)
-                    .inspector(isPresented: $inspectorShown) { inspector.inspectorColumnWidth(min: 220, ideal: 260, max: 360) }
+            case .notes: detail.onAppear(perform: Perf.end)
             }
+        }
+        // On the split view, not inside the note pane: there, on macOS 26, it counted the floating sidebar's width twice,
+        // the pane outgrew the window and the layout ran away until the window drew blank (D78).
+        .inspector(isPresented: Binding(get: { mode == .notes && inspectorShown }, set: { inspectorShown = $0 })) {
+            inspector.inspectorColumnWidth(min: 220, ideal: 260, max: 360)
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
