@@ -8,7 +8,8 @@ NoteAnywhere is a notes app for macOS with a companion extension for Chrome and 
 (GPL-3.0), so every claim below can be checked in the code at https://github.com/Vishwas3000/NoteAnywhere.
 
 The short version: your notes live in a database on your Mac. The AI features run on your Mac. Sync is off unless
-you turn it on. There are no analytics, no ads, no tracking and no account unless you choose to sync.
+you turn it on. The app has no analytics, no ads, no tracking and no account unless you choose to sync. This website
+counts visits without cookies; see [This website](#this-website).
 
 ## What is stored, and where
 
@@ -81,7 +82,7 @@ NoteAnywhere connects to the internet only for these reasons:
 | Google sign-in | Only if you choose Continue with Google to sign in to sync (Mac app) | Google, whose sign-in page opens in a secure window, then Supabase | What you enter on Google's page goes to Google. Google learns that you signed in to NoteAnywhere and gives Supabase your email address, name and profile picture address. |
 | Updates | From version 0.1.3: once a day if you allow automatic checks (the app asks on its second launch), and when you choose Check for Updates… | noteanywhere.app for the update feed (`https://noteanywhere.app/appcast.xml`); GitHub (Releases) for downloading an update | A request for the feed, with NoteAnywhere's version in the user agent, and a normal download of the new version. No notes, no personal data and no system profile. |
 
-There are no analytics, no telemetry, no crash reporting and no advertising.
+The app has no analytics, no telemetry, no crash reporting and no advertising.
 
 ## On-device AI
 
@@ -133,6 +134,20 @@ only read and write its own data.
 Signing out stops syncing and leaves your notes on your Mac. To delete your synced data and account, email
 timeupvishwa@gmail.com from the address you signed in with; deleting the account deletes all of its notes and snapshots
 from the cloud database.
+
+## This website
+
+Everything above is about the app and the extension. This website, noteanywhere.app, counts visits with
+[PostHog](https://posthog.com) on its EU cloud, in cookieless mode: it sets no cookies and stores nothing in your browser,
+so there is no cookie banner.
+
+- **What is sent:** each page you view and when you leave it, with its address, the site or AI assistant that sent you
+  there, and your browser, operating system and screen size; and whether you click Download, Add to Chrome or a GitHub
+  link, or send the feedback form (not what you wrote in it).
+- **How visitors are counted:** PostHog tells visitors apart with a hash it computes on its servers. Your IP address is
+  not kept with the events.
+- **What is not collected:** no session recordings, no other clicks and nothing you type.
+- If your browser sends Do Not Track, nothing is sent. Blocking PostHog in your browser stops it too.
 
 ## Sharing and selling
 
