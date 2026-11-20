@@ -297,8 +297,9 @@ NoteAnywhere.app ◀──── Darwin notification "com.memorynotes.changed" a
 - **Sync** pushes changed rows to Supabase, which keeps the newer edit by `updated_at` and stamps each write with a
   sequence number that devices pull from.
 
-SwiftUI and AppKit, with no Xcode project: SwiftPM plus `scripts/install.sh`. Every decision and why it was made is
-in [docs/DECISIONS.md](docs/DECISIONS.md).
+SwiftUI and AppKit, with no Xcode project: SwiftPM plus `scripts/install.sh`. The whole picture, with the phone apps,
+the editor and sync, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Every decision and why it was made is in
+[docs/DECISIONS.md](docs/DECISIONS.md).
 
 The project used to be called MemoryNotes, and internal identifiers keep that name (bundle id, native host
 `com.memorynotes.host`, the `memorynotes://` URL scheme, the data folder) so existing installs keep their notes,
