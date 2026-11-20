@@ -971,4 +971,15 @@ Made by the subagent that wrote the extension:
 - **Checked:** `MN_UI_PROBE=1 swift test --filter sidebarDrag` fails on the old placement (pane 2040 with the
   inspector hidden, 2300 shown) and passes with the fix, with the inspector still showing as a 220-360 point column;
   no texture errors; `swift test` 65 passing (the probe is opt-in and skipped there).
+
+## D79 — Same-day snapshot updates reach the server (2026-11-20)
+- **Bug:** the server's `sync_accept` trigger ran `if tg_table_name in ('notes', 'folders') and old.deleted_at is not null`
+  for every table. PL/pgSQL prepares a condition whole, so on `snapshots` (no `deleted_at`) every update failed with
+  "record old has no field deleted_at", which PostgREST returns as HTTP 400. A day's first snapshot uploaded; later
+  edits that day were rejected on every sync, for every user. Found in the maintainer's log: 120 HTTP 400s in three
+  hours from the hour sync was first turned on, with 6 of today's snapshots stuck.
+- **Fix:** `20261120130000_snapshot_updates.sql` checks `deleted_at` only inside a branch for notes and folders. No app
+  change: released apps start uploading the stuck snapshots on their next sync.
+- **Checked on a throwaway local Postgres (14):** the deployed trigger reproduces the exact error on a same-day update;
+  with the fix the update lands, an older upload still loses to a newer one, and a deleted note or folder stays deleted.
 - **Status:** Done.
