@@ -207,6 +207,15 @@ check("the handle menu's search finds actions by name or other words, without li
   assert.deepEqual(labels("head"), ["Heading 1", "Heading 2", "Heading 3"]);
   assert.deepEqual(labels("zzz"), []);
 });
+check("the # menu's search: case aside, the tag itself, then tags starting with it, then ones containing it; 8 at most", () => {
+  const tags = [{ tag: "homework", count: 9 }, { tag: "workshop", count: 5 }, { tag: "work", count: 2 }, { tag: "bug", count: 1 }];
+  const names = (q) => Array.from(MNEditor.matchTags(tags, q), (t) => t.tag);
+  assert.deepEqual(names("WORK"), ["work", "workshop", "homework"]);
+  assert.deepEqual(names("or"), ["homework", "workshop", "work"]);  // the host's order, most used first
+  assert.deepEqual(names(""), ["homework", "workshop", "work", "bug"]);
+  assert.deepEqual(names("zzz"), []);
+  assert.equal(MNEditor.matchTags(Array.from({ length: 20 }, (_, i) => ({ tag: `t${i}`, count: 1 })), "t").length, 8);
+});
 check("@tomorrow + space becomes a real date chip, and ⌘-click reports the day", () => {
   let got;
   const ed = mount("", { onDate: (d) => (got = d) });
@@ -625,6 +634,80 @@ await checkAsync("a preview that fails says why and leaves the link; code and te
   code.editor.commands.setTextSelection(2);
   assert.ok(!paste(code, URL_CLIP("https://example.com")));
   assert.ok(!paste(mount("", previewHost([])), URL_CLIP("see https://example.com")));
+});
+
+// The "#" menu: the tags in use come from the host (onFindTags) and are narrowed in the editor.
+const TAGS = [{ tag: "noteanywhere", count: 3 }, { tag: "bug", count: 1 }];
+const tagMenu = (ed) => ed.editor.view.dom.parentElement.querySelector('.mn-at-menu[aria-label="Tags"]');
+const tagLabels = (ed) => [...(tagMenu(ed)?.querySelectorAll(".mn-at-item") ?? [])].map((i) => i.firstChild.textContent);
+const typeIn = (ed, text) => { for (const ch of text) ed.editor.commands.insertContent(ch); };
+// Not commands.focus(): it redraws a frame later, which would hide a menu that doesn't redraw for the host's answer.
+const caretAt = (ed, pos = ed.editor.state.doc.content.size) => ed.editor.commands.setTextSelection(pos);
+await checkAsync("typing # offers the tags in use; Return, Tab or a click types the tag and a space; Esc closes", async () => {
+  const asked = [];
+  const ed = mount("Plan ", { onFindTags: async (q) => { asked.push(q); return TAGS; } });
+  caretAt(ed);
+  typeIn(ed, "#no");
+  await settle();
+  assert.deepEqual(tagLabels(ed), ["#noteanywhere"]);
+  assert.equal(tagMenu(ed).querySelector(".mn-at-hint").textContent, "3");
+  assert.deepEqual(asked, [""], "asked once, when # was typed; the rest is narrowed here");
+  hit(ed, "Enter");
+  assert.equal(ed.editor.state.doc.textContent, "Plan #noteanywhere ");
+  assert.deepEqual(tagLabels(ed), []);
+  typeIn(ed, "#");
+  await settle();
+  assert.deepEqual(tagLabels(ed), ["#noteanywhere", "#bug"]);
+  hit(ed, "ArrowDown");
+  hit(ed, "Tab");
+  typeIn(ed, "#B");
+  await settle();
+  tagMenu(ed).querySelector(".mn-at-item").dispatchEvent(new window.MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+  typeIn(ed, "#");
+  await settle();
+  hit(ed, "Escape");
+  assert.deepEqual(tagLabels(ed), []);
+  assert.equal(ed.editor.state.doc.textContent, "Plan #noteanywhere #bug #bug #");
+  typeIn(ed, " #zz");
+  await settle();
+  assert.deepEqual(tagLabels(ed), [], "a new tag matches nothing: no menu");
+});
+await checkAsync("no # menu in inline code, a link or a word, without onFindTags, or for a tag the caret lands on", async () => {
+  const host = { onFindTags: async () => TAGS };
+  const at = (md, pos, options = host) => { const ed = mount(md, options); caretAt(ed, pos); return ed; };
+  const eds = [at("`a  b`", 3), at("[a  b](https://example.com)", 3), at("a b", 3)];  // the caret after "a "
+  for (const ed of eds) typeIn(ed, "#no");
+  const bare = at("Plan", 5, {});
+  typeIn(bare, " #no");
+  const landed = at("Plan #noteanywhere", 19);  // right after the tag: Return must still start a new line
+  await settle();
+  assert.deepEqual([...eds, bare].map(tagLabels), [[], [], [], []]);
+  assert.equal(bare.editor.state.doc.textContent, "Plan #no");
+  assert.deepEqual(tagLabels(landed), []);
+  hit(landed, "Enter");
+  assert.deepEqual([landed.editor.state.doc.childCount, landed.editor.state.doc.firstChild.textContent], [2, "Plan #noteanywhere"]);
+  // The host's text ending in a tag (the Mac's + Tag) leaves the caret after it, without a menu.
+  landed.setMarkdown("Plan #noteanywhere #bug");
+  await settle();
+  assert.equal(landed.editor.state.selection.from, landed.editor.state.doc.content.size - 1, "caret after #bug");
+  assert.deepEqual(tagLabels(landed), []);
+});
+await checkAsync("only the latest answer to the # menu counts; a failed one says why", async () => {
+  const replies = [];
+  const ed = mount("", { onFindTags: () => new Promise((resolve) => replies.push(resolve)) });
+  caretAt(ed);
+  typeIn(ed, "#b #");  // two "#"s, two questions
+  replies[1]([{ tag: "bug", count: 2 }]);
+  await settle();
+  replies[0]([{ tag: "old", count: 9 }]);  // the first answer, arriving late
+  await settle();
+  assert.deepEqual(tagLabels(ed), ["#bug"]);
+  const failing = mount("", { onFindTags: async () => { throw new Error("The notes aren't loaded."); } });
+  caretAt(failing);
+  typeIn(failing, "#");
+  const root = failing.editor.options.element.closest(".mn-editor");
+  await waitFor(() => root.querySelector(".mn-notice"));
+  assert.equal(root.querySelector(".mn-notice")?.textContent, "Tags not suggested: The notes aren't loaded.");
 });
 
 await window.happyDOM.close();

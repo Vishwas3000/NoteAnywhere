@@ -935,6 +935,10 @@ Made by the subagent that wrote the extension:
     notes; ✕: remove), a field to add one (tags in use that contain what you type, those starting with it first;
     Return adds exactly what you typed: "Project X" becomes `#project-x`), and its related notes: notes sharing a tag,
     most tags in common first, then the newest. A click opens one.
+  - Typing `#` in a note (Mac, iPhone) lists the tags in use, most used first with their counts, narrowed as you type:
+    the tag itself, then tags starting with it, then ones containing it. Return, Tab or a click types `#tag` and a
+    space; a new tag shows nothing. It opens only on a `#` you just typed, not when the caret lands on an existing tag
+    (Return there must still start a new line). The editor asks the app (`findTags`); the browser panel has no list.
   - Searching `#note` lists notes tagged `#note` (or nested under it) first, then those with a tag starting with
     "note", such as `#noteanywhere`. The main window, ⌥⇧Space, the browser panel and the iPhone share this search; the
     MCP tag filter stays exact.

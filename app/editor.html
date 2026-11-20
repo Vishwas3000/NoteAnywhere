@@ -39,6 +39,7 @@
         onAI: (action, text) => ask("ai", { action, text }),
         onAddImage: (mime, data) => ask("addImage", { mime, data }),  // shown through ImageScheme (noteimage:)
         onLinkPreview: (url) => ask("linkPreview", { url }),  // LinkPreview.swift fetches the page; its pictures become note images
+        onFindTags: (query) => ask("findTags", { query }),  // the "#" menu: every tag in use with its note count
         // The Mac app makes pages from highlighted text, finds notes to link and previews them on hover.
         ...(options.pages ? {
           onAddPage: (text) => ask("addPage", { text }),
