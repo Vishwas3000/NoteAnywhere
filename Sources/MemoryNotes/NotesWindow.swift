@@ -71,16 +71,16 @@ struct NotesWindow: View {
         NavigationSplitView {
             sidebar
         } detail: {
-            switch mode {
-            case .calendar: CalendarView().onAppear(perform: Perf.end)
-            case .graph: GraphView().onAppear(perform: Perf.end)
-            case .notes: detail.onAppear(perform: Perf.end)
+            Group {
+                switch mode {
+                case .calendar: CalendarView().onAppear(perform: Perf.end)
+                case .graph: GraphView().onAppear(perform: Perf.end)
+                case .notes: detail.onAppear(perform: Perf.end)
+                }
             }
-        }
-        // On the split view, not inside the note pane: there, on macOS 26, it counted the floating sidebar's width twice,
-        // the pane outgrew the window and the layout ran away until the window drew blank (D78).
-        .inspector(isPresented: Binding(get: { mode == .notes && inspectorShown }, set: { inspectorShown = $0 })) {
-            inspector.inspectorColumnWidth(min: 220, ideal: 260, max: 360)
+            // The window decides the widths; this pane takes what the sidebar leaves and never pushes back. A minimum
+            // from here gets the floating sidebar's width added on top, outgrows the window and a drag runs away (D80).
+            .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -244,7 +244,7 @@ struct NotesWindow: View {
             if id != nil { switchTo(.notes) }
             peekID = nil  // a peek belongs to the note it was opened from
         }
-        .navigationSplitViewColumnWidth(min: 240, ideal: 290)
+        .navigationSplitViewColumnWidth(min: 240, ideal: 290, max: 400)
     }
 
     /// Every #tag in use with its number of notes, most used first, like Obsidian's tag pane.
@@ -406,10 +406,12 @@ struct NotesWindow: View {
         }
     }
 
-    @ViewBuilder
+    /// Side by side as plain views, not split views: on macOS 26 each split view added the floating sidebar's width (and
+    /// the inspector's) to the note's minimum once more, until it outgrew the window and a divider drag ran away (D80).
+    /// The peek and the inspector have fixed widths; the note takes the rest.
     private var detail: some View {
-        if let note = selectedNote {
-            HSplitView {
+        HStack(spacing: 0) {
+            if let note = selectedNote {
                 VStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 10) {
                         header(note)
@@ -420,19 +422,29 @@ struct NotesWindow: View {
                     }
                     .frame(maxWidth: 720)
                     .padding(.horizontal, 40)
-                    // Full width, so its scroll bar is at the window's edge; the page keeps the text in the same column.
+                    // Full width, so its scroll bar is at the pane's edge; the page keeps the text in the same column.
                     NoteEditor(noteID: note.id, fontSize: 15, titleLine: true, focusIfEmpty: !editingAddress,
                                openLink: { peekID = $0 })
                 }
                 .padding(.top, 16)
-                .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
-                if let peekID, model.notes.contains(where: { $0.id == peekID }) { peek(peekID) }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(nsColor: .textBackgroundColor))
+                .onChange(of: targetFocused) { _, focused in editingAddress = focused }
+                if let peekID, model.notes.contains(where: { $0.id == peekID }) {
+                    Divider()
+                    peek(peekID)
+                }
+            } else {
+                ContentUnavailableView("No Note Selected", systemImage: "note.text",
+                                       description: Text("Pick a note in the sidebar, or press ⌘N to start one."))
             }
-            .background(Color(nsColor: .textBackgroundColor))
-            .onChange(of: targetFocused) { _, focused in editingAddress = focused }
-        } else {
-            ContentUnavailableView("No Note Selected", systemImage: "note.text",
-                                   description: Text("Pick a note in the sidebar, or press ⌘N to start one."))
+            if inspectorShown {
+                Divider()
+                inspector
+                    .frame(width: 260)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Inspector")
+            }
         }
     }
 
@@ -452,7 +464,7 @@ struct NotesWindow: View {
             .padding(.top, 10)
             NoteEditor(noteID: id, toolbar: false, fontSize: 14, titleLine: true, focusIfEmpty: false, openLink: { peekID = $0 })
         }
-        .frame(minWidth: 280, idealWidth: 380, maxWidth: 560, maxHeight: .infinity)
+        .frame(width: 380)
         .background(Color(nsColor: .windowBackgroundColor))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Linked page")
@@ -704,5 +716,20 @@ extension View {
         } else {
             safeAreaInset(edge: .bottom, spacing: 0) { bar().background(.bar) }
         }
+    }
+}
+
+extension NotesWindow {
+    /// 0.1.3 could save pane widths from a runaway layout (D80), which AppKit restores at every launch. A pane wider
+    /// than its window is never right, so the window then starts from its default widths.
+    static func forgetRunawayPaneWidths(in defaults: UserDefaults = .standard) {
+        let key = "NSSplitView Subview Frames notes, SidebarNavigationSplitView"
+        func width(_ field: Substring?) -> Double? { field.flatMap { Double($0.trimmingCharacters(in: .whitespaces)) } }
+        // "x y width height …" and, per pane, "x, y, width, height, collapsed, hidden".
+        guard let window = width(defaults.string(forKey: "NSWindow Frame notes")?.split(separator: " ").dropFirst(2).first),
+              let panes = defaults.stringArray(forKey: key),
+              panes.contains(where: { (width($0.split(separator: ",").dropFirst(2).first) ?? 0) > window + 1 })
+        else { return }
+        defaults.removeObject(forKey: key)
     }
 }

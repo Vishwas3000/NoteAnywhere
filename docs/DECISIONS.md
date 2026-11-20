@@ -971,6 +971,7 @@ Made by the subagent that wrote the extension:
 - **Checked:** `MN_UI_PROBE=1 swift test --filter sidebarDrag` fails on the old placement (pane 2040 with the
   inspector hidden, 2300 shown) and passes with the fix, with the inspector still showing as a 220-360 point column;
   no texture errors; `swift test` 65 passing (the probe is opt-in and skipped there).
+- **Status:** superseded by D80. The fix was incomplete: dragging the inspector ran the layout away again.
 
 ## D79 — Same-day snapshot updates reach the server (2026-11-20)
 - **Bug:** the server's `sync_accept` trigger ran `if tg_table_name in ('notes', 'folders') and old.deleted_at is not null`
@@ -982,4 +983,27 @@ Made by the subagent that wrote the extension:
   change: released apps start uploading the stuck snapshots on their next sync.
 - **Checked on a throwaway local Postgres (14):** the deployed trigger reproduces the exact error on a same-day update;
   with the fix the update lands, an older upload still loses to a newer one, and a deleted note or folder stays deleted.
+- **Status:** Done.
+
+## D80 — One split view decides the widths; the inspector and the side peek are plain panes (2026-11-20)
+- **Bug:** after D78, dragging the inspector's edge and then the sidebar's ran the main window's layout away again; the
+  maintainer's saved layout had a 4,288-point sidebar and a 9,556-point note pane in a 1,296-point window. On macOS 26
+  the sidebar and the inspector float over the note pane, and each split view (the sidebar's, the one `.inspector`
+  makes, and the side peek's `HSplitView`) added their widths to the note's minimum once more. Measured: 320 + 2 × (298
+  + 260) + 260 = 1,696 points in a 1,296-point window. SwiftUI centred what didn't fit, 200 points past both edges (so
+  panes moved the opposite way to a drag), and every drag fed the bigger size back.
+- **Why D78 missed it:** its probe never opened a note (no 320-point minimum, no peek split view), moved the divider
+  with `setPosition` instead of a mouse drag, never touched the inspector, and ran its two cases at the same time.
+- **Fix:** the sidebar's split view is the only one. The note pane reports no minimum (`.frame(minWidth: 0)`) and takes
+  what the sidebar leaves. The inspector (260 points) and the side peek (380) are fixed-width panes in an `HStack` next
+  to the note, and the sidebar is at most 400. At launch, a saved pane wider than its window is dropped
+  (`NotesWindow.forgetRunawayPaneWidths`), so a copy of 0.1.3 that saved a runaway layout opens normally.
+- **Rejected:** keeping `.inspector` and only dropping the note's minimum (by the same sums, 0 + 2 × 558 + 260 = 1,376
+  points still overflows a 1,296-point window); raising the window's minimum width (hides the miscount, doesn't stop it).
+- **Lost:** dragging the inspector or the peek wider; both have fixed widths.
+- **Checked:** `MN_UI_PROBE=1 swift test --filter dividerDrags` replays real mouse drags with a note open (out to the
+  widest, back, then collapsing the sidebar) at 1,296 points with the inspector hidden and shown, and at 760 with it
+  shown: one split view, nothing past the window at any step, the inspector whole at the right edge, no texture
+  errors. The same drag replay on the D78 layout measured -200…1,496 before any drag and -3,870…5,166 after one.
+  `swift test`: 66 passing. Run the probe alone: it shares the notes model and the main run loop with other tests.
 - **Status:** Done.
