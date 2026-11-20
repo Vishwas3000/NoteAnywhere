@@ -11,6 +11,7 @@ enum Main {
         }
         // AI apps (Claude, Codex, Gemini) launch it as an MCP server: MemoryNotes --mcp.
         if CommandLine.arguments.dropFirst().first == "--mcp" { MCPServer.run() }
+        NotesWindow.forgetRunawayPaneWidths()  // before AppKit restores the window (D80)
         MemoryNotesApp.main()
     }
 }
