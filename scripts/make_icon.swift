@@ -1,7 +1,12 @@
 // Draws the app icon: a note floating over an app window, the overlay idea. Writes a 1024 px PNG to the given path.
-// Usage: swift scripts/make_icon.swift out.png   (scripts/install.sh turns it into AppIcon.icns)
+// Usage: swift scripts/make_icon.swift out.png [mac|ios|android-foreground]
+//   mac (default): the macOS tile with its shadow; scripts/make_app.sh turns it into AppIcon.icns.
+//   ios: the tile full-bleed and opaque (iOS rounds the corners) -> ios/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+//   android-foreground: the window and note alone, inside an adaptive icon's safe zone, drawn over the tile's gradient
+//   (res/drawable/ic_launcher_background.xml) -> sips -z 432 432 into res/drawable-xxxhdpi/ic_launcher_foreground.png
 import AppKit
 
+let style = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "mac"
 let size: CGFloat = 1024
 // A bitmap at exactly 1024 px; NSImage.lockFocus would render at the screen's 2x scale.
 let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size), pixelsHigh: Int(size), bitsPerSample: 8,
@@ -15,17 +20,30 @@ func rgb(_ hex: UInt32, _ alpha: CGFloat = 1) -> NSColor {
 
 // macOS icon grid: 824 px tile centred on the 1024 canvas, with room for the drop shadow.
 let tile = NSRect(x: 100, y: 100, width: 824, height: 824)
-let tilePath = NSBezierPath(roundedRect: tile, xRadius: 185, yRadius: 185)
-ctx.saveGState()
-let shadow = NSShadow()
-shadow.shadowColor = .black.withAlphaComponent(0.3)
-shadow.shadowOffset = NSSize(width: 0, height: -12)
-shadow.shadowBlurRadius = 28
-shadow.set()
-rgb(0x3B47D6).setFill()
-tilePath.fill()
-ctx.restoreGState()
-NSGradient(starting: rgb(0x5B6CFF), ending: rgb(0x2E2A9E))!.draw(in: tilePath, angle: -90)
+let gradient = NSGradient(starting: rgb(0x5B6CFF), ending: rgb(0x2E2A9E))!
+switch style {
+case "ios":  // the tile fills the canvas
+    ctx.scaleBy(x: size / tile.width, y: size / tile.height)
+    ctx.translateBy(x: -tile.minX, y: -tile.minY)
+    gradient.draw(in: tile, angle: -90)
+case "android-foreground":  // the tile maps onto the middle 66 of 108 dp, the part every launcher's mask shows
+    let safe = size * 66 / 108
+    ctx.translateBy(x: (size - safe) / 2, y: (size - safe) / 2)
+    ctx.scaleBy(x: safe / tile.width, y: safe / tile.height)
+    ctx.translateBy(x: -tile.minX, y: -tile.minY)
+default:
+    let tilePath = NSBezierPath(roundedRect: tile, xRadius: 185, yRadius: 185)
+    ctx.saveGState()
+    let shadow = NSShadow()
+    shadow.shadowColor = .black.withAlphaComponent(0.3)
+    shadow.shadowOffset = NSSize(width: 0, height: -12)
+    shadow.shadowBlurRadius = 28
+    shadow.set()
+    rgb(0x3B47D6).setFill()
+    tilePath.fill()
+    ctx.restoreGState()
+    gradient.draw(in: tilePath, angle: -90)
+}
 
 // The app underneath: a translucent window with traffic lights and content bars.
 let window = NSRect(x: 190, y: 300, width: 520, height: 440)
@@ -87,4 +105,11 @@ for (i, width) in [340.0, 300, 220].enumerated() {
 ctx.restoreGState()
 
 NSGraphicsContext.current = nil
-try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: CommandLine.arguments[1]))
+var image = rep.cgImage!
+if style == "ios" {  // App Store icons may not have an alpha channel
+    let opaque = CGContext(data: nil, width: Int(size), height: Int(size), bitsPerComponent: 8, bytesPerRow: 0,
+                           space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+    opaque.draw(image, in: CGRect(x: 0, y: 0, width: size, height: size))
+    image = opaque.makeImage()!
+}
+try! NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: CommandLine.arguments[1]))
