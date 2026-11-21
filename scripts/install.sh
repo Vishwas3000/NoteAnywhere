@@ -32,7 +32,11 @@ if [ -z "$SIGN_ID" ]; then
 fi
 # Inside out, in the order Sparkle documents for signing outside Xcode: its helpers, the framework, then the app.
 FW=$APP/Contents/Frameworks/Sparkle.framework
-for code in "$FW/Versions/B/Autoupdate" "$FW/Versions/B/Updater.app" "$FW" "$APP"; do codesign --force --sign "$SIGN_ID" "$code"; done
+for code in "$FW/Versions/B/Autoupdate" "$FW/Versions/B/Updater.app" "$FW"; do codesign --force --sign "$SIGN_ID" "$code"; done
+# The Safari extension, sandboxed through its entitlements (D82), before the app that contains it.
+PLUGIN=$APP/Contents/PlugIns/NoteAnywhereSafari.appex
+[ ! -d "$PLUGIN" ] || codesign --force --sign "$SIGN_ID" --entitlements safari/NoteAnywhereSafari.entitlements "$PLUGIN"
+codesign --force --sign "$SIGN_ID" "$APP"
 
 open "$APP"
 echo "Installed $APP. Now load $(pwd)/extension as an unpacked extension."

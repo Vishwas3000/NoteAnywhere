@@ -1,0 +1,62 @@
+# The Safari extension for the Mac (D82): an app extension that scripts/make_app.sh builds and puts in
+# NoteAnywhere.app/Contents/PlugIns. Generated with `xcodegen generate` (in this folder); the .xcodeproj is not committed.
+name: NoteAnywhereSafari
+options:
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    GENERATE_INFOPLIST_FILE: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: NO  # the copy phase reads extension/ from the repo
+    CODE_SIGNING_ALLOWED: NO  # scripts/install.sh and release.sh sign it inside the app, with its entitlements
+packages:
+  swift-embeddings:
+    url: https://github.com/jkrukowski/swift-embeddings
+    exactVersion: 0.1.1  # as Package.resolved pins it for the app
+
+targets:
+  NoteAnywhereSafari:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: ../ios/Safari/SafariWebExtensionHandler.swift  # the iPhone's handler: the same NativeHost.handle
+      - path: ../Sources/MemoryNotes/Note.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/SearchIndex.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/Assistant.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/NativeHost.swift
+        group: Shared
+      - path: ../Sources/MemoryNotes/LinkPreview.swift  # NativeHost's linkPreview op
+        group: Shared
+    dependencies:
+      - package: swift-embeddings
+        product: Embeddings
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.memorynotes.app.safari
+        INFOPLIST_FILE: Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: NoteAnywhere
+    postBuildScripts:
+      # The shared extension as is (overlay.js relays through the background in Safari, D81); only the manifest changes.
+      - name: Copy browser extension
+        basedOnDependencyAnalysis: false
+        script: |
+          dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          rsync -a --exclude manifest.json "$SRCROOT/../extension/" "$dest/"
+          /usr/bin/python3 - "$SRCROOT/../extension/manifest.json" "$dest" <<'PY'
+          import json, sys
+          m = json.load(open(sys.argv[1]))
+          m.pop("key", None)  # pins the unpacked Chrome extension's id; Safari doesn't use it
+          m["background"] = {"scripts": m["background"]["scripts"]}  # a non-persistent background page, as on iPhone
+          json.dump(m, open(sys.argv[2] + "/manifest.json", "w"), indent=2)
+          PY
+
+schemes:
+  NoteAnywhereSafari:
+    build:
+      targets:
+        NoteAnywhereSafari: all

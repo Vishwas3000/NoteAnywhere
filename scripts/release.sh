@@ -44,14 +44,21 @@ swift build -c release $ARCHS
 scripts/make_app.sh "$(swift build -c release $ARCHS --show-bin-path)/MemoryNotes" "$APP"
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
+PLUGIN=$APP/Contents/PlugIns/NoteAnywhereSafari.appex
+[ -d "$PLUGIN" ] || { echo "No Safari extension in the app: install XcodeGen (brew install xcodegen)" >&2; exit 1; }
+plutil -replace CFBundleShortVersionString -string "$VERSION" "$PLUGIN/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "$VERSION" "$PLUGIN/Contents/Info.plist"
 
-# Hardened runtime, no entitlements: no sandbox, JIT, unsigned libraries or Apple Events. WebKit's JIT runs in its own
+# The app: hardened runtime, no entitlements: no sandbox, JIT, unsigned libraries or Apple Events. WebKit's JIT runs in its own
 # processes; Accessibility, the Keychain (file-based) and Foundation Models need none.
 # Inside out, in the order Sparkle documents for signing outside Xcode (never --deep): its helpers, the framework, the app.
 FW=$APP/Contents/Frameworks/Sparkle.framework
-for code in "$FW/Versions/B/Autoupdate" "$FW/Versions/B/Updater.app" "$FW" "$APP"; do
+for code in "$FW/Versions/B/Autoupdate" "$FW/Versions/B/Updater.app" "$FW"; do
   codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$code"
 done
+# The Safari extension runs sandboxed: it alone has entitlements (safari/NoteAnywhereSafari.entitlements, D82).
+codesign --force --options runtime --timestamp --entitlements safari/NoteAnywhereSafari.entitlements --sign "$SIGN_ID" "$PLUGIN"
+codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 codesign -dvv "$APP" 2>&1 | grep -qx "TeamIdentifier=$TEAM" || { echo "Signed by a team other than $TEAM" >&2; exit 1; }
 if [ -n "$NOTARIZE" ]; then

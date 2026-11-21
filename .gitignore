@@ -4,6 +4,7 @@
 node_modules/
 supabase/.temp/
 ios/MemoryNotes.xcodeproj/
+safari/NoteAnywhereSafari.xcodeproj/
 .signing-identity
 dist/
 # Signing and notarization exports, and local env files

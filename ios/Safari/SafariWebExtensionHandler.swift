@@ -1,7 +1,8 @@
 import SafariServices
 
-/// Answers the extension's `runtime.sendNativeMessage` with the same handler as the Mac's native host
-/// (list, save, search, delete, ai), on the database the app shares through the App Group.
+/// Answers the extension's `runtime.sendNativeMessage` in Safari, on iPhone and on the Mac, with the handler the Chrome
+/// and Firefox host uses (`NativeHost.handle`), on the app's own database: through the App Group on iPhone, through a
+/// sandbox exception on the Mac (D82).
 final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
     func beginRequest(with context: NSExtensionContext) {
         let message = (context.inputItems.first as? NSExtensionItem)?.userInfo?[SFExtensionMessageKey]

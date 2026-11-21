@@ -319,7 +319,7 @@ enum DateStyle {
     static var choices: [String] { numeric + named }
 
     static var pattern: String {
-        let chosen = UserDefaults.standard.string(forKey: key) ?? ""
+        let chosen = NoteStore.settings.string(forKey: key) ?? ""
         return chosen.isEmpty ? region : chosen
     }
 
@@ -380,17 +380,29 @@ enum NoteStore {
     static let embeddingModel = "sentence-transformers/all-MiniLM-L6-v2"
 
     static let appGroup = "group.com.memorynotes"
+    /// The app's settings. The Mac's Safari extension is a separate, sandboxed bundle, so it reads the app's domain
+    /// (allowed by a sandbox exception, D82).
+    static let settings: UserDefaults = {
+        #if os(macOS)
+        if Bundle.main.bundleURL.pathExtension == "appex" { return UserDefaults(suiteName: "com.memorynotes.app") ?? .standard }
+        #endif
+        return .standard
+    }()
     static let root: URL = {
         #if os(iOS)
         // Shared with the Share and Safari extensions.
         let shared = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         #else
         let shared: URL? = nil
+        // From the real home folder: the Safari extension runs sandboxed, where Application Support is its container's
+        // (it may use this folder through a sandbox exception, D82).
+        let support = URL(fileURLWithPath: String(cString: getpwuid(getuid()).pointee.pw_dir))
+            .appendingPathComponent("Library/Application Support")
         #endif
         let root = ProcessInfo.processInfo.environment["MEMORYNOTES_DIR"].map { URL(fileURLWithPath: $0) }
             ?? shared?.appendingPathComponent("MemoryNotes")
-            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("MemoryNotes")
+            ?? support.appendingPathComponent("MemoryNotes")
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         return root
     }()

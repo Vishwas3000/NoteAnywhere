@@ -6,7 +6,7 @@ import notify
 enum NativeHost {
     /// Settings ▸ General: off, the Mac panel and the browser panel open only with their shortcut (D63).
     static let autoOpenKey = "openNotesByThemselves"
-    static var autoOpen: Bool { UserDefaults.standard.object(forKey: autoOpenKey) as? Bool ?? true }
+    static var autoOpen: Bool { NoteStore.settings.object(forKey: autoOpenKey) as? Bool ?? true }
 
     struct Request: Decodable {
         let op: String

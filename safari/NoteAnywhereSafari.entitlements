@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Safari only runs sandboxed app extensions (D82). -->
+	<key>com.apple.security.app-sandbox</key><true/>
+	<!-- Link previews, and the search model if the app hasn't downloaded it yet. -->
+	<key>com.apple.security.network.client</key><true/>
+	<!-- The notes database, images and search model the app keeps; outside the Mac App Store these exceptions are allowed. -->
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
+	<array><string>/Library/Application Support/MemoryNotes/</string></array>
+	<!-- The app's settings: auto-open and the date format. -->
+	<key>com.apple.security.temporary-exception.shared-preference.read-only</key>
+	<array><string>com.memorynotes.app</string></array>
+</dict>
+</plist>

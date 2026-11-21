@@ -30,3 +30,17 @@ iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 # The shared editor (also used by the browser extension, which the build refreshes) is loaded by the app's web views.
 (cd editor && npm ci --no-audit --no-fund --silent && npm run build --silent)
 cp editor/dist/* app/editor.html "$APP/Contents/Resources/editor/"
+
+# The Safari extension (D82): an app extension that Xcode builds from safari/project.yml, inside the app's PlugIns.
+if command -v xcodegen >/dev/null; then
+  (cd safari && xcodegen generate --quiet && xcodebuild -project NoteAnywhereSafari.xcodeproj -scheme NoteAnywhereSafari \
+    -configuration Release -destination 'generic/platform=macOS' -derivedDataPath ../.build/safari build -quiet)
+  PLUGIN=$APP/Contents/PlugIns/NoteAnywhereSafari.appex
+  mkdir -p "$APP/Contents/PlugIns"
+  ditto .build/safari/Build/Products/Release/NoteAnywhereSafari.appex "$PLUGIN"
+  for key in CFBundleShortVersionString CFBundleVersion; do  # release.sh overrides with a tag, as for the app
+    plutil -replace $key -string "$(cat VERSION)" "$PLUGIN/Contents/Info.plist"
+  done
+else
+  echo "XcodeGen isn't installed (brew install xcodegen): this build has no Safari extension." >&2
+fi
