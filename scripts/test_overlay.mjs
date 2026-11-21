@@ -24,6 +24,8 @@ if (hosted) {
   const copy = path.join(tmp, "MemoryNotes");
   fs.copyFileSync(bin, copy);
   fs.chmodSync(copy, 0o755);
+  // with Sparkle beside it: the binary finds the framework through @loader_path (D75)
+  fs.cpSync(path.join(path.dirname(bin), "Sparkle.framework"), path.join(tmp, "Sparkle.framework"), { recursive: true, verbatimSymlinks: true });
   fs.mkdirSync(path.join(tmp, "profile/NativeMessagingHosts"), { recursive: true });
   fs.writeFileSync(path.join(tmp, "profile/NativeMessagingHosts/com.memorynotes.host.json"), JSON.stringify({
     name: "com.memorynotes.host", description: "test", path: copy, type: "stdio",
