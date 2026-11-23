@@ -26,7 +26,8 @@ final class ShareFromSafariTests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         XCTAssertTrue(safari.staticTexts["example.com"].waitForExistence(timeout: 5), "the page's target")
         field.tap()
-        field.typeText("Shared from Safari")
+        // Typed through Safari: on iOS 26.2 the share sheet's text view takes the text but fails the element's own focus check.
+        safari.typeText("Shared from Safari")
         safari.buttons["Save"].tap()
 
         let app = XCUIApplication()

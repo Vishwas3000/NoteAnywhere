@@ -1,13 +1,18 @@
-"""End-to-end check of the native messaging host: frames JSON like Chrome does, against a temp store."""
+"""End-to-end check of the native messaging host: frames JSON like Chrome and Firefox do, against a temp store."""
 import datetime, json, os, sqlite3, struct, subprocess, sys, tempfile
 
 BIN = sys.argv[1] if len(sys.argv) > 1 else ".build/release/MemoryNotes"
 env = {**os.environ, "MEMORYNOTES_DIR": tempfile.mkdtemp()}
 DB = os.path.join(env["MEMORYNOTES_DIR"], "memorynotes.sqlite")
 
-def call(msg, env=env):
+CHROME = ("chrome-extension://test/",)
+# Firefox passes the path of the host manifest it read and the add-on's id, not an origin.
+FIREFOX = ("/Users/x/Library/Application Support/Mozilla/NativeMessagingHosts/com.memorynotes.host.json",
+           "noteanywhere@noteanywhere.app")
+
+def call(msg, env=env, args=CHROME):
     body = json.dumps(msg).encode()
-    out = subprocess.run([BIN, "chrome-extension://test/"], input=struct.pack("<I", len(body)) + body,
+    out = subprocess.run([BIN, *args], input=struct.pack("<I", len(body)) + body,
                          capture_output=True, env=env, timeout=60).stdout
     (n,) = struct.unpack("<I", out[:4])
     assert len(out) == 4 + n, out
@@ -28,6 +33,7 @@ assert ids("github.com/vercel") == [page]
 assert ids("github.com/vercel/next.js") == [page]
 assert ids("github.com/vercel/next.js/") == [page]
 assert ids("github.com/vercel/next.jsx") == []
+assert [n["id"] for n in call({"op": "list", "url": "github.com/"}, args=FIREFOX)["notes"]] == [site, page]
 assert ids("github.company.com/") == []
 
 assert not call({"op": "save", "note": note("../../evil", "x.com")})["ok"], "non-UUID ids must be rejected"
