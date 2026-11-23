@@ -30,6 +30,10 @@ struct NoteDetailView: View {
                 ToolbarItemGroup(placement: .primaryAction) {
                     if !note.locked { ShareLink(item: note.text) }
                     Menu {
+                        if !note.locked && !NoteLock.isEnvelope(note.text) {
+                            Button { model.findRequest = noteID } label: { Label("Find in Note", systemImage: "magnifyingglass") }
+                            Divider()
+                        }
                         NoteMenu(note: note) { confirmDelete = true }
                     } label: {
                         Label("More", systemImage: "ellipsis")

@@ -21,6 +21,9 @@ struct NoteEditor: View {
                                     "tapTags": true, "pages": true],
                           openNote: openNote)
                 .id("\(noteID)/\(dateFormat)")  // a fresh editor per note keeps undo history per note; new date format redraws
+                // The web view makes room for the keyboard itself; SwiftUI shrinking it as well left iOS's find bar
+                // scrolling its match out of sight.
+                .ignoresSafeArea(.keyboard)
         } else {
             TextEditor(text: model.binding(noteID, \.text)).font(.body).padding(.horizontal)
         }
@@ -45,6 +48,7 @@ private struct EditorWebView: UIViewRepresentable {
             .mn-toolbar button { min-width: 36px; height: 36px; flex: none; }
             .mn-editor:has(.mn-ai) .mn-toolbar { padding-right: 0; margin-right: 44px; }
             .mn-ai > button { width: 36px; height: 36px; opacity: 1; }
+            .mn-toolbar button[aria-label="Find in note"] { display: none; }
             .mn-content { padding-left: 0; } .mn-drag { margin-left: -20px; opacity: 0.6; pointer-events: auto; transition: none; } .mn-content .mn-date { white-space: nowrap; }
             """
         if #unavailable(iOS 26) { css += " .mn-ai { display: none; } .mn-editor:has(.mn-ai) .mn-toolbar { margin-right: 0; }" }
@@ -65,6 +69,7 @@ private struct EditorWebView: UIViewRepresentable {
         web.backgroundColor = .clear
         web.scrollView.backgroundColor = .clear
         web.scrollView.keyboardDismissMode = .interactive
+        web.isFindInteractionEnabled = true  // More ▸ Find in Note: iOS's find bar, like Safari's Find on Page
         web.navigationDelegate = context.coordinator
         web.uiDelegate = context.coordinator
         web.loadFileURL(dir.appendingPathComponent("editor.html"), allowingReadAccessTo: dir)
@@ -75,6 +80,10 @@ private struct EditorWebView: UIViewRepresentable {
     func updateUIView(_ web: WKWebView, context: Context) {
         context.coordinator.parent = self
         context.coordinator.push(markdown)  // e.g. the same note arrived from the Mac by sync
+        if NotesModel.shared.findRequest == noteID {
+            DispatchQueue.main.async { NotesModel.shared.findRequest = nil }  // not during a view update
+            web.findInteraction?.presentFindNavigator(showingReplace: false)
+        }
     }
 
     static func dismantleUIView(_ web: WKWebView, coordinator: Coordinator) {

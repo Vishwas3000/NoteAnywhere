@@ -1,5 +1,5 @@
 import { Editor, Extension, InputRule, Node as TiptapNode } from "@tiptap/core";
-import { NodeSelection, Plugin, TextSelection } from "@tiptap/pm/state";
+import { NodeSelection, Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import StarterKit from "@tiptap/starter-kit";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
@@ -1375,6 +1375,55 @@ function datePopover(editor, root, body) {
   };
 }
 
+// Find in the note (⌘F): every match is highlighted and one is current. The bar's input drives it through setMeta(FIND).
+const FIND = new PluginKey("mnFind");
+const FIND_ICON = icon('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>');
+// Where `query` occurs, ignoring case, as document ranges. Matches stay inside one paragraph (or heading, list item's
+// text, table cell…) but cross bold, links and other marks. An image or formula in the line counts as one character.
+export function findMatches(doc, query) {
+  if (!query) return [];
+  const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "giu");  // u: case folding keeps indexes
+  const found = [];
+  doc.descendants((node, pos) => {
+    if (!node.isTextblock) return true;
+    let text = "";
+    node.forEach((child) => { text += child.isText ? child.text : "￼".repeat(child.nodeSize); });
+    for (const m of text.matchAll(pattern)) found.push({ from: pos + 1 + m.index, to: pos + 1 + m.index + m[0].length });
+    return false;
+  });
+  return found;
+}
+const findState = (query, doc, current) => {
+  const matches = findMatches(doc, query);
+  current = Math.min(Math.max(current, 0), Math.max(matches.length - 1, 0));
+  const decorations = DecorationSet.create(doc, matches.map((m, i) =>
+    Decoration.inline(m.from, m.to, { class: i === current ? "mn-find-match mn-find-current" : "mn-find-match" })));
+  return { query, matches, current, decorations };
+};
+function find() {
+  return Extension.create({
+    name: "mnFind",
+    addProseMirrorPlugins: () => [new Plugin({
+      key: FIND,
+      state: {
+        init: (_, state) => findState("", state.doc, 0),
+        apply(tr, value, _old, state) {
+          const meta = tr.getMeta(FIND);
+          if (meta) {
+            const query = meta.query ?? value.query;
+            // A new search starts at the first match after the cursor, like Notes and Safari.
+            const current = meta.current ?? (query === value.query ? value.current
+              : findMatches(state.doc, query).findIndex((m) => m.from >= state.selection.from));
+            return findState(query, state.doc, current < 0 ? 0 : current);
+          }
+          return tr.docChanged && value.query ? findState(value.query, state.doc, value.current) : value;
+        },
+      },
+      props: { decorations: (state) => FIND.getState(state).decorations },
+    })],
+  });
+}
+
 const PAGE_ICON = icon('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15h6"/>');
 const NOTE_LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>');
 const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>');
@@ -1413,9 +1462,25 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   linkInput.placeholder = "https://… or note://id — empty removes";
   linkInput.setAttribute("aria-label", "Link address");
   linkForm.append(linkInput);
+  const findForm = el("form", "mn-find");
+  findForm.hidden = true;
+  findForm.setAttribute("role", "search");
+  const findInput = Object.assign(document.createElement("input"), { type: "search", placeholder: "Find in note" });
+  findInput.setAttribute("aria-label", "Find in note");
+  const findCount = el("span", "mn-find-count");
+  findCount.setAttribute("aria-live", "polite");
+  const findButton = (label, title, glyph) => {
+    const b = Object.assign(document.createElement("button"), { type: "button", title, innerHTML: glyph });
+    b.setAttribute("aria-label", label);
+    return b;
+  };
+  const findPrev = findButton("Previous match", "Previous (⇧Return)", icon('<path d="m18 15-6-6-6 6"/>'));
+  const findNext = findButton("Next match", "Next (Return)", icon('<path d="m6 9 6 6 6-6"/>'));
+  const findDone = findButton("Done", "Done (Esc)", "Done");
+  findForm.append(findInput, findCount, findPrev, findNext, findDone);
   const body = document.createElement("div");
   body.className = "mn-body";
-  root.append(bar, linkForm, body);
+  root.append(bar, linkForm, findForm, body);
   element.append(root);
   // Problems the user must see (an image that wasn't added), at the bottom of the view whatever the scroll.
   const notice = el("div", "mn-notice");
@@ -1469,6 +1534,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
       dates(onDate, () => pickDate?.(), datePattern),
       ...maths(() => editor),
       Extension.create({ name: "mnSlash", addProseMirrorPlugins() { return [slashMenu(this.editor, () => pickDate?.())]; } }),
+      find(),
       dragHandle(),
       StarterKit.configure({ link: { openOnClick: false, protocols: ["note"], autolink: true },
         dropcursor: false }), // the drag handle draws its own line between blocks
@@ -1536,6 +1602,59 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   linkButton.onmousedown = (e) => e.preventDefault();
   linkButton.onclick = openLink;
   bar.append(linkButton);
+
+  // Find in the note: ⌘F (Ctrl-F elsewhere) or the toolbar's magnifier; the Mac app's Edit menu calls find() for ⌘F.
+  const setFind = (meta) => {
+    editor.view.dispatch(editor.state.tr.setMeta(FIND, meta));
+    const { query, matches, current } = FIND.getState(editor.state);
+    findCount.textContent = !query ? "" : matches.length ? `${current + 1} of ${matches.length}` : "Not found";
+    findPrev.disabled = findNext.disabled = matches.length < 2;
+    body.querySelector(".mn-find-current")?.scrollIntoView({ block: "nearest" });
+  };
+  const openFind = () => {
+    const { from, to, empty } = editor.state.selection;
+    const picked = empty ? "" : editor.state.doc.textBetween(from, to, "\n");
+    if (picked && !picked.includes("\n") && picked.length <= 200) findInput.value = picked;  // the highlighted words
+    findForm.hidden = false;
+    findInput.focus();
+    findInput.select();
+    setFind({ query: findInput.value });
+    return true;
+  };
+  const stepFind = (by) => {
+    const { matches, current } = FIND.getState(editor.state);
+    if (matches.length) setFind({ current: (current + by + matches.length) % matches.length });
+  };
+  // Closing leaves the current match selected, so typing carries on from what you found.
+  const closeFind = () => {
+    const { matches, current } = FIND.getState(editor.state);
+    const match = matches[current];
+    findForm.hidden = true;
+    setFind({ query: "" });
+    if (match) editor.chain().focus().setTextSelection(match).run();
+    else editor.commands.focus();
+  };
+  findInput.oninput = () => setFind({ query: findInput.value });
+  findForm.onsubmit = (e) => e.preventDefault();
+  findInput.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); stepFind(e.shiftKey ? -1 : 1); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeFind(); }
+  };
+  findPrev.onclick = () => stepFind(-1);
+  findNext.onclick = () => stepFind(1);
+  findDone.onclick = closeFind;
+  const MAC = /Mac|iP(hone|[oa]d)/.test(navigator.platform);  // on a Mac, Ctrl-F moves the cursor (Emacs keys)
+  root.addEventListener("keydown", (e) => {
+    if (!(MAC ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey) || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (k === "f" && !e.shiftKey) { e.preventDefault(); openFind(); }  // instead of the browser's find in the whole page
+    else if (k === "g" && !findForm.hidden) { e.preventDefault(); stepFind(e.shiftKey ? -1 : 1); }
+  });
+  const searchButton = Object.assign(document.createElement("button"), { type: "button", innerHTML: FIND_ICON, title: `Find in note (${MAC ? "⌘F" : "Ctrl+F"})` });
+  searchButton.setAttribute("aria-label", "Find in note");
+  searchButton.onmousedown = (e) => e.preventDefault();
+  searchButton.onclick = () => (findForm.hidden ? openFind() : closeFind());
+  bar.append(searchButton);
   const refreshToolbar = () => {
     for (const [b, active] of buttons) {
       b.setAttribute("aria-pressed", String(Array.isArray(active) ? editor.isActive(...active) : editor.isActive(active)));
@@ -1557,6 +1676,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
     setMarkdown: (md) => editor.commands.setContent(md, { contentType: "markdown", emitUpdate: false }),
     getMarkdown: () => editor.getMarkdown(),
     focus: () => editor.commands.focus("end"),
+    find: openFind,
     isFocused: () => editor.isFocused || root.contains(document.activeElement),
     setToolbar: (on) => { bar.hidden = !on; },
     destroy: () => { observer?.disconnect(); editor.destroy(); root.remove(); },

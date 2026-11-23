@@ -1007,3 +1007,26 @@ Made by the subagent that wrote the extension:
   errors. The same drag replay on the D78 layout measured -200…1,496 before any drag and -3,870…5,166 after one.
   `swift test`: 66 passing. Run the probe alone: it shares the notes model and the main run loop with other tests.
 - **Status:** Done.
+
+## D83 — Find in a note: ⌘F in the shared editor, iOS's own find bar on the iPhone (2026-11-23)
+
+- **Asked:** search inside the open note, as well as across notes.
+- **Decision:** like Apple Notes, ⌘F finds in the open note and Search All Notes moves to ⌥⌘F (the Mac window's menu,
+  the floating panel's button, the shortcut lists). The find bar lives in the shared editor (`editor/src/index.js`,
+  `find()`), so the Mac window, the floating panel and the browser panel (Chrome, Firefox, Safari) get the same one: every
+  match tinted, the current one solid yellow, "2 of 5", Return / ⇧Return (and ⌘G / ⇧⌘G) to step, Esc or Done to close
+  with the match selected. Case is ignored; a match can cross bold or a link but not a line. The toolbar has a magnifier
+  for it. In the Mac app, Edit ▸ Find in Note (⌘F) opens the bar of the note being typed in, else of the largest note in
+  the front window (`FindInNote`); when the note has focus the page takes ⌘F first. In the browser the panel takes ⌘F
+  only while it has focus; elsewhere the browser's own find runs. On a Mac, Ctrl-F still moves the cursor.
+- **iPhone:** the note's More menu has Find in Note, which opens iOS's find bar (`isFindInteractionEnabled`, as Safari's
+  Find on Page). A bar opened from the page can't bring up the keyboard without another tap, so the editor's magnifier is
+  hidden there. The editor now ignores SwiftUI's keyboard safe area: with both SwiftUI and the web view making room for
+  the keyboard, iOS's find scrolled its match out of sight (31 points above the view).
+- **Not found:** the titles inside link cards and note mentions (they are attributes, not text). Android's editor has no
+  find yet.
+- **Checked:** `editor/test.js` (67, 4 new: matching rules, the ⌘F flow, typing and edits, the magnifier and Ctrl-F);
+  `scripts/test_overlay.mjs` in Chromium, 19/19 with the new "⌘F finds in the note" (7 marks, Return to 2 of 7, Esc
+  closes, the page doesn't scroll); `FindInNoteTests` on the simulator (the bar, the keyboard, "1 of 2", the match inside
+  the view; and typed lines stay above the keyboard). The Mac's menu item is built but needs a person to press ⌘F.
+- **Status:** Done.

@@ -160,8 +160,8 @@ struct OverlayView: View {
                     Button { if searching { closeSearch() } else { searching = true } } label: {
                         Label(searching ? "Close Search" : "Search All Notes", systemImage: "magnifyingglass")
                     }
-                    .keyboardShortcut("f")
-                    .help(searching ? "Close Search" : "Search All Notes (⌘F)")
+                    .keyboardShortcut("f", modifiers: [.command, .option])  // ⌘F finds in the note (Find in Note)
+                    .help(searching ? "Close Search" : "Search All Notes (⌥⌘F)")
                     Button { newNote() } label: { Label("New Note", systemImage: "plus") }
                         .keyboardShortcut("n")
                         .help("New Note (⌘N)")

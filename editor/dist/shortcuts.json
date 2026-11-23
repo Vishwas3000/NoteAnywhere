@@ -45,6 +45,11 @@
     "action": "Undo / redo"
   },
   {
+    "group": "Text",
+    "keys": "⌘F",
+    "action": "Find in this note (Return / ⇧Return: next / previous match, Esc: done)"
+  },
+  {
     "group": "Blocks",
     "keys": "⌘⌥1 / 2 / 3",
     "action": "Heading 1 / 2 / 3"

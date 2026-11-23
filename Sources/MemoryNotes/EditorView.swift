@@ -39,6 +39,25 @@ struct NoteEditor: View {
     }
 }
 
+/// Edit ▸ Find in Note (⌘F): opens the find bar of the note being typed in, in the front window (the main window or the
+/// floating panel), else of the largest note it shows. When the note has focus, the page takes ⌘F itself before the menu.
+enum FindInNote {
+    @MainActor static func run() {
+        guard let window = NSApp.keyWindow, let content = window.contentView else { return NSSound.beep() }
+        var focused = window.firstResponder as? NSView
+        while let view = focused, !(view is EditorWebView.WebView) { focused = view.superview }
+        func editors(in view: NSView) -> [EditorWebView.WebView] {
+            (view as? EditorWebView.WebView).map { [$0] } ?? view.subviews.flatMap(editors)
+        }
+        let area = { (web: NSView) in web.visibleRect.width * web.visibleRect.height }
+        guard let web = (focused as? EditorWebView.WebView)
+                ?? editors(in: content).filter({ !$0.isHiddenOrHasHiddenAncestor && area($0) > 0 }).max(by: { area($0) < area($1) })
+        else { return NSSound.beep() }
+        window.makeFirstResponder(web)
+        web.evaluateJavaScript("MNHost.find()")
+    }
+}
+
 private struct EditorWebView: NSViewRepresentable {
     let dir: URL
     let noteID: String

@@ -10,6 +10,7 @@ export const shortcuts = [
   { group: "Text", keys: "⌘⌥P", action: "Add a page from the highlighted text (it links to the new note)" },
   { group: "Text", keys: "⌘⇧K", action: "Link the highlighted text to one of your notes" },
   { group: "Text", keys: "⌘Z / ⌘⇧Z", action: "Undo / redo" },
+  { group: "Text", keys: "⌘F", action: "Find in this note (Return / ⇧Return: next / previous match, Esc: done)" },
   { group: "Blocks", keys: "⌘⌥1 / 2 / 3", action: "Heading 1 / 2 / 3" },
   { group: "Blocks", keys: "⌘⌥0", action: "Normal text" },
   { group: "Blocks", keys: "⌘⇧B", action: "Quote" },
