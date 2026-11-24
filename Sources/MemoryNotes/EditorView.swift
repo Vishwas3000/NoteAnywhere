@@ -5,7 +5,7 @@ import WebKit
 /// Falls back to a plain TextEditor if the editor files aren't in the app bundle.
 struct NoteEditor: View {
     let noteID: String
-    var toolbar = true
+    var toolbar = true  // formatting on highlighted text (no row above the note: D84); false: none
     var fontSize = 13
     var titleLine = false  // first line styled as the title, like Apple Notes
     var fit: ClosedRange<CGFloat>?  // grow with the content within this range instead of filling the space
@@ -26,7 +26,7 @@ struct NoteEditor: View {
             LockedNoteView(compact: fit != nil)
         } else if let dir = Self.editorDir, FileManager.default.fileExists(atPath: dir.appendingPathComponent("mn-editor.js").path) {
             EditorWebView(dir: dir, noteID: noteID, markdown: model.textBinding(noteID),
-                          options: ["toolbar": toolbar, "fontSize": fontSize, "titleLine": titleLine,
+                          options: ["toolbar": toolbar ? "selection" as Any : false, "fontSize": fontSize, "titleLine": titleLine,
                                     "page": fit == nil, "datePattern": DateStyle.pattern, "pages": true],
                           showMainWindow: showMainWindow, openLink: openLink,
                           focusIfEmpty: focusIfEmpty,

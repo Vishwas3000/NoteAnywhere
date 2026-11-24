@@ -105,6 +105,7 @@ struct NotesWindow: View {
                 }
             }
         }
+        .toolbar(removing: .title)  // the app's name; the sidebar already shows the folder and its count
         .focusedSceneValue(\.windowActions, WindowActions(
             newNote: newNote,
             newWebsiteNote: newWebsiteNote,
@@ -125,7 +126,6 @@ struct NotesWindow: View {
             welcomeShown = true
             openWindow(id: "welcome")
         }
-        .navigationSubtitle(searching ? "^[\(hits.count) result](inflect: true)" : "^[\(visibleNotes.count) note](inflect: true)")
     }
 
     private var selectedNote: Note? { selection.flatMap { id in model.notes.first { $0.id == id } } }
@@ -136,7 +136,9 @@ struct NotesWindow: View {
         List(selection: $selection) {
             if searching {
                 if !hits.isEmpty {
-                    Section { ForEach(hits, id: \.note.id) { row($0.note) } } header: { sectionHeader("Results") }
+                    Section { ForEach(hits, id: \.note.id) { row($0.note) } } header: {
+                        sectionHeader(hits.count == 1 ? "1 Result" : "\(hits.count) Results")
+                    }
                 }
             } else {
                 folderSection
@@ -175,15 +177,13 @@ struct NotesWindow: View {
             }
         }
         .hardScrollEdges()
-        .bottomBar {  // the corner: which version this is, and a way to say what's wrong
+        .bottomBar {  // Apple Notes' corner. The version is in About, Feedback in the Help menu (D84)
             HStack {
-                Button { openWindow(id: "feedback") } label: { Label("Feedback", systemImage: "envelope") }
+                Button { promptFolder(moving: nil) } label: { Label("New Folder", systemImage: "plus.circle") }
                     .buttonStyle(.borderless)
-                    .help("Report a problem or suggest an idea")
+                    .foregroundStyle(.secondary)
                 Spacer()
-                Text("Version \(appVersion)").foregroundStyle(.secondary).textSelection(.enabled)
             }
-            .font(.caption)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
         }
@@ -305,6 +305,9 @@ struct NotesWindow: View {
         if let url = pageURL(note) {
             Divider()
             pageActions(url)
+        } else if note.kind == .url {  // no page yet: tie it to one, so it shows up there in the browser
+            Divider()
+            Button { selection = note.id; editingAddress = true } label: { Label("Add Website…", systemImage: "link.badge.plus") }
         }
         Divider()
         Button(role: .destructive) { pendingDelete = note } label: { Label("Delete", systemImage: "trash") }
@@ -327,9 +330,6 @@ struct NotesWindow: View {
                         }
                     }
             }
-            Button { promptFolder(moving: nil) } label: { Label("New Folder…", systemImage: "folder.badge.plus") }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
         } header: { sectionHeader("Folders") }
     }
 
@@ -470,7 +470,7 @@ struct NotesWindow: View {
         .accessibilityLabel("Linked page")
     }
 
-    /// The source chip; for a note without one, a quiet "Add Website" button; the address field while editing it.
+    /// The source chip, or the address field while editing it. A note without one gets it from its row's menu (D84).
     @ViewBuilder
     private func header(_ note: Note) -> some View {
         if note.kind == .url && editingAddress {
@@ -509,11 +509,6 @@ struct NotesWindow: View {
             }
         } else if note.hasSource {
             chip(note)
-        } else {
-            Button { editingAddress = true } label: { Label("Add Website", systemImage: "link.badge.plus") }
-                .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
-                .help("Tie this note to a web page, so it shows up there in the browser")
         }
     }
 
@@ -606,7 +601,8 @@ struct NotesWindow: View {
     }
 }
 
-/// An Apple Notes list row: bold title; the date then the preview; the app or site it belongs to.
+/// An Apple Notes list row: bold title; the icon of the app or site it belongs to, the date, the preview. Two lines;
+/// the source's name is in the tooltip and on the note's chip (D84).
 struct NoteRow: View {
     let note: Note
     let date: String
@@ -620,18 +616,17 @@ struct NoteRow: View {
                     Image(systemName: "star.fill").font(.caption).foregroundStyle(Color.notesAccent).accessibilityLabel("Starred")
                 }
             }
-            (Text(date) + Text("  ") + Text(note.preview.isEmpty ? "No additional text" : note.preview).foregroundStyle(.secondary))
-                .font(.subheadline)
-                .lineLimit(1)
-            if note.hasSource {
-                HStack(spacing: 4) {
-                    NoteIcon(note: note, size: 12)
-                    Text(note.shortSource).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
-                }
+            HStack(spacing: 4) {
+                if note.hasSource { NoteIcon(note: note, size: 12) }
+                (Text(date) + Text("  ") + Text(note.preview.isEmpty ? "No additional text" : note.preview).foregroundStyle(.secondary))
+                    .font(.subheadline)
+                    .lineLimit(1)
             }
         }
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .help(note.hasSource ? note.shortSource : "")
+        .accessibilityValue(note.hasSource ? note.shortSource : "")
         .overlay(alignment: .bottom) { Rectangle().fill(.separator).frame(height: 1) }  // a hairline between notes, like Notes
         .overlay(alignment: .leading) {  // the colour label: a strip at the sidebar's edge, like a Chrome tab group's
             if let color = note.color {

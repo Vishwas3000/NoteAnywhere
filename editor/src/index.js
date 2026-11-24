@@ -1124,11 +1124,13 @@ const el = (tag, className, text) => Object.assign(document.createElement(tag), 
  * onAddPage(text) => Promise<id>; onFindNotes(query) => Promise<[{id, title, preview}]>. Returns the two actions
  * for their shortcuts.
  */
-function selectionMenu(editor, body, { onAddPage, onFindNotes, onLinkNote }) {
+function selectionMenu(editor, body, { onAddPage, onFindNotes, onLinkNote, format }) {
   const bar = el("div", "mn-bubble");
   bar.setAttribute("role", "toolbar");
   bar.setAttribute("aria-label", "Highlighted text");
   let range = null, results = [], active = 0, searchTimer;
+  const doc = () => editor.state.doc;
+  const oneBlock = (r) => doc().resolve(r.from).parent === doc().resolve(r.to).parent;  // pages are made from one line
 
   const hide = () => { bar.remove(); range = null; clearTimeout(searchTimer); };
   const link = (id) => editor.chain().focus().setTextSelection(range).setLink({ href: `note://${id}` }).run();
@@ -1144,7 +1146,7 @@ function selectionMenu(editor, body, { onAddPage, onFindNotes, onLinkNote }) {
   const fail = (message) => { bar.replaceChildren(el("span", "mn-bubble-error", message)); setTimeout(hide, 4000); };
 
   const addPage = async () => {
-    if (!range || !onAddPage) return false;
+    if (!range || !onAddPage || !oneBlock(range)) return false;
     const text = editor.state.doc.textBetween(range.from, range.to, " ").trim();
     if (!text) return false;
     try {
@@ -1201,7 +1203,7 @@ function selectionMenu(editor, body, { onAddPage, onFindNotes, onLinkNote }) {
     e.stopPropagation();
   };
   const findNote = () => {
-    if (!range || !onFindNotes) return false;
+    if (!range || !onFindNotes || !oneBlock(range)) return false;
     input.value = "";
     results = [];
     bar.replaceChildren(input, list);
@@ -1218,12 +1220,24 @@ function selectionMenu(editor, body, { onAddPage, onFindNotes, onLinkNote }) {
   });
   bar.addEventListener("focusout", hideIfAway);
 
+  // Formatting (Bold … Link) on any highlight; the page actions on a highlight within one line.
+  const formatButton = ([glyph, name, run, active]) => {
+    const b = Object.assign(el("button"), { type: "button", innerHTML: glyph, title: name }); // our own constant markup
+    b.setAttribute("aria-label", name);
+    b.setAttribute("aria-pressed", String(editor.isActive(active)));
+    b.onmousedown = (e) => e.preventDefault(); // keep the highlight
+    b.onclick = () => { run(); if (bar.isConnected) place(); }; // place again: the pressed state changed
+    return b;
+  };
   const place = () => {
     const sel = editor.state.selection;
-    if (sel.empty || !(sel instanceof TextSelection) || sel.$from.parent !== sel.$to.parent || editor.isActive("codeBlock")) return hide();
+    if (sel.empty || !(sel instanceof TextSelection) || editor.isActive("codeBlock")) return hide();
     range = { from: sel.from, to: sel.to };
-    bar.replaceChildren(...[onAddPage && button("Add page", PAGE_ICON, addPage),
-      onFindNotes && button("Link to a note…", NOTE_LINK_ICON, findNote)].filter(Boolean));
+    const actions = oneBlock(range) ? [onAddPage && button("Add page", PAGE_ICON, addPage),
+      onFindNotes && button("Link to a note…", NOTE_LINK_ICON, findNote)].filter(Boolean) : [];
+    const formatting = (format ?? []).map(formatButton);
+    if (!actions.length && !formatting.length) return hide();
+    bar.replaceChildren(...formatting, ...(formatting.length && actions.length ? [el("span", "mn-sep")] : []), ...actions);
     if (!bar.isConnected) body.append(bar);
     const start = editor.view.coordsAtPos(sel.from), end = editor.view.coordsAtPos(sel.to), frame = body.getBoundingClientRect();
     const above = start.top - frame.top - bar.offsetHeight - 6;
@@ -1439,7 +1453,8 @@ const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.0
  * => Promise<{title, preview}> shows a card when hovering a note link. onAddImage / imageURL: pasted and dropped images
  * (see images). onLinkPreview(url) => Promise<{title, description, icon, image}>: the menu on a pasted link (see
  * linkPreviews). onFindTags(query) => Promise<[{tag, count}]>: every tag in use, most used first, for the "#" menu
- * (see tagMenu); without it there's no menu.
+ * (see tagMenu); without it there's no menu. toolbar: true shows the formatting row above the note; "selection" shows
+ * Bold, Italic, Strike, Code and Link on highlighted text instead (the Mac window, D84); false shows neither.
  */
 export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
   fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview, onAddImage, imageURL, onLinkPreview,
@@ -1451,7 +1466,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   bar.className = "mn-toolbar";
   bar.setAttribute("role", "toolbar");
   bar.setAttribute("aria-label", "Formatting");
-  bar.hidden = !toolbar;
+  bar.hidden = toolbar !== true;
   let pages; // "Add page" / "Link to a note…" on highlighted text, when the host supports them
   let pickDate; // set once the editor exists; the "@" menu's "Pick a date…" uses it
   const linkForm = document.createElement("form");
@@ -1663,7 +1678,11 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   editor.on("transaction", refreshToolbar);
   refreshToolbar();
   if (onAI) root.append(aiMenu(editor, onAI));
-  if (onAddPage || onFindNotes) pages = selectionMenu(editor, body, { onAddPage, onFindNotes, onLinkNote });
+  const format = toolbar === "selection" ? [
+    ...TOOLBAR.slice(0, 4).map(([glyph, name, run, active]) => [glyph, name, () => run(editor.chain().focus()).run(), active]),
+    [LINK_ICON, "Link", openLink, "link"],
+  ] : null;
+  if (onAddPage || onFindNotes || format) pages = selectionMenu(editor, body, { onAddPage, onFindNotes, onLinkNote, format });
   if (onNotePreview) noteHover(editor.view, root, body, onNotePreview);
   let observer;
   if (onHeight && typeof ResizeObserver !== "undefined") {
