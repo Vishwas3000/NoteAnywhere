@@ -41,7 +41,10 @@ if (window.top === window && !window.__memoryNotes) (() => {
   };
   chrome.storage?.local.get("panelSpot").then(({ panelSpot }) => { if (panelSpot) { spot = panelSpot; place(); } }).catch(() => {});
 
-  const tell = (type, extra) => chrome.runtime.sendMessage({ type, ...extra }).catch(() => {});
+  // Firefox doesn't pass a content script's messages to the panel's frame; the background forwards them (background.js).
+  const viaBackground = chrome.runtime.getURL("").startsWith("moz-extension:");
+  const tell = (type, extra) => chrome.runtime.sendMessage(viaBackground ? { type: "mn:panel", message: { type, ...extra } }
+    : { type, ...extra }).catch(() => {});
   const calm = matchMedia("(prefers-reduced-motion: reduce)");
   frame.addEventListener("transitionend", () => { frame.style.transition = "none"; });
 

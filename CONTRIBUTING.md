@@ -5,7 +5,7 @@ This repo is NoteAnywhere's apps:
 - the Mac app (`Sources/`),
 - the iPhone app (`ios/`),
 - the Android app (`android/`),
-- the Chrome/Brave extension (`extension/`),
+- the browser extension for Chrome, Brave and Firefox (`extension/`),
 - and the editor they share (`editor/`).
 
 The website isn't in this repo. If something on noteanywhere.app is wrong, open an issue here.
@@ -47,7 +47,10 @@ You need macOS 15+, Xcode 26 (or its command-line tools) and Node.js 20.19+ or 2
 ```
 
 This builds the app into `~/Applications`, builds the shared editor (`editor/`), and registers the native messaging
-host for Chrome and Brave. Then load `extension/` as an unpacked extension (Developer mode ▸ Load unpacked).
+host for Chrome, Brave and Firefox. Then load `extension/` as an unpacked extension (Developer mode ▸ Load unpacked).
+In Firefox, open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on…** and pick
+`extension/manifest.json` (it stays until Firefox quits). Quit and reopen NoteAnywhere once after installing Firefox:
+it registers its host for the browsers it finds at launch.
 
 To try things without touching your own notes, point the app at another folder:
 
@@ -85,6 +88,8 @@ swift test                                  # Swift: parsers, dates, tags, graph
 swift build -c release && python3 scripts/test_host.py   # the native messaging host, end to end
 cd editor && npm test                       # the shared editor (happy-dom)
 cd android && ./gradlew testDebugUnitTest   # Android: notes store, sync rows, vault
+node scripts/test_overlay.mjs               # the extension in headless Chromium (needs Playwright)
+python3 scripts/test_firefox.py             # the extension in headless Firefox (needs Firefox and Selenium)
 MN_UI_PROBE=1 swift test --filter dividerDrags  # alone: main window off-screen, real drags keep every pane in the window
 ```
 

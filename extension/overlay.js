@@ -19,7 +19,19 @@ const [searchBox, resultList, noResults, footer, help] = [".search", ".results",
 const [favicon, hostName, pageTitle] = [".site img", ".host", ".page-title"].map($);
 const store = chrome.storage?.local; // needs the "storage" permission; without it the size choice just isn't remembered
 
+// Firefox doesn't give this frame (an extension page inside a web page) the tabs and native messaging APIs, and Safari
+// kills a page whose frame calls them, so there the background makes those calls for it (background.js).
+const relayed = !chrome.tabs?.sendMessage || !chrome.runtime.sendNativeMessage
+  || chrome.runtime.getURL("").startsWith("safari-web-extension:");
+const tabsSend = (tabId, message, options) => relayed
+  ? chrome.runtime.sendMessage({ type: "mn:relay", tabId, message, options })
+  : chrome.tabs.sendMessage(tabId, message, options);
+
 function send(msg) {
+  if (relayed) {
+    return chrome.runtime.sendMessage({ type: "mn:native", message: msg })
+      .then((reply) => reply ?? { ok: false, error: MISSING }, () => ({ ok: false, error: MISSING }));
+  }
   return new Promise((resolve) => {
     chrome.runtime.sendNativeMessage(HOST, msg, (reply) => {
       if (chrome.runtime.lastError) resolve({ ok: false, error: MISSING });
@@ -88,7 +100,7 @@ function report() {
     : panel.offsetHeight - shown.clientHeight + shown.scrollHeight;
   // A hidden frame isn't laid out, so the panel measures 0 when reopened: show it at its last size, measure once drawn.
   if (visible && !height) { height = lastHeight; requestAnimationFrame(report); } else if (height) lastHeight = height;
-  chrome.tabs.sendMessage(tabId, { type: "mn:frame", visible, height, width: panel.offsetWidth, animate: !resizing }, { frameId: 0 })
+  tabsSend(tabId, { type: "mn:frame", visible, height, width: panel.offsetWidth, animate: !resizing }, { frameId: 0 })
     .then((h) => {
       if (!h || h === hostH) return;
       hostH = h;
@@ -103,7 +115,7 @@ new ResizeObserver(report).observe(panel);
 // so it measures in screen coordinates and content.js moves the frame.
 const header = panel.querySelector("header");
 let drag = null;
-const moved = (event, phase) => chrome.tabs.sendMessage(tabId, { type: "mn:drag", phase,
+const moved = (event, phase) => tabsSend(tabId, { type: "mn:drag", phase,
   dx: event.screenX - drag.x, dy: event.screenY - drag.y }, { frameId: 0 }).catch(() => {});
 header.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 || event.target.closest("button") || tabId === undefined) return;
@@ -131,7 +143,7 @@ grip.addEventListener("pointerdown", (event) => {
   grip.setPointerCapture(event.pointerId);
   resizing = true;
   // The frame grows over the room the panel can grow into, so the pointer stays inside it while dragging.
-  chrome.tabs.sendMessage(tabId, { type: "mn:resizing", on: true }, { frameId: 0 }).catch(() => {});
+  tabsSend(tabId, { type: "mn:resizing", on: true }, { frameId: 0 }).catch(() => {});
 });
 grip.addEventListener("pointermove", (event) => {
   if (!gripStart) return;
@@ -146,7 +158,7 @@ const endResize = () => {
   gripStart = null;
   resizing = false;
   if (size) store?.set({ panelSize: size });
-  chrome.tabs.sendMessage(tabId, { type: "mn:resizing", on: false }, { frameId: 0 }).catch(() => {}).then(report);
+  tabsSend(tabId, { type: "mn:resizing", on: false }, { frameId: 0 }).catch(() => {}).then(report);
 };
 grip.addEventListener("pointerup", endResize);
 grip.addEventListener("pointercancel", endResize);
@@ -425,7 +437,7 @@ async function load(nav) {
   }
 }
 
-chrome.runtime.onMessage.addListener((msg, sender) => {
+function received(msg, sender) {
   if (msg.type === "mn:changed") { // from background.js, so no sender tab
     clearTimeout(changeTimer);
     changeTimer = setTimeout(() => { if (visible && document.visibilityState === "visible") load(false); }, 300);
@@ -445,11 +457,20 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
   } else if (msg.type === "mn:resize") {
     report();
   }
-});
+}
+chrome.runtime.onMessage.addListener(received);
+// Firefox passes this frame no messages, from the page's content script or the background: they come down a port the
+// background keeps for each tab's panel (background.js). The port also keeps Firefox's background page running.
+(function connect() {
+  if (!chrome.runtime.getURL("").startsWith("moz-extension:")) return;
+  const port = chrome.runtime.connect({ name: "panel" });
+  port.onMessage.addListener((msg) => received(msg, { tab: { id: tabId } }));
+  port.onDisconnect.addListener(() => setTimeout(connect, 1000)); // the background restarted
+})();
 
 (async () => {
   tabId = await chrome.runtime.sendMessage({ type: "mn:whoami" });
-  page = await chrome.tabs.sendMessage(tabId, { type: "mn:ready" }, { frameId: 0 });
+  page = await tabsSend(tabId, { type: "mn:ready" }, { frameId: 0 });
   forced = page.open;
   ({ expanded = false, panelSize: size = null } = (await store?.get(["expanded", "panelSize"]).catch(() => null)) ?? {});
   expanded = !!expanded;
