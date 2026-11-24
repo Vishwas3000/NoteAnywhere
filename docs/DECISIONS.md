@@ -1098,3 +1098,16 @@ Made by the subagent that wrote the extension:
   before and after; the editor page in headless Chromium with a word highlighted (the bubble above it, ✨ beside the
   title).
 - **Status:** Done.
+
+## D85 — Appearance: Automatic, Light or Dark (2026-11-24)
+
+- **Asked:** the app should follow dark, light or automatic (the system's setting).
+- **Decision:** Settings ▸ General ▸ Appearance, a picker: Automatic (the default, the Mac's own setting), Light or
+  Dark, saved as `appearance`. It sets `NSApp.appearance` (`Appearance.apply`, at launch before any window shows and on
+  every change), which every window, the floating panel and the search popup inherit, and which the notes' web views
+  report to the shared editor as `prefers-color-scheme`. Only the Mac app; the iPhone and Android apps follow the
+  system.
+- **Checked:** `AppearanceTests` (each choice sets the app's appearance; Automatic clears it). On this Mac in Dark mode:
+  a panel created after choosing Light is light; a throwaway app with a web view reported `prefers-color-scheme: dark`
+  false under Light and true under Automatic and Dark; the main window rendered light under Light.
+- **Status:** Done.
