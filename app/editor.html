@@ -8,7 +8,14 @@
   html, body { margin: 0; background: transparent; }
   body { padding: 0 2px; }
   /* A note filling a window: the web view is full width (scroll bar at the edge), the text a centred column. */
-  body.page #editor { max-width: 720px; margin: 0 auto; padding: 0 40px; }
+  body.page #editor { max-width: 680px; margin: 0 auto; padding: 0 56px; }
+  /* Room to breathe (D84): taller lines, more space between blocks and above headings. Only the Mac's windows. */
+  body.page .mn-editor { line-height: 1.65; }
+  body.page .mn-content > :is(p, ul, ol, blockquote) { margin-bottom: 0.7em; }
+  body.page .mn-content li { margin: 0.25em 0; }
+  body.page .mn-content ul[data-type="taskList"] li > label { height: 1.65em; }  /* checkbox centred on the taller line */
+  body.page .mn-content > :is(h1, h2, h3):not(:first-child) { margin-top: 1.4em; }
+  body.page .mn-title-line .mn-content > :first-child { margin-bottom: 0.8em; }
 </style>
 </head>
 <body>

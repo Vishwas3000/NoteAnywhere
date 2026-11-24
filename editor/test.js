@@ -463,6 +463,22 @@ await checkAsync("Link to a note… searches as you type and links the pick", as
   input.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
   assert.equal(ed.getMarkdown().trim(), "See the [answer](note://ANS) here");
 });
+check('toolbar: "selection" hides the row; a highlight offers Bold … Link, the page actions only within one line', () => {
+  const ed = mount("one two\n\nthree", { toolbar: "selection", onAddPage: async () => "X", onFindNotes: async () => [] });
+  const root = ed.editor.options.element.closest(".mn-editor");
+  const labels = () => [...root.querySelectorAll(".mn-bubble button")].map((b) => b.getAttribute("aria-label") ?? b.textContent);
+  assert.equal(root.querySelector(".mn-toolbar").hidden, true);
+  ed.editor.commands.focus();
+  ed.editor.commands.setTextSelection({ from: 1, to: 4 });  // "one"
+  assert.deepEqual(labels(), ["Bold", "Italic", "Strikethrough", "Inline code", "Link", "Add page", "Link to a note…"]);
+  root.querySelector('.mn-bubble button[aria-label="Bold"]').click();
+  assert.equal(ed.getMarkdown().trim(), "**one** two\n\nthree");
+  assert.equal(root.querySelector('.mn-bubble button[aria-label="Bold"]').getAttribute("aria-pressed"), "true");
+  ed.editor.commands.setTextSelection({ from: 1, to: 15 });  // across both lines: formatting, no page
+  assert.deepEqual(labels(), ["Bold", "Italic", "Strikethrough", "Inline code", "Link"]);
+  ed.editor.commands.setTextSelection(3);
+  assert.equal(root.querySelector(".mn-bubble"), null, "gone without a highlight");
+});
 await checkAsync("hovering a note link shows its title and first lines", async () => {
   const ed = mount("Question: [why?](note://ANS)", { onNotePreview: async (id) => ({ title: `Answer ${id}`, preview: "Because sockets idle out." }) });
   const a = ed.editor.view.dom.querySelector('a[href="note://ANS"]');

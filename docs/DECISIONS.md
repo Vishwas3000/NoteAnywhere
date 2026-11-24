@@ -1065,3 +1065,36 @@ Made by the subagent that wrote the extension:
   closes, the page doesn't scroll); `FindInNoteTests` on the simulator (the bar, the keyboard, "1 of 2", the match inside
   the view; and typed lines stay above the keyboard). The Mac's menu item is built but needs a person to press ⌘F.
 - **Status:** Done.
+
+## D84 — A cleaner Mac window: formatting on the highlight, Apple Notes' sidebar corner, two-line rows (2026-11-24)
+
+- **Asked:** the Mac window "looks very cluttered", make it clean, checking Apple's rules. Measured against Apple's
+  Human Interface Guidelines (toolbars: "Choose items deliberately to avoid overcrowding", "If titling a toolbar seems
+  redundant, you can leave the title area empty"; sidebars: "Avoid putting critical information or actions at the
+  bottom of a sidebar"; lists: "Keep item text succinct"). The user picked each change from mockups.
+- **Formatting on the highlight:** the always-visible row above the note (B I S, code, H1 H2, lists, quote, table, 📅,
+  link, find) is gone from the main window and note windows. Highlighting text shows Bold, Italic, Strikethrough, Inline
+  code and Link in the bubble that already held Add page / Link to a note… (those two only within one line, as
+  before). Headings, lists, checklists, tables and dates come from `/`, `@` and Markdown; ⌘B, ⌘I, ⌘K, ⌘F still work.
+  In the shared editor as `toolbar: "selection"`; `true` (the browser panel, unchanged) still shows the row and `false`
+  neither. With no row, the ✨ button sits beside the title, which leaves room for it.
+- **Toolbar:** no "NoteAnywhere / 24 notes" title: the app's name, and the count is beside All Notes. A search
+  shows its count in the Results header instead. Delete and Inspector already share one capsule (macOS groups them), so
+  the toolbar keeps three groups: the Notes/Calendar/Graph switch, New Note, Delete + Inspector.
+- **Sidebar corner:** like Apple Notes, it holds only New Folder, and the folder list loses its New Folder… row. This
+  undoes D72's corner, which the user had asked for: the version is in NoteAnywhere ▸ About NoteAnywhere, Feedback in Help ▸ Send
+  Feedback… and the menu-bar icon's menu.
+- **Rows:** two lines, not three. The app's or site's icon goes before the date; its name moves to the row's tooltip
+  (and VoiceOver's value) and stays on the note's chip.
+- **Room to breathe** (asked after the first pass: "still looks very clutter, need some negative spacing"): the note's
+  column is 680 points wide with 56-point sides (was 720 and 40) and starts lower; lines are 1.65 high (was 1.5), with
+  more space between paragraphs, list items and above headings (`app/editor.html`, `body.page`, so only the Mac's
+  windows; the iPhone and the panels keep theirs). In the sidebar, notes are separated by space instead of hairlines
+  (11-point padding, was 8) and section headers get more room above them.
+- **Add Website:** no longer a button above every plain note; the note's right-click menu has Add Website… (File ▸ New
+  Note for Website, ⇧⌘N, stays).
+- **Checked:** `editor/test.js` 68 (new: the row hidden, the bubble's buttons on one line and across two, Bold applied
+  and shown pressed, gone without a highlight); the main window rendered off-screen in dark and light with sample notes,
+  before and after; the editor page in headless Chromium with a word highlighted (the bubble above it, ✨ beside the
+  title).
+- **Status:** Done.

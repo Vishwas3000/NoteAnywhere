@@ -62,7 +62,8 @@ notes link up.
 - **Apple Intelligence.** The ✨ menu fixes spelling and grammar, makes text clearer or shorter, turns it into a
   checklist or adds a title, using Apple's on-device model (macOS 26). System Writing Tools work in the editor too.
 - **Plain notes too.** A note doesn't need an app or website: ⌘N writes a plain note, ⇧⌘N a website note, and any
-  note can gain or lose its website later (Add Website / Remove Website).
+  note can gain or lose its website later (right-click it in the list ▸ Add Website…, or its page menu ▸ Remove
+  Website).
 - **#tags, Obsidian-style.** Type `#tag` anywhere (typing `#` lists the tags you already use) and nest with
   `#area/topic`. ⌘-click a tag or search `#tag` (or the
   start of one: `#note` finds `#noteanywhere`) to see its notes; the sidebar lists every tag with its count. On the Mac,
@@ -71,10 +72,13 @@ notes link up.
 - **Pages from a highlight.** Highlight a question and choose **Add page**: a new note titled with it, linked from
   the highlight and linking back. Or **Link to a note…** to point it at an answer you already wrote. Hover a link to a
   note for a quick look, like VS Code's hover; click it and the page opens in a side peek next to the note.
+- **A clean page on the Mac.** No formatting row above the note: highlighting text shows Bold, Italic, Strike, Code
+  and Link; headings, lists, checklists and tables come from `/` or Markdown (`# `, `- `, `[ ] `), and ⌘B, ⌘I, ⌘K
+  and ⌘F work as usual. The browser panel keeps its row.
 - **A knowledge graph.** Each note is a dot joined to its app or site, the notes it links to, its #tags (a hub per
   tag), and notes with a similar meaning. Drag, zoom, and switch each kind of link on or off.
 - **Dates and tasks.** Type `@` for a Notion-style date menu (Today, Tomorrow, the coming week, Pick a date…), or
-  `@today` / `@fri` + Space, or pick a day from 📅 in the toolbar's calendar. Dated lines show as chips, in your
+  `@today` / `@fri` + Space, or pick a day from the calendar (Pick a date…, or 📅 in the browser panel's toolbar). Dated lines show as chips, in your
   date format (Settings ▸ General: your region's, day/month/year, month/day/year or year-month-day); ⌘-click one to
   open that day. The note itself stores `@2026-10-30`, which Obsidian reads too.
 - **A calendar.** Month, week and day views. Dated lines and checklist tasks appear under "Planned", with a circle that

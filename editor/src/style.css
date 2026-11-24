@@ -120,6 +120,7 @@
   background: var(--mn-code-bg); border-radius: 6px; }
 .mn-ai-menu[hidden] { display: none; }
 .mn-editor:has(.mn-ai) .mn-toolbar { padding-right: 34px; }  /* room for the ✨ button */
+.mn-editor:has(.mn-ai):has(.mn-toolbar[hidden]) .mn-content > :first-child { padding-right: 34px; }  /* no row: beside the title */
 /* #tags, like Obsidian: a soft accent pill. */
 .mn-content .mn-tag { color: var(--mn-link); background: color-mix(in srgb, var(--mn-check) 18%, transparent); border-radius: 4px; padding: 0 2px; }
 /* Notion-style block handle in a narrow gutter left of the text. */
@@ -182,7 +183,12 @@
 .mn-bubble { position: absolute; z-index: 4; display: flex; flex-direction: column; gap: 2px; padding: 3px; border-radius: 9px;
   border: 1px solid var(--mn-line); background: var(--mn-menu-bg); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); font: 12.5px -apple-system, system-ui, sans-serif; }
-.mn-bubble:has(> button) { flex-direction: row; }
+.mn-bubble:has(> button) { flex-direction: row; align-items: center; }
+/* Formatting on the highlight (toolbar: "selection"): icon buttons like the formatting row's. */
+.mn-bubble > button[aria-pressed] { justify-content: center; min-width: 28px; padding: 0 6px; font-weight: 600; font-size: 13px; }
+.mn-bubble > button[aria-pressed] svg { color: inherit; }
+.mn-bubble > button[aria-pressed="true"] { color: var(--mn-accent); background: var(--mn-hover); }
+.mn-bubble .mn-glyph { font-size: 14px; line-height: 1; }
 .mn-bubble > button { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; color: var(--mn-fg);
   font: inherit; background: none; border: none; border-radius: 6px; cursor: default; white-space: nowrap; }
 .mn-bubble > button svg { width: 15px; height: 15px; color: var(--mn-muted); }
