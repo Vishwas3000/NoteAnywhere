@@ -75,6 +75,8 @@ notes link up.
 - **A clean page on the Mac.** No formatting row above the note: highlighting text shows Bold, Italic, Strike, Code
   and Link; headings, lists, checklists and tables come from `/` or Markdown (`# `, `- `, `[ ] `), and ⌘B, ⌘I, ⌘K
   and ⌘F work as usual. The browser panel keeps its row.
+- **Light, Dark or Automatic.** Settings ▸ General ▸ Appearance: Automatic follows the Mac's setting; Light or Dark
+  keeps the app that way, the notes, the floating panel and search included.
 - **A knowledge graph.** Each note is a dot joined to its app or site, the notes it links to, its #tags (a hub per
   tag), and notes with a similar meaning. Drag, zoom, and switch each kind of link on or off.
 - **Dates and tasks.** Type `@` for a Notion-style date menu (Today, Tomorrow, the coming week, Pick a date…), or

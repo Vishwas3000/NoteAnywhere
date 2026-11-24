@@ -23,6 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // scripts/install.sh removes SUFeedURL, so a dev build never starts Sparkle and never replaces itself with a release.
     let updaterController = SPUStandardUpdaterController(
         startingUpdater: Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") != nil, updaterDelegate: nil, userDriverDelegate: nil)
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        Appearance.apply()  // before any window shows
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         BrowserBridge.registerThisApp()
         overlay.start()
@@ -57,7 +61,7 @@ struct MemoryNotesApp: App {
 
         Settings {
             TabView {
-                Form { AutoOpenToggle(); DateFormatPicker() }
+                Form { AppearancePicker(); AutoOpenToggle(); DateFormatPicker() }
                     .formStyle(.grouped)
                     .tabItem { Label("General", systemImage: "gearshape") }
                 SyncSettingsView()
