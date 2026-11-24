@@ -1051,6 +1051,11 @@ Made by the subagent that wrote the extension:
   Feedback… and the menu-bar icon's menu.
 - **Rows:** two lines, not three. The app's or site's icon goes before the date; its name moves to the row's tooltip
   (and VoiceOver's value) and stays on the note's chip.
+- **Room to breathe** (asked after the first pass: "still looks very clutter, need some negative spacing"): the note's
+  column is 680 points wide with 56-point sides (was 720 and 40) and starts lower; lines are 1.65 high (was 1.5), with
+  more space between paragraphs, list items and above headings (`app/editor.html`, `body.page`, so only the Mac's
+  windows; the iPhone and the panels keep theirs). In the sidebar, notes are separated by space instead of hairlines
+  (11-point padding, was 8) and section headers get more room above them.
 - **Add Website:** no longer a button above every plain note; the note's right-click menu has Add Website… (File ▸ New
   Note for Website, ⇧⌘N, stays).
 - **Checked:** `editor/test.js` 68 (new: the row hidden, the bubble's buttons on one line and across two, Bold applied

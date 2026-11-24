@@ -255,7 +255,7 @@ struct NotesWindow: View {
 
     /// Bold, sentence-case headers like Notes, instead of the sidebar's small grey ones.
     private func sectionHeader(_ title: String) -> some View {
-        Text(title).font(.headline).foregroundStyle(.primary).textCase(nil).padding(.top, 4)
+        Text(title).font(.headline).foregroundStyle(.primary).textCase(nil).padding(.top, 14).padding(.bottom, 2)
     }
 
     private func row(_ note: Note) -> some View {
@@ -412,7 +412,7 @@ struct NotesWindow: View {
     private var detail: some View {
         HStack(spacing: 0) {
             if let note = selectedNote {
-                VStack(spacing: 10) {
+                VStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 10) {
                         header(note)
                         Text("Edited \(note.edited.formatted(date: .long, time: .shortened))")
@@ -420,13 +420,13 @@ struct NotesWindow: View {
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: 720)
-                    .padding(.horizontal, 40)
+                    .frame(maxWidth: 680)  // the editor page's column (app/editor.html)
+                    .padding(.horizontal, 56)
                     // Full width, so its scroll bar is at the pane's edge; the page keeps the text in the same column.
                     NoteEditor(noteID: note.id, fontSize: 15, titleLine: true, focusIfEmpty: !editingAddress,
                                openLink: { peekID = $0 })
                 }
-                .padding(.top, 16)
+                .padding(.top, 28)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(nsColor: .textBackgroundColor))
                 .onChange(of: targetFocused) { _, focused in editingAddress = focused }
@@ -608,7 +608,7 @@ struct NoteRow: View {
     let date: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
                 if note.locked { Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary) }
                 Text(note.title).font(.headline).lineLimit(1)
@@ -623,11 +623,10 @@ struct NoteRow: View {
                     .lineLimit(1)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 11)  // space between notes instead of hairlines (D84)
         .frame(maxWidth: .infinity, alignment: .leading)
         .help(note.hasSource ? note.shortSource : "")
         .accessibilityValue(note.hasSource ? note.shortSource : "")
-        .overlay(alignment: .bottom) { Rectangle().fill(.separator).frame(height: 1) }  // a hairline between notes, like Notes
         .overlay(alignment: .leading) {  // the colour label: a strip at the sidebar's edge, like a Chrome tab group's
             if let color = note.color {
                 Capsule().fill(color.swatch).frame(width: 4).padding(.vertical, 4).offset(x: -12)
