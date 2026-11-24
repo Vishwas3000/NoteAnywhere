@@ -5,8 +5,10 @@ import SwiftUI
 @main
 enum Main {
     static func main() {
-        // Chrome/Brave launch this same binary as the native messaging host, passing the extension origin.
-        if CommandLine.arguments.dropFirst().first?.hasPrefix("chrome-extension://") == true {
+        // Browsers launch this same binary as the native messaging host: Chrome and its kin pass the extension's origin,
+        // Firefox the path of the host manifest it read (then the add-on's id).
+        let first = CommandLine.arguments.dropFirst().first ?? ""
+        if first.hasPrefix("chrome-extension://") || first.hasSuffix("/\(BrowserBridge.hostName).json") {
             NativeHost.run()
         }
         // AI apps (Claude, Codex, Gemini) launch it as an MCP server: MemoryNotes --mcp.

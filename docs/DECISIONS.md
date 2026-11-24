@@ -1008,6 +1008,41 @@ Made by the subagent that wrote the extension:
   `swift test`: 66 passing. Run the probe alone: it shares the notes model and the main run loop with other tests.
 - **Status:** Done.
 
+## D81 — The extension in Firefox; one relay for every browser's restricted panel frame (2026-11-21)
+- **Asked by the maintainer:** make the extension work in Firefox and Safari too. Firefox first; Safari on the Mac
+  next, as an app extension inside NoteAnywhere.app (the maintainer's choice, over a separate Safari app).
+- **One manifest for Chrome and Firefox.** `background` names both `service_worker` (Chrome, which ignores `scripts`
+  from Chrome 121) and `scripts` (Firefox, which has no extension service workers and runs it as an event page).
+  `browser_specific_settings.gecko` fixes the add-on id `noteanywhere@noteanywhere.app` (the host allows Firefox add-ons
+  by id), needs Firefox 140 and declares `browsingActivity` and `searchTerms` as required data collection: Mozilla
+  counts data handed to another program on the computer, and the add-on sends each page's address, search queries
+  included, to the Mac app (the maintainer chose this over "none"). `release.sh` builds a Firefox zip next to the
+  Chrome one, each manifest with only its browser's keys.
+- **The Mac side.** `BrowserBridge` also writes the host manifest Firefox reads,
+  `~/Library/Application Support/Mozilla/NativeMessagingHosts/`, listing the add-on id in `allowed_extensions`, when
+  Firefox's profile folder exists. Firefox starts the host with the manifest's path and the add-on id, not an origin,
+  so `Main` also takes a first argument ending in `/com.memorynotes.host.json` as host mode.
+- **The panel's frame.** Firefox gives the panel (an extension page in an iframe of the web page) no `tabs` and no
+  native messaging, and delivers it no messages, from the background or the page's content script; its own requests
+  do get answers. Safari has the first restriction too (a frame calling them gets its page killed), which the iPhone
+  build used to patch with two shims. Now `overlay.js` sends those calls through `background.js` ("relayed") in
+  Firefox and Safari, and in Firefox each panel keeps a port to the background, which forwards the content script's
+  messages and live updates down it. The port also keeps Firefox's background page from unloading while panels are
+  open. Chrome keeps its direct calls and messages: an idle port wouldn't keep its service worker alive, and
+  reconnecting would wake it every 30 seconds. The iPhone build's shims and its rewrite of `overlay.js` are gone.
+- **Rejected:** `window.postMessage` between the content script and the frame (the page could forge it, D17); ports
+  in Chrome too (wakeups); a separate Firefox copy of the extension.
+- **Checked:** `python3 scripts/test_firefox.py` in headless Firefox 160: the panel opens by itself on a page with
+  notes, shows the note and its image through the host, saves typing, shows a note saved elsewhere live after the
+  background sat idle three times its timeout, and closes on an in-page move to a page without notes, 6/6.
+  `node scripts/test_overlay.mjs` in Chromium: 18/18 (its host copy now gets Sparkle beside it; since D75 the copied
+  host couldn't load it, so the image steps had been failing). `swift test` for the bridge, `test_host.py` with a
+  Firefox-style launch. Not checked: the toolbar button in Firefox (each half of its path is: the background to the
+  content script, and the content script through the background to the panel), and Mozilla's linter (`web-ext lint`
+  wasn't allowed to run here).
+- **Status:** Firefox built and tested, not yet on addons.mozilla.org (the maintainer submits it; AMO also asks for
+  the editor bundle's source, which is this repo). Safari on the Mac: next.
+
 ## D83 — Find in a note: ⌘F in the shared editor, iOS's own find bar on the iPhone (2026-11-23)
 
 - **Asked:** search inside the open note, as well as across notes.

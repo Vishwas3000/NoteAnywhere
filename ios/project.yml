@@ -123,7 +123,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Safari/MemoryNotesSafari.entitlements
         INFOPLIST_KEY_CFBundleDisplayName: NoteAnywhere
     postBuildScripts:
-      # The Chrome extension as is; the two Safari-only shims (Safari/*-shim.js, bundled as resources) are wired in here.
+      # The shared extension as is (overlay.js relays through the background in Safari, D81); only the manifest changes.
       - name: Copy browser extension
         basedOnDependencyAnalysis: false
         script: |
@@ -133,18 +133,8 @@ targets:
           import json, sys
           m = json.load(open(sys.argv[1]))
           m.pop("key", None)  # pins the unpacked Chrome extension's id; Safari doesn't use it
-          # Safari on iOS: a non-persistent background page, with the relay for the overlay frame.
-          m["background"] = {"scripts": ["background-shim.js", m["background"]["service_worker"]]}
+          m["background"] = {"scripts": m["background"]["scripts"]}  # Safari on iOS: a non-persistent background page
           json.dump(m, open(sys.argv[2] + "/manifest.json", "w"), indent=2)
-          html = open(sys.argv[2] + "/overlay.html").read()
-          tag = '<script src="overlay.js"></script>'
-          assert tag in html, "overlay.html changed: load overlay-shim.js before overlay.js by hand"
-          open(sys.argv[2] + "/overlay.html", "w").write(html.replace(tag, '<script src="overlay-shim.js"></script>' + tag))
-          js = open(sys.argv[2] + "/overlay.js").read()
-          for call, shim in [("chrome.tabs.sendMessage(", "mnTabsSendMessage("), ("chrome.runtime.sendNativeMessage(", "mnSendNativeMessage(")]:
-              assert call in js, "overlay.js changed: update the Safari rewrite in project.yml"
-              js = js.replace(call, shim)
-          open(sys.argv[2] + "/overlay.js", "w").write(js)
           PY
 
   MemoryNotesUITests:

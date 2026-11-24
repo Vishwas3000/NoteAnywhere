@@ -1,6 +1,7 @@
 #!/bin/sh
-# Builds dist/NoteAnywhere-<version>.dmg (Developer ID signed, notarized, stapled) and the Chrome Web Store zip
-# dist/NoteAnywhere-extension-<version>.zip. Run by the maintainer, who publishes releases.
+# Builds dist/NoteAnywhere-<version>.dmg (Developer ID signed, notarized, stapled), the Chrome Web Store zip
+# dist/NoteAnywhere-extension-<version>.zip and the Firefox add-on zip dist/NoteAnywhere-firefox-<version>.zip.
+# Run by the maintainer, who publishes releases.
 # Usage: scripts/release.sh [--skip-notarize]
 #   NOTEANYWHERE_SIGN_ID  signing identity (default: the Developer ID below, by SHA-1)
 #   NOTEANYWHERE_TEAM_ID  team the signature must belong to (default GH5YVSN865)
@@ -33,7 +34,7 @@ notarize() {  # notarize + staple one .zip/.dmg; stapler fails if Apple didn't a
 }
 
 DIST=dist APP=dist/NoteAnywhere.app
-DMG=$DIST/NoteAnywhere-$VERSION.dmg ZIP=$DIST/NoteAnywhere-extension-$VERSION.zip
+DMG=$DIST/NoteAnywhere-$VERSION.dmg ZIP=$DIST/NoteAnywhere-extension-$VERSION.zip FIREFOX_ZIP=$DIST/NoteAnywhere-firefox-$VERSION.zip
 rm -rf "$DIST"
 mkdir -p "$DIST"
 
@@ -71,18 +72,26 @@ codesign --verify --strict --verbose=2 "$DMG"
 if [ -n "$NOTARIZE" ]; then notarize "$DMG"; fi
 spctl -a -vv -t open --context context:primary-signature "$DMG" || [ -z "$NOTARIZE" ]
 
-# Extension for the Chrome Web Store: runtime files only, and no "key" (the store assigns the id and rejects it).
-EXT=$(mktemp -d)
-cp -R extension/background.js extension/content.js extension/overlay.html extension/overlay.js extension/editor \
-  extension/icons "$EXT/"
-python3 - "$VERSION" extension/manifest.json "$EXT/manifest.json" <<'PY'
+# The extension for the Chrome Web Store and for Firefox's add-ons site: runtime files only, each manifest with just
+# the keys its browser reads. Neither has "key": the Web Store assigns the id and rejects it, Firefox goes by gecko.id.
+for BROWSER in chrome firefox; do
+  EXT=$(mktemp -d)
+  cp -R extension/background.js extension/content.js extension/overlay.html extension/overlay.js extension/editor \
+    extension/icons "$EXT/"
+  python3 - "$BROWSER" "$VERSION" extension/manifest.json "$EXT/manifest.json" <<'PY'
 import json, sys
-version, src, dst = sys.argv[1:]
+browser, version, src, dst = sys.argv[1:]
 manifest = json.load(open(src))
 del manifest["key"]
 manifest["version"] = version
+if browser == "chrome":
+    del manifest["browser_specific_settings"], manifest["background"]["scripts"]
+else:  # Firefox runs background.js as an event page: it has no extension service workers
+    del manifest["background"]["service_worker"]
 json.dump(manifest, open(dst, "w"), indent=2)
 PY
-(cd "$EXT" && zip -qrX - .) > "$ZIP"
+  if [ "$BROWSER" = chrome ]; then OUT=$ZIP; else OUT=$FIREFOX_ZIP; fi
+  (cd "$EXT" && zip -qrX - .) > "$OUT"
+done
 
-echo "Built $DMG and $ZIP (version $VERSION)${NOTARIZE:+, notarized}."
+echo "Built $DMG, $ZIP and $FIREFOX_ZIP (version $VERSION)${NOTARIZE:+, notarized}."

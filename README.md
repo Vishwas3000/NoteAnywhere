@@ -246,7 +246,9 @@ Releases (the notarized DMG and the Chrome Web Store package) are built with `sc
 the maintainer only.
 
 Then in `chrome://extensions` (or `brave://extensions`), turn on Developer mode, click **Load unpacked** and pick
-`extension/`. The manifest's `key` keeps the unpacked extension's id stable, so the bridge recognises it.
+`extension/`. The manifest's `key` keeps the unpacked extension's id stable, so the bridge recognises it. In Firefox,
+open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on…** and pick `extension/manifest.json`; its
+`browser_specific_settings.gecko.id` is the id the bridge allows.
 
 Tests:
 
@@ -255,7 +257,8 @@ swift test && swift build -c release && python3 scripts/test_host.py && (cd edit
 ```
 
 The browser overlay's show/close/reopen check runs in headless Chromium (needs a global Playwright):
-`node scripts/test_overlay.mjs`. The MCP server is checked end to end, every tool over stdio as AI apps start it, on a
+`node scripts/test_overlay.mjs`, and in headless Firefox (needs Firefox and Selenium) with
+`python3 scripts/test_firefox.py`. The MCP server is checked end to end, every tool over stdio as AI apps start it, on a
 scratch store: `node scripts/test_mcp.mjs` (the installed app by default, or pass a binary's path).
 
 </details>
@@ -301,8 +304,9 @@ NoteAnywhere.app ◀──── Darwin notification "com.memorynotes.changed" a
 - **Sync** pushes changed rows to Supabase, which keeps the newer edit by `updated_at` and stamps each write with a
   sequence number that devices pull from.
 
-SwiftUI and AppKit, with no Xcode project: SwiftPM plus `scripts/install.sh`. Every decision and why it was made is
-in [docs/DECISIONS.md](docs/DECISIONS.md).
+SwiftUI and AppKit, with no Xcode project: SwiftPM plus `scripts/install.sh`. The whole picture, with the phone apps,
+the editor and sync, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Every decision and why it was made is in
+[docs/DECISIONS.md](docs/DECISIONS.md).
 
 The project used to be called MemoryNotes, and internal identifiers keep that name (bundle id, native host
 `com.memorynotes.host`, the `memorynotes://` URL scheme, the data folder) so existing installs keep their notes,
