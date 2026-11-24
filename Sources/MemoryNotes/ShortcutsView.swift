@@ -14,7 +14,7 @@ struct ShortcutsView: View {
         .init(keys: "⌥⇧M", action: "Show or hide notes for the app (and channel or file) in front", group: "App"),
         .init(keys: "⌘N", action: "New note", group: "App"),
         .init(keys: "⇧⌘N", action: "New note for a website", group: "App"),
-        .init(keys: "⌘F", action: "Find notes", group: "App"),
+        .init(keys: "⌥⌘F", action: "Search all notes", group: "App"),
         .init(keys: "⌘1 / ⌘2 / ⌘3", action: "Show Notes / Calendar / Graph", group: "App"),
         .init(keys: "⌘⌫", action: "Delete the selected note", group: "App"),
         .init(keys: "⌘← / ⌘T / ⌘→", action: "Calendar: previous / today / next", group: "App"),

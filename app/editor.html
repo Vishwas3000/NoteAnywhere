@@ -56,6 +56,7 @@
     aiDone(id, text, error) { this.reply(id, text, error); },  // the iPhone app's name for reply
     set(markdown) { if (editor && editor.getMarkdown() !== markdown) editor.setMarkdown(markdown); },
     focus() { editor?.focus(); },
+    find() { editor?.find(); },  // Edit ▸ Find in Note (⌘F)
   };
   post({ type: "ready" });
 </script>

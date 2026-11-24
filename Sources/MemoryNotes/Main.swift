@@ -106,8 +106,11 @@ private struct NotesCommands: Commands {
             Button("Lock All Notes") { LockSession.shared.lockNow() }  // locked notes close again, like Apple Notes' Lock Now
         }
         CommandGroup(after: .textEditing) {
-            Button("Find Notes") { actions?.findNotes() }
+            // Like Apple Notes: ⌘F finds in the open note, ⌥⌘F searches every note.
+            Button("Find in Note") { FindInNote.run() }
                 .keyboardShortcut("f")
+            Button("Search All Notes") { actions?.findNotes() }
+                .keyboardShortcut("f", modifiers: [.command, .option])
                 .disabled(actions == nil)
         }
         CommandGroup(after: .pasteboard) {

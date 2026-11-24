@@ -15,6 +15,8 @@ final class NotesModel: ObservableObject {
     @Published var searchRequest: String?
     /// A day ("yyyy-MM-dd") for the Calendar tab to show, after a date is opened in the editor.
     @Published var calendarRequest: String?
+    /// The note whose editor should show iOS's find bar (the note's More ▸ Find in Note).
+    @Published var findRequest: String?
     /// The note to move into a folder the user is about to name (RootView asks for the name).
     @Published var newFolderFor: String?
 

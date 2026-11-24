@@ -710,6 +710,78 @@ await checkAsync("only the latest answer to the # menu counts; a failed one says
   assert.equal(root.querySelector(".mn-notice")?.textContent, "Tags not suggested: The notes aren't loaded.");
 });
 
+// Find in the note (⌘F).
+const ranges = (ed, q) => Array.from(MNEditor.findMatches(ed.editor.state.doc, q), (m) => ed.editor.state.doc.textBetween(m.from, m.to));
+check("find: any case, across bold and links, in lists and tables; never across lines; regex characters are plain", () => {
+  const ed = mount("Water is H2O. **wat**er\n\n- [x] WATER bottle\n\n| a | b |\n| - | - |\n| water | c.d |\n\nwa\nter");
+  assert.deepEqual(ranges(ed, "water"), ["Water", "water", "WATER", "water"]);
+  assert.deepEqual(ranges(ed, "c.d"), ["c.d"]);
+  assert.deepEqual(ranges(ed, "c*"), []);
+  assert.deepEqual(ranges(ed, ""), []);
+});
+const findKey = (target, k, extra = {}) => target.dispatchEvent(new window.KeyboardEvent("keydown",
+  { key: k, metaKey: mac, ctrlKey: !mac, bubbles: true, cancelable: true, ...extra }));
+const bar = (ed) => ed.editor.view.dom.closest(".mn-editor").querySelector(".mn-find");
+const marks = (ed) => [...ed.editor.view.dom.querySelectorAll(".mn-find-match")].map((e) => e.textContent);
+check("⌘F opens the bar with the highlighted word; Return and ⇧Return step through, wrapping; Esc selects the match", () => {
+  const ed = mount("one cat\n\ntwo cats\n\nthree CAT");
+  ed.editor.commands.setTextSelection({ from: 5, to: 8 });  // "cat"
+  findKey(ed.editor.view.dom, "f");
+  const form = bar(ed), input = form.querySelector("input"), count = form.querySelector(".mn-find-count");
+  assert.equal(form.hidden, false);
+  assert.equal(input.value, "cat");
+  assert.equal(document.activeElement, input);
+  assert.deepEqual(marks(ed), ["cat", "cat", "CAT"]);
+  assert.equal(count.textContent, "1 of 3");
+  assert.equal(ed.editor.view.dom.querySelector(".mn-find-current").textContent, "cat");
+  findKey(input, "Enter", { metaKey: false, ctrlKey: false });
+  assert.equal(count.textContent, "2 of 3");
+  findKey(input, "Enter", { metaKey: false, ctrlKey: false, shiftKey: true });
+  findKey(input, "Enter", { metaKey: false, ctrlKey: false, shiftKey: true });
+  assert.equal(count.textContent, "3 of 3");
+  findKey(input, "g");  // ⌘G: next, from the last back to the first
+  assert.equal(count.textContent, "1 of 3");
+  findKey(input, "Enter", { metaKey: false, ctrlKey: false });
+  findKey(input, "Escape", { metaKey: false, ctrlKey: false });
+  assert.equal(form.hidden, true);
+  assert.deepEqual(marks(ed), []);
+  const { from, to } = ed.editor.state.selection;
+  assert.equal(ed.editor.state.doc.textBetween(from, to), "cat");
+  assert.equal(from, MNEditor.findMatches(ed.editor.state.doc, "cat")[1].from);
+});
+check("find: typing a query counts as you go, says when nothing matches, and follows edits to the note", () => {
+  const ed = mount("alpha beta\n\nalphabet");
+  findKey(ed.editor.view.dom, "f");
+  const input = bar(ed).querySelector("input"), count = bar(ed).querySelector(".mn-find-count");
+  assert.equal(input.value, "");
+  assert.equal(count.textContent, "");
+  input.value = "alp";
+  input.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(count.textContent, "1 of 2");
+  input.value = "zeta";
+  input.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(count.textContent, "Not found");
+  input.value = "alp";
+  input.dispatchEvent(new window.Event("input", { bubbles: true }));
+  ed.editor.commands.insertContentAt(1, "alpine ");
+  assert.deepEqual(marks(ed), ["alp", "alp", "alp"]);
+});
+check("find: the toolbar's magnifier opens and closes the bar; find() is there for the Mac app's menu; Ctrl-F on a Mac doesn't", () => {
+  const ed = mount("some text");
+  const button = ed.editor.view.dom.closest(".mn-editor").querySelector('.mn-toolbar button[aria-label="Find in note"]');
+  button.click();
+  assert.equal(bar(ed).hidden, false);
+  button.click();
+  assert.equal(bar(ed).hidden, true);
+  ed.find();
+  assert.equal(bar(ed).hidden, false);
+  if (mac) {
+    const other = mount("more text");
+    findKey(other.editor.view.dom, "f", { metaKey: false, ctrlKey: true });
+    assert.equal(bar(other).hidden, true);
+  }
+});
+
 await window.happyDOM.close();
 console.log(failed ? `${failed} failed` : "all passed");
 process.exit(failed ? 1 : 0);

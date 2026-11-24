@@ -176,6 +176,22 @@ try {
     console.log(`${inside ? "PASS" : "FAIL"} "@" near the right edge: the menu fits and nothing scrolls sideways: ${JSON.stringify(at)}`);
     await page.keyboard.press("Escape");
 
+    // ⌘F in the panel finds in its note, not in the page: every match marked, Return steps on, Esc closes the bar.
+    const pageScroll = await page.evaluate(() => scrollY);
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+f" : "Control+f");
+    await page.keyboard.type("e");
+    const firstCount = await overlay.locator(".mn-find-count").textContent();
+    await page.keyboard.press("Enter");
+    const found = await overlay.evaluate(() => ({ count: document.querySelector(".mn-find-count").textContent,
+      marks: document.querySelectorAll(".mn-find-match").length, current: document.querySelectorAll(".mn-find-current").length,
+      focus: document.activeElement?.getAttribute("aria-label") }));
+    await page.keyboard.press("Escape");
+    const closed = await overlay.evaluate(() => document.querySelector(".mn-find").hidden && !document.querySelector(".mn-find-match"));
+    const finds = /^1 of \d+$/.test(firstCount) && found.count.startsWith("2 of ") && found.marks > 1 && found.current === 1
+      && found.focus === "Find in note" && closed && await page.evaluate(() => scrollY) === pageScroll;
+    if (!finds) failed++;
+    console.log(`${finds ? "PASS" : "FAIL"} ⌘F finds in the note: ${JSON.stringify({ firstCount, ...found, closed })}`);
+
     // The query names a YouTube video (D70): its note shows on that video only, whatever else the address carries.
     await ctx.route("https://www.youtube.com/**", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><title>Video</title><p>A video" }));
     await page.goto("https://www.youtube.com/watch?v=abc&t=42s");

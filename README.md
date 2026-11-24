@@ -167,7 +167,7 @@ Tools: `search_notes`, `list_notes`, `get_note`, `list_tasks`, `list_tags`, `lis
 | ⌥⇧M | Show or hide the notes for the app (and channel or file) in front |
 | ⌥⇧N | In Chrome/Brave: show or hide the page's notes |
 | ⌘N / ⇧⌘N | New note / new note for a website |
-| ⌘F | Find notes |
+| ⌘F / ⌥⌘F | Find in this note / search all notes |
 | ⌘1 / ⌘2 / ⌘3 | Notes / Calendar / Graph |
 | ⌘← / ⌘T / ⌘→ | Calendar: previous / today / next |
 | ⌘⌫ | Delete the selected note (asks first) |
