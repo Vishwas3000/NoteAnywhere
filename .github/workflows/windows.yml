@@ -50,6 +50,20 @@ jobs:
           Write-Host "What NoteAnywhere saw in front:"; Get-Content $report
           $seen = Get-Content $report | ConvertFrom-Json | Where-Object { $_.Target -like "win.notepad/probe.txt*" }
           if (-not $seen) { throw "NoteAnywhere didn't see probe.txt in Notepad come to the front" }
+      - name: The panel opens beside Notepad
+        shell: powershell
+        run: |
+          $env:NOTEANYWHERE_DIR = Join-Path $env:RUNNER_TEMP "store"  # the sample notes from the first step, one for probe.txt
+          $file = Join-Path $env:RUNNER_TEMP "probe.txt"
+          $app = Start-Process out\NoteAnywhere.exe -ArgumentList "--seed-sample-notes", "--background" -PassThru
+          Start-Sleep -Seconds 8
+          Start-Process notepad.exe -ArgumentList $file
+          Start-Sleep -Seconds 15
+          try { & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Notepad" -Out "shots\panel-${{ matrix.rid }}.png" }
+          finally {
+            Get-Process notepad -ErrorAction SilentlyContinue | Stop-Process -Force
+            Stop-Process -Id $app.Id -ErrorAction SilentlyContinue
+          }
       - name: Make the installer
         shell: pwsh
         run: |
