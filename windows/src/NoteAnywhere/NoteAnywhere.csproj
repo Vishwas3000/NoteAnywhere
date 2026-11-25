@@ -25,6 +25,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4370.26" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
     <ProjectReference Include="..\NoteAnywhere.Core\NoteAnywhere.Core.csproj" />
   </ItemGroup>
   <!-- The shared editor, as the Mac app bundles it (scripts/make_app.sh): editor/dist plus app/editor.html, side by side. -->

@@ -50,8 +50,34 @@ jobs:
           Write-Host "What NoteAnywhere saw in front:"; Get-Content $report
           $seen = Get-Content $report | ConvertFrom-Json | Where-Object { $_.Target -like "win.notepad/probe.txt*" }
           if (-not $seen) { throw "NoteAnywhere didn't see probe.txt in Notepad come to the front" }
+      - name: Make the installer
+        shell: pwsh
+        run: |
+          dotnet tool install -g vpk --version 1.2.161
+          # NoteAnywhere.App, so the install folder (%LOCALAPPDATA%\NoteAnywhere.App) never holds the notes
+          # (%LOCALAPPDATA%\NoteAnywhere): uninstalling removes the whole install folder.
+          vpk pack --packId NoteAnywhere.App --packVersion (Get-Content VERSION).Trim() --packDir out --mainExe NoteAnywhere.exe `
+            --packTitle NoteAnywhere --packAuthors NoteAnywhere --icon windows/src/NoteAnywhere/Assets/NoteAnywhere.ico `
+            --runtime ${{ matrix.rid }} --outputDir releases
+          Get-ChildItem releases | Format-Table Name, Length
+      - name: Install it as a person would
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem releases -Filter *Setup.exe | Select-Object -First 1).FullName
+          Start-Process $setup -ArgumentList "--silent" -Wait
+          Start-Sleep -Seconds 10
+          $exe = Join-Path $env:LOCALAPPDATA "NoteAnywhere.App\current\NoteAnywhere.exe"
+          if (-not (Test-Path $exe)) { Get-ChildItem (Join-Path $env:LOCALAPPDATA "NoteAnywhere.App") -Recurse -Depth 1; throw "not installed at $exe" }
+          if (-not (Get-Process NoteAnywhere -ErrorAction SilentlyContinue)) { Start-Process $exe -ArgumentList "--background"; Start-Sleep -Seconds 10 }
+          $manifest = (Get-ItemProperty "HKCU:\Software\Google\Chrome\NativeMessagingHosts\com.memorynotes.host").'(default)'
+          $path = (Get-Content $manifest -Raw | ConvertFrom-Json).path
+          Write-Host "Chrome's host manifest: $manifest -> $path"
+          if ($path -ne $exe) { throw "Chrome would start $path, not the installed app" }
+          Get-Process NoteAnywhere -ErrorAction SilentlyContinue | Stop-Process -Force
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: screenshots-${{ matrix.rid }}
-          path: shots/
+          name: windows-${{ matrix.rid }}
+          path: |
+            shots/
+            releases/*Setup.exe

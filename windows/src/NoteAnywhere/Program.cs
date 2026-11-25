@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Threading;
 using NoteAnywhere.Platform;
+using Velopack;
 
 namespace NoteAnywhere;
 
@@ -13,6 +14,8 @@ static class Program
     [STAThread]
     static int Main(string[] args)
     {
+        // The installer's hooks (install, update, uninstall) arrive as arguments and end here; anything else goes on.
+        VelopackApp.Build().Run();
         if (args is ["--report-front", var file, var seconds]) return ReportFront(file, int.Parse(seconds));
         var app = new App();
         app.InitializeComponent();
