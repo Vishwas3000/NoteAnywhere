@@ -14,6 +14,7 @@ public partial class App : Application
     MainWindow? main;
     SettingsWindow? settings;
     PanelWindow? panel;
+    SearchPopup? search;
 
     public FrontWindow? Front => front;
 
@@ -77,8 +78,7 @@ public partial class App : Application
         else if (front?.Current is { } c) panel.ShowFor(c, takeFocus: true);
     }
 
-    // The search popup comes next (D86); until then Alt+Shift+Space opens the notes window's search.
-    void OpenSearch() => ShowNotes();
+    void OpenSearch() => (search ??= new SearchPopup()).Toggle();
 
     public void OpenNote(string id)
     {
