@@ -36,6 +36,7 @@ public partial class App : Application
         hotkeys.Register(0x20, OpenSearch);   // Alt+Shift+Space
         tray = new Tray(ShowNotes, TogglePanel, OpenSearch, ShowSettings, SendFeedback, Shutdown);
         instance.ListenForShow(() => Dispatcher.Invoke(ShowNotes));
+        if (e.Args.Contains("--seed-sample-notes")) SampleNotes.SeedIfEmpty();
         if (!e.Args.Contains("--background")) ShowNotes();
     }
 

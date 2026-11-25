@@ -31,7 +31,7 @@ jobs:
         run: |
           $env:NOTEANYWHERE_DIR = Join-Path $env:RUNNER_TEMP "store"  # a scratch store, never anyone's notes
           New-Item -ItemType Directory -Force shots | Out-Null
-          $app = Start-Process out\NoteAnywhere.exe -PassThru
+          $app = Start-Process out\NoteAnywhere.exe -ArgumentList "--seed-sample-notes" -PassThru
           Start-Sleep -Seconds 25
           if ($app.HasExited) { throw "NoteAnywhere quit by itself, exit code $($app.ExitCode)" }
           & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Out "shots\main-${{ matrix.rid }}.png"
