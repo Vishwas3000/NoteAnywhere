@@ -18,9 +18,12 @@ static class Program
     [STAThread]
     static int Main(string[] args)
     {
+        // The browsers' host starts before Velopack, which may apply a downloaded update and restart the program, the
+        // browser's pipes and all.
+        if (BrowserHost.IsHost(args)) return BrowserHost.Run();
         // The installer's hooks (install, update, uninstall) arrive as arguments and end here; anything else goes on. A
-        // downloaded update installs as the app starts, never when a browser or an AI app starts this program in another
-        // role: the restart would cut them off.
+        // downloaded update installs as the app starts, never when an AI app starts this program as its MCP server (the
+        // restart would cut it off).
         VelopackApp.Build().SetAutoApplyOnStartup(IsApp(args)).Run();
         if (args is ["--report-front", var file, var seconds]) return ReportFront(file, int.Parse(seconds));
         if (args is ["--write-title", var report]) return WriteTitle(report).GetAwaiter().GetResult();
