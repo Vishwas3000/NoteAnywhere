@@ -15,7 +15,8 @@ public static class NoteLock
     const string CheckText = "noteanywhere-lock-check";
     const string PasswordName = "notes-password";
 
-    static readonly ConcurrentDictionary<(string Password, string Salt), byte[]> keys = new();
+    // Keyed by a hash of the password, as the Mac keeps it: no typed password stays in memory for the app's lifetime.
+    static readonly ConcurrentDictionary<(string PasswordHash, string Salt), byte[]> keys = new();
 
     public static bool IsEnvelope(string text) => text.StartsWith(Prefix, StringComparison.Ordinal);
 
@@ -44,7 +45,7 @@ public static class NoteLock
     /// PBKDF2-SHA256 → 256-bit key; also the sync passphrase's key (see SyncVault). Each password and salt is derived
     /// once per run: a derivation takes a noticeable fraction of a second.
     public static byte[] Key(string password, byte[] salt) =>
-        keys.GetOrAdd((password, Convert.ToBase64String(salt)),
+        keys.GetOrAdd((Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(password))), Convert.ToBase64String(salt)),
                       _ => Rfc2898DeriveBytes.Pbkdf2(password, salt, Iterations, HashAlgorithmName.SHA256, 32))
             .ToArray();  // a copy, so a caller wiping its key can't wipe the cache
 
