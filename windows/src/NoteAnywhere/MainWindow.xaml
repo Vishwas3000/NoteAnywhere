@@ -28,7 +28,7 @@
     <DataTemplate DataType="{x:Type local:NoteItem}">
       <Grid Margin="0,6" ToolTip="{Binding Source}" ToolTipService.IsEnabled="{Binding Note.HasSource}">
         <Grid.ColumnDefinitions><ColumnDefinition Width="4"/><ColumnDefinition/></Grid.ColumnDefinitions>
-        <Border Background="{Binding Strip}" CornerRadius="2" Margin="-6,2,0,2"/>
+        <Border Background="{Binding Strip}" CornerRadius="2" Width="3" HorizontalAlignment="Left" Margin="-8,2,0,2"/>
         <StackPanel Grid.Column="1">
           <DockPanel>
             <TextBlock Text="&#xE72E; " FontFamily="{StaticResource Icons}" FontSize="11" Opacity="0.6" VerticalAlignment="Center" Visibility="{Binding LockVisibility}"/>

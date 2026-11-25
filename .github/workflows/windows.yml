@@ -42,6 +42,20 @@ jobs:
           & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "NoteAnywhere" -Out "shots\main-${{ matrix.rid }}.png"
           & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Welcome to NoteAnywhere" -Out "shots\welcome-${{ matrix.rid }}.png"
           Stop-Process -Id $app.Id
+          # Dark (D85): the editor's light text has to sit on the window's dark background, not on white.
+          $settings = Join-Path $env:NOTEANYWHERE_DIR "settings.json"
+          $saved = Get-Content $settings -Raw | ConvertFrom-Json
+          $saved.appearance = "dark"; $saved | ConvertTo-Json | Set-Content $settings
+          $app = Start-Process out\NoteAnywhere.exe -PassThru
+          Start-Sleep -Seconds 20
+          if ($app.HasExited) {
+            $log = Join-Path $env:NOTEANYWHERE_DIR "crash.log"
+            if (Test-Path $log) { Get-Content $log }
+            throw "NoteAnywhere quit by itself in dark mode, exit code $($app.ExitCode)"
+          }
+          & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "NoteAnywhere" -Out "shots\main-dark-${{ matrix.rid }}.png"
+          Stop-Process -Id $app.Id
+          $saved.appearance = "system"; $saved | ConvertTo-Json | Set-Content $settings
       - name: Follow the window in front (Notepad)
         shell: powershell
         run: |

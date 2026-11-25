@@ -18,7 +18,8 @@ public sealed class EditorView : ContentControl
     // One environment for every editor: WebView2 refuses a second one on the same folder with other options.
     static Task<CoreWebView2Environment>? environment;
 
-    readonly WebView2 web = new();
+    // Transparent, as the page is, so the window's theme shows through: WebView2's own white made dark mode's text unreadable.
+    readonly WebView2 web = new() { DefaultBackgroundColor = System.Drawing.Color.Transparent };
     string? noteId, shown;
     bool ready, focusWhenReady;
 
