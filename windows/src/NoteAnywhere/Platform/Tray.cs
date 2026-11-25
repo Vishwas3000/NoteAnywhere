@@ -8,7 +8,7 @@ sealed class Tray : IDisposable
 {
     readonly Forms.NotifyIcon icon;
 
-    public Tray(Action openNotes, Action togglePanel, Action search, Action settings, Action feedback, Action quit)
+    public Tray(Action openNotes, Action togglePanel, Action search, Action settings, Action feedback, Action welcome, Action quit)
     {
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Open Notes", null, (_, _) => openNotes());
@@ -17,6 +17,7 @@ sealed class Tray : IDisposable
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Settings…", null, (_, _) => settings());
         menu.Items.Add("Send Feedback…", null, (_, _) => feedback());
+        menu.Items.Add("Welcome to NoteAnywhere", null, (_, _) => welcome());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Quit NoteAnywhere", null, (_, _) => quit());
         icon = new Forms.NotifyIcon

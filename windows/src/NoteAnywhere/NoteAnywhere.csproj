@@ -32,5 +32,7 @@
   <ItemGroup>
     <Content Include="..\..\..\editor\dist\**" LinkBase="editor" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\app\editor.html" Link="editor\editor.html" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The Welcome window's picture: the app icon the browser extension uses. -->
+    <Resource Include="..\..\..\extension\icons\icon128.png" Link="Assets\icon128.png" />
   </ItemGroup>
 </Project>

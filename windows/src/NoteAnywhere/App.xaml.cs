@@ -15,6 +15,7 @@ public partial class App : Application
     SettingsWindow? settings;
     PanelWindow? panel;
     SearchPopup? search;
+    WelcomeWindow? welcome;
 
     public FrontWindow? Front => front;
 
@@ -39,7 +40,7 @@ public partial class App : Application
         hotkeys = new HotKeys();
         hotkeys.Register(0x4D, TogglePanel);  // Alt+Shift+M
         hotkeys.Register(0x20, OpenSearch);   // Alt+Shift+Space
-        tray = new Tray(ShowNotes, TogglePanel, OpenSearch, ShowSettings, SendFeedback, Shutdown);
+        tray = new Tray(ShowNotes, TogglePanel, OpenSearch, ShowSettings, SendFeedback, ShowWelcome, Shutdown);
         instance.ListenForShow(() => Dispatcher.Invoke(ShowNotes));
         if (e.Args.Contains("--seed-sample-notes")) SampleNotes.SeedIfEmpty();
         if (!e.Args.Contains("--background")) ShowNotes();
@@ -51,6 +52,23 @@ public partial class App : Application
         main.Show();
         if (main.WindowState == WindowState.Minimized) main.WindowState = WindowState.Normal;
         main.Activate();
+        // Once, the first time the notes window shows, as the Mac's NotesWindow.
+        if (Settings.Load() is { WelcomeShown: false } saved)
+        {
+            (saved with { WelcomeShown = true }).Save();
+            ShowWelcome();
+        }
+    }
+
+    void ShowWelcome()
+    {
+        if (welcome is null)
+        {
+            welcome = new WelcomeWindow();
+            welcome.Closed += (_, _) => welcome = null;  // a closed window can't show again
+        }
+        welcome.Show();
+        welcome.Activate();
     }
 
     void ShowSettings()

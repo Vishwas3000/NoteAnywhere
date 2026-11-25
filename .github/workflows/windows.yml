@@ -38,7 +38,9 @@ jobs:
             if (Test-Path $log) { Get-Content $log }
             throw "NoteAnywhere quit by itself, exit code $($app.ExitCode)"
           }
-          & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Out "shots\main-${{ matrix.rid }}.png"
+          # By title: on a first launch the Welcome window opens too, and either could be the process's "main" window.
+          & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "NoteAnywhere" -Out "shots\main-${{ matrix.rid }}.png"
+          & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Welcome to NoteAnywhere" -Out "shots\welcome-${{ matrix.rid }}.png"
           Stop-Process -Id $app.Id
       - name: Follow the window in front (Notepad)
         shell: powershell
