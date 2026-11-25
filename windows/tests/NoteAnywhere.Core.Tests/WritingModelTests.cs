@@ -37,7 +37,8 @@ public class WritingModelTests
     static (string, string, long, string)[] Pinned(Dictionary<string, byte[]> files) =>
         [.. files.Select(f => (f.Key, "https://huggingface.test/" + f.Key, (long)f.Value.Length, Convert.ToHexStringLower(SHA256.HashData(f.Value))))];
 
-    static string NewFolder() => Path.Combine(AppPaths.Data, "models", Guid.NewGuid().ToString("N"));
+    // Not models/: the MCP server's tests check that nothing started a download there.
+    static string NewFolder() => Path.Combine(AppPaths.Data, "writing-model-tests", Guid.NewGuid().ToString("N"));
 
     [Fact]
     public async Task DownloadsChecksMovesIntoPlaceAndRemoves()
