@@ -22,7 +22,8 @@ static class SampleNotes
         // CI opens probe.txt in Notepad and expects the panel to open with this note.
         model.Add(NoteKind.App, "win.notepad/probe.txt", "Notepad", text: "Notes on probe.txt\n\nThis note waits beside Notepad whenever probe.txt is open.\n\n- [ ] Check the panel opens by itself");
         model.Add(NoteKind.Url, "arxiv.org/abs/1706.03762", "Attention Is All You Need", text: "Attention is all you need\n\nWhat is an RNN, and what are its limits? #ml #reading");
-        model.Add(NoteKind.Url, "", "", text: $"Plans\n\nTeam offsite {On(5)} - {On(7)}{{purple}}\nDentist {On(1)}\n\n#personal");
+        // Seven days around today, so the week on screen always has a range, and the month shows one meeting a new week.
+        model.Add(NoteKind.Url, "", "", text: $"Plans\n\nTeam offsite {On(-1)} - {On(5)}{{purple}}\nDentist {On(1)}\n\n#personal");
     }
 
     /// "@2026-11-27" for `days` from today.

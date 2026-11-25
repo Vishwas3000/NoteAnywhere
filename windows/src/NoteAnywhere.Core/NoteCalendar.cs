@@ -47,12 +47,14 @@ public static partial class NoteCalendar
     public static List<string> WeekdayNames(CultureInfo culture) =>
         [.. Enumerable.Range(0, 7).Select(i => culture.DateTimeFormat.AbbreviatedDayNames[((int)culture.DateTimeFormat.FirstDayOfWeek + i) % 7])];
 
-    /// A month cell's list: up to three dated lines, then notes edited that day while there's room, and how many more.
-    public static (List<DatedLine> Planned, List<Snapshot> Edited, int More) MonthCell(IReadOnlyList<DatedLine> planned, IReadOnlyList<Snapshot> edited)
+    /// A month cell's list in `lines` lines (the Mac's four: three items and "N more"; fewer in a short window): dated
+    /// lines first, then notes edited that day while there's room, and how many more there are.
+    public static (List<DatedLine> Planned, List<Snapshot> Edited, int More) MonthCell(IReadOnlyList<DatedLine> planned, IReadOnlyList<Snapshot> edited, int lines = 4)
     {
-        List<DatedLine> lines = [.. planned.Take(3)];
-        List<Snapshot> notes = [.. edited.Take(Math.Max(0, 3 - planned.Count))];
-        return (lines, notes, planned.Count + edited.Count - lines.Count - notes.Count);
+        var room = Math.Clamp(planned.Count + edited.Count <= lines ? lines : lines - 1, 0, 3);  // keep a line for "N more" when not all fit
+        List<DatedLine> shown = [.. planned.Take(room)];
+        List<Snapshot> notes = [.. edited.Take(Math.Max(0, room - planned.Count))];
+        return (shown, notes, planned.Count + edited.Count - shown.Count - notes.Count);
     }
 
     /// The week's ranges in rows shared by its seven columns, so a strip lines up from day to day: earliest start first,

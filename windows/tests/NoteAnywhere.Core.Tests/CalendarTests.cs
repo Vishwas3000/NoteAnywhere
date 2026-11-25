@@ -122,6 +122,14 @@ public class CalendarTests
         Assert.Equal((0, 2), (edited.Count, more));
         (planned, edited, more) = NoteCalendar.MonthCell([], [S("1")]);
         Assert.Equal((0, 1, 0), (planned.Count, edited.Count, more));
+
+        // A short window has fewer lines: "N more" keeps one of them, and nothing is cut in half.
+        (planned, edited, more) = NoteCalendar.MonthCell([L("a")], [S("1"), S("2"), S("3")], lines: 2);
+        Assert.Equal((1, 0, 3), (planned.Count, edited.Count, more));
+        (planned, edited, more) = NoteCalendar.MonthCell([L("a")], [S("1")], lines: 2);
+        Assert.Equal((1, 1, 0), (planned.Count, edited.Count, more));
+        (planned, edited, more) = NoteCalendar.MonthCell([L("a"), L("b")], [], lines: 1);
+        Assert.Equal((0, 0, 2), (planned.Count, edited.Count, more));
     }
 
     [Fact]

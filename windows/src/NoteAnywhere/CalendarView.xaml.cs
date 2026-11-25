@@ -20,12 +20,16 @@ public partial class CalendarView : UserControl
 {
     static readonly Geometry Check = Geometry.Parse("M3.8,7.3 L6.1,9.6 L10.3,4.7");
     static readonly Brush GridLine = new SolidColorBrush(Color.FromArgb(0x22, 0x80, 0x80, 0x80)), CardFill = new SolidColorBrush(Color.FromArgb(0x1A, 0x80, 0x80, 0x80));
+    // A month cell's lines are all one height, so how many fit is known before they're drawn.
+    const double LineHeight = 18, LineGap = 2;
 
     readonly NotesModel model = NotesModel.Shared;
     readonly ContextMenu eventMenu = new();
     Mode mode = Mode.Month;
     DateOnly date = Today;
     bool stale = true, shortcuts;
+    double monthHeader;
+    int monthLines;
     CultureInfo culture = CultureInfo.CurrentCulture;
     string? datePattern;
     Dictionary<string, List<DatedLine>> due = [];
@@ -42,6 +46,7 @@ public partial class CalendarView : UserControl
         model.Changed += Refresh;
         Appearance.Changed += Refresh;
         IsVisibleChanged += (_, _) => { if (IsVisible && stale) Render(); };
+        Body.SizeChanged += (_, _) => { if (IsVisible && mode == Mode.Month && MonthLines() != monthLines) Draw(); };
         Loaded += (_, _) => AddShortcuts();
     }
 
@@ -106,6 +111,11 @@ public partial class CalendarView : UserControl
         datePattern = Settings.Load().DateFormat is { Length: > 0 } pattern ? pattern : null;
         due = DatedLine.ByDay(model.Notes.SelectMany(n => n.Dates));
         edited = NoteStore.LoadHistory().GroupBy(s => s.Day).ToDictionary(day => day.Key, day => day.ToList());
+        Draw();
+    }
+
+    void Draw()
+    {
         Heading.Text = NoteCalendar.Title(date, mode, culture);
         var unit = mode.ToString().ToLowerInvariant();
         PreviousButton.ToolTip = $"Previous {unit} (Ctrl+Left)";
@@ -125,6 +135,9 @@ public partial class CalendarView : UserControl
         var names = new UniformGrid { Columns = 7, Margin = new Thickness(0, 4, 0, 4) };
         foreach (var name in NoteCalendar.WeekdayNames(culture))
             names.Children.Add(Secondary(new TextBlock { Text = name, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center }));
+        names.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        monthHeader = names.DesiredSize.Height;
+        monthLines = MonthLines();
         // Always 6 rows, so the grid doesn't jump in height between months.
         var cells = new UniformGrid { Columns = 7, Rows = 6 };
         foreach (var day in NoteCalendar.Days(date, Mode.Month, First)) cells.Children.Add(MonthCell(day));
@@ -135,15 +148,24 @@ public partial class CalendarView : UserControl
     {
         List<DatedLine> planned = Due(day);
         List<Snapshot> notes = Edited(day);
-        var (lines, shown, more) = NoteCalendar.MonthCell(planned, notes);
+        var (lines, shown, more) = NoteCalendar.MonthCell(planned, notes, monthLines);
         var list = new StackPanel { Margin = new Thickness(6), Opacity = day.Month == date.Month ? 1 : 0.35 };
         list.Children.Add(DayNumber(day));
-        foreach (var item in lines) list.Children.Add(Spaced(item.IsRange ? Strip(item, day, 6) : Pill(item), 3));
+        foreach (var item in lines) list.Children.Add(Line(item.IsRange ? Strip(item, day, 6) : Pill(item)));
         foreach (var s in shown)
-            list.Children.Add(Spaced(Secondary(new TextBlock { FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, Inlines = { Glyph(s.Note, 11), new Run(" " + s.Note.Title) } }), 3));
-        if (more > 0) list.Children.Add(Spaced(Secondary(new TextBlock { Text = $"{more} more", FontSize = 12 }), 3));
+            list.Children.Add(Line(Secondary(new TextBlock { FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, Inlines = { Glyph(s.Note, 11), new Run(" " + s.Note.Title) } })));
+        if (more > 0) list.Children.Add(Line(Secondary(new TextBlock { Text = $"{more} more", FontSize = 12 })));
         var cell = Plain(list, () => Show(day, Mode.Day), $"{day.ToString("D", culture)}, {planned.Count} planned, {notes.Count} notes edited");
         return new Border { BorderBrush = GridLine, BorderThickness = new Thickness(0, 0, 1, 1), ClipToBounds = true, Child = cell };
+    }
+
+    /// How many lines a month cell has under its day number: its share of the height, less its padding and the number.
+    int MonthLines() => Math.Max(1, (int)(((Body.ActualHeight - monthHeader - 1) / 6 - 12 - 22) / (LineHeight + LineGap)));
+
+    static T Line<T>(T element) where T : FrameworkElement
+    {
+        element.Height = LineHeight;
+        return Spaced(element, LineGap);
     }
 
     /// A planned line in a month cell: a tinted pill, so planned days stand apart from notes merely edited that day.

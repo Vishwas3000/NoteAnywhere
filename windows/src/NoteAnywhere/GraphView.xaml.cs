@@ -119,8 +119,16 @@ public partial class GraphView : UserControl
 
     void Fit()
     {
-        camera = Camera.Fitting(layout.Positions, Plot.ActualWidth, Plot.ActualHeight);
+        camera = Fitting();
         Plot.InvalidateVisual();
+    }
+
+    /// The camera that fits the graph beside the controls, which float over the right of the view and would hide a corner of it.
+    Camera Fitting()
+    {
+        var beside = Toggles.IsVisible ? Toggles.ActualWidth + Toggles.Margin.Left + Toggles.Margin.Right : 0;
+        var fit = Camera.Fitting(layout.Positions, Plot.ActualWidth - beside, Plot.ActualHeight);
+        return fit with { OffsetX = fit.OffsetX - beside / 2 };
     }
 
     // Moving
@@ -146,7 +154,7 @@ public partial class GraphView : UserControl
             return;
         }
         layout.Step();
-        if (autoFit) camera = camera.Approaching(Camera.Fitting(layout.Positions, Plot.ActualWidth, Plot.ActualHeight));
+        if (autoFit) camera = camera.Approaching(Fitting());
         Plot.InvalidateVisual();
     }
 
