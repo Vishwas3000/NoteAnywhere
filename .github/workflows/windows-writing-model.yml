@@ -1,7 +1,8 @@
 name: Windows writing model
 # ✨ end to end on GitHub's Windows machines (D86): the app's own code downloads Phi-4-mini (4.9 GB) and checks it, then
-# titles a short note through Assistant.Run, as the editor's Title does. Heavy, so it runs by hand or when the model's
-# code changes, never on every push; the model is cached by its Hugging Face commit, so a rerun doesn't fetch it again.
+# titles a short note through Assistant.Run, as the editor's Title does; Settings' Download and Cancel are pressed for
+# real. Heavy, so it runs by hand or when the model's code changes, never on every push; the model is cached by its
+# Hugging Face commit, so a rerun doesn't fetch it again.
 on:
   workflow_dispatch:
   push:
@@ -10,6 +11,7 @@ on:
       - windows/src/NoteAnywhere.Core/Assistant.cs
       - windows/src/NoteAnywhere.Core/NoteAnywhere.Core.csproj
       - windows/src/NoteAnywhere/Program.cs
+      - windows/src/NoteAnywhere/SettingsWindow.*
       - .github/workflows/windows-writing-model.yml
 permissions:
   contents: read
@@ -62,3 +64,46 @@ jobs:
         with:
           path: store/models/Phi-4-mini-instruct-cpu-int4
           key: writing-model-${{ steps.model.outputs.commit }}
+      - name: Settings downloads it by its button, and Cancel leaves nothing
+        if: always()
+        shell: powershell
+        run: |
+          $env:NOTEANYWHERE_DIR = Join-Path $env:RUNNER_TEMP "settings-store"  # no model here, so Settings offers it
+          New-Item -ItemType Directory -Force shots | Out-Null
+          $app = Start-Process out\NoteAnywhere.exe -ArgumentList "--background", "--settings" -PassThru
+          Start-Sleep -Seconds 10
+          try {
+            Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+            $A = [System.Windows.Automation.AutomationElement]
+            $settings = $A::RootElement.FindFirst("Children", (New-Object System.Windows.Automation.AndCondition(
+              (New-Object System.Windows.Automation.PropertyCondition($A::ProcessIdProperty, $app.Id)),
+              (New-Object System.Windows.Automation.PropertyCondition($A::NameProperty, "Settings")))))
+            if (-not $settings) { throw "no Settings window" }
+            function Button($name) {
+              $button = $settings.FindFirst("Descendants", (New-Object System.Windows.Automation.PropertyCondition($A::NameProperty, $name)))
+              if (-not $button) { throw "Settings has no '$name' button" }
+              $button
+            }
+            function Shot($name) { & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Settings" -Out "shots\settings-$name-${{ matrix.rid }}.png" }
+            Shot "offer"
+            (Button "Download (4.9 GB)").GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            Start-Sleep -Seconds 3
+            Shot "downloading"
+            $models = Join-Path $env:NOTEANYWHERE_DIR "models"
+            if (-not (Test-Path "$models\Phi-4-mini-instruct-cpu-int4.download")) { throw "Download didn't start the download" }
+            (Button "Cancel").GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            Start-Sleep -Seconds 3
+            Shot "cancelled"
+            Button "Download (4.9 GB)" | Out-Null
+            if (Get-ChildItem $models) { Get-ChildItem $models | Format-Table Name; throw "Cancel left something behind" }
+          }
+          finally {
+            $log = Join-Path $env:NOTEANYWHERE_DIR "crash.log"
+            if (Test-Path $log) { Get-Content $log }
+            Stop-Process -Id $app.Id -ErrorAction SilentlyContinue
+          }
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: writing-model-${{ matrix.rid }}
+          path: shots/

@@ -48,6 +48,7 @@ public partial class App : Application
         instance.ListenForShow(() => Dispatcher.Invoke(ShowNotes));
         if (e.Args.Contains("--seed-sample-notes")) SampleNotes.SeedIfEmpty();
         if (!e.Args.Contains("--background")) ShowNotes();
+        if (e.Args.Contains("--settings")) ShowSettings();  // CI: the writing model's download, by its buttons
     }
 
     public void ShowNotes()
