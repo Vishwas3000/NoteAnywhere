@@ -143,6 +143,10 @@ public sealed class EditorView : ContentControl
                     shown = Text("markdown") ?? "";
                     if (noteId != null) notes.SaveText(noteId, shown);
                     break;
+                case "height":
+                    // A card sized to its note (the panel), within the Mac's 44–320 points.
+                    if (!Page && msg.TryGetProperty("value", out var h) && h.ValueKind == JsonValueKind.Number) Height = Math.Clamp(h.GetDouble(), 44, 320);
+                    break;
                 case "openNote":
                     if (Text("id") is { } open) OpenNote?.Invoke(open.ToLowerInvariant());
                     break;

@@ -18,6 +18,20 @@ public static class NoteActions
         ? string.Join(" › ", [note.Label, .. note.Target.Split('/', StringSplitOptions.RemoveEmptyEntries).Skip(1)])
         : note.Target;
 
+    /// Chromium browsers by their app id (the Mac's, D86): their page is the place, so title notes show only on their title.
+    public static readonly HashSet<string> Browsers =
+    [
+        "com.google.Chrome", "com.google.Chrome.beta", "com.google.Chrome.canary", "org.chromium.Chromium",
+        "com.brave.Browser", "com.brave.Browser.beta", "com.brave.Browser.nightly", "com.microsoft.edgemac", "com.vivaldi.Vivaldi",
+    ];
+
+    /// The panel's notes for the place in front, as the Mac's NotesModel.shown: an app note on that place or (outside a
+    /// browser) under it, so a parent sees its children; in a browser, also the open page's website notes.
+    public static List<Note> Shown(IEnumerable<Note> notes, string context, string? page, bool inBrowser) =>
+        notes.Where(n => n.Kind == NoteKind.App
+            ? n.Target == context || (!inBrowser && n.Target.StartsWith(context + "/", StringComparison.Ordinal))
+            : page != null && (n.Target == page || n.Target.StartsWith(page + "/", StringComparison.Ordinal))).ToList();
+
     /// Every #tag in use with its number of notes, most used first, then A to Z (the sidebar and the "#" menu).
     public static List<(string Tag, int Count)> TagCounts(IEnumerable<Note> notes) =>
         notes.SelectMany(n => n.Tags).GroupBy(t => t).Select(g => (Tag: g.Key, Count: g.Count()))

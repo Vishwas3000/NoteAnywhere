@@ -43,3 +43,22 @@ public class NoteActionsTests
         Assert.Equal([b, a], NoteActions.Search([a, b, N("c #other")], "#project"));
     }
 }
+
+/// The Mac's browserTitleNotesShowOnlyOnTheirTitle: which notes the panel shows for the place in front.
+public class PanelNotesTests
+{
+    [Fact]
+    public void BrowserTitleNotesShowOnlyOnTheirTitle()
+    {
+        var title = new Note { Kind = NoteKind.App, Target = "com.brave.Browser/Site/Page", Label = "Brave" };
+        var page = new Note { Kind = NoteKind.Url, Target = "example.com/docs", Label = "Docs" };
+        var chat = new Note { Kind = NoteKind.App, Target = "com.tinyspeck.slackmacgap/Acme/general", Label = "Slack" };
+        Note[] all = [title, page, chat];
+        // Brave's window with an empty title: only the app is known. Its title notes must not pop up.
+        Assert.Empty(NoteActions.Shown(all, "com.brave.Browser", null, inBrowser: true));
+        Assert.Equal([title.Id, page.Id], NoteActions.Shown(all, "com.brave.Browser/Site/Page", "example.com", inBrowser: true).Select(n => n.Id));
+        // Other apps keep "parents see children".
+        Assert.Equal([chat.Id], NoteActions.Shown(all, "com.tinyspeck.slackmacgap/Acme", null, inBrowser: false).Select(n => n.Id));
+        Assert.Contains("com.microsoft.edgemac", NoteActions.Browsers);
+    }
+}

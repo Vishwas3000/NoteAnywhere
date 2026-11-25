@@ -1,0 +1,29 @@
+<Window x:Class="NoteAnywhere.PanelWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="NoteAnywhere" Width="340" Height="460" MinWidth="260" MinHeight="180"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False" WindowStyle="ToolWindow" ResizeMode="CanResize">
+  <Window.Resources>
+    <FontFamily x:Key="Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+  </Window.Resources>
+  <DockPanel Margin="12">
+    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+      <Button DockPanel.Dock="Right" Click="OnNewNote" ToolTip="New Note" Content="&#xE710;" FontFamily="{StaticResource Icons}"
+              Padding="8,4" AutomationProperties.Name="New Note" VerticalAlignment="Center"/>
+      <StackPanel>
+        <TextBlock x:Name="AppName" FontWeight="SemiBold" FontSize="15" TextTrimming="CharacterEllipsis"/>
+        <TextBlock x:Name="PlaceLine" Opacity="0.7" TextTrimming="CharacterEllipsis"/>
+      </StackPanel>
+    </DockPanel>
+    <Grid>
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="Cards" AutomationProperties.Name="Notes"/>
+      </ScrollViewer>
+      <StackPanel x:Name="Empty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed" MaxWidth="260">
+        <TextBlock Text="No Notes Here Yet" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+        <TextBlock Text="Write one and it will be waiting when you come back." Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,12"/>
+        <Button x:Name="EmptyNew" Click="OnNewNote" HorizontalAlignment="Center" Padding="12,6"/>
+      </StackPanel>
+    </Grid>
+  </DockPanel>
+</Window>

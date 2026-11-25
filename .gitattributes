@@ -1,0 +1,3 @@
+# The Windows app's C# keeps LF on every checkout, Windows included: its tests compare multi-line text written in the
+# source, and the store's SQL must read the same as the Mac's (D86).
+windows/**/*.cs text eol=lf
