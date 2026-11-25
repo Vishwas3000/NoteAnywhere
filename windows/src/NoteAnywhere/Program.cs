@@ -17,7 +17,9 @@ static class Program
         // The installer's hooks (install, update, uninstall) arrive as arguments and end here; anything else goes on.
         VelopackApp.Build().Run();
         if (args is ["--report-front", var file, var seconds]) return ReportFront(file, int.Parse(seconds));
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => CrashLog.Write(e.ExceptionObject);
         var app = new App();
+        app.DispatcherUnhandledException += (_, e) => CrashLog.Write(e.Exception);
         app.InitializeComponent();
         return app.Run();
     }

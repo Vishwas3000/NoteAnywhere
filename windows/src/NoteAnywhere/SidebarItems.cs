@@ -49,7 +49,8 @@ sealed class SidebarRowStyles : StyleSelector
         if (item is not HeaderItem) return null;
         if (header is null)
         {
-            header = new Style(typeof(ListBoxItem), (Style)Application.Current.FindResource(typeof(ListBoxItem)));
+            // Based on the theme's own row style when it can be found; a lookup that throws would end the app.
+            header = new Style(typeof(ListBoxItem), Application.Current.TryFindResource(typeof(ListBoxItem)) as Style);
             header.Setters.Add(new Setter(UIElement.IsHitTestVisibleProperty, false));
             header.Setters.Add(new Setter(UIElement.FocusableProperty, false));
         }
