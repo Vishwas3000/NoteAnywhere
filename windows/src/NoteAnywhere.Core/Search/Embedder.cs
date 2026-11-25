@@ -30,7 +30,10 @@ public sealed partial class Embedder(string folder) : IDisposable
     readonly Lock gate = new();
     Task<(InferenceSession, BertTokenizer)?>? loading;
 
-    public Embedder() : this(Path.Combine(AppPaths.Data, "models", "all-MiniLM-L6-v2")) { }
+    /// The app's copy, beside the notes.
+    public static string DefaultFolder => Path.Combine(AppPaths.Data, "models", "all-MiniLM-L6-v2");
+
+    public Embedder() : this(DefaultFolder) { }
 
     /// Whether the model is on disk, so embedding won't start its download (the Mac's SearchIndex.hasModel).
     public bool HasModel => Files.All(file => File.Exists(Path.Combine(folder, file.Name)));

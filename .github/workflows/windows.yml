@@ -31,6 +31,11 @@ jobs:
         env:
           NOTEANYWHERE_DIR: ${{ runner.temp }}\mcp-store  # an empty scratch store, never anyone's notes
         run: python windows/scripts/test_mcp.py out\NoteAnywhere.exe
+      - name: The browsers' host, started as Chrome and Firefox start it
+        timeout-minutes: 10
+        env:
+          NOTEANYWHERE_DIR: ${{ runner.temp }}\host-store  # a scratch store, never anyone's notes
+        run: python windows/scripts/test_host.py out\NoteAnywhere.exe
       - name: Open it and take screenshots
         shell: powershell
         run: |
