@@ -1126,6 +1126,13 @@ Made by the subagent that wrote the extension:
 - **Testing:** `.github/workflows/windows.yml` builds and tests on GitHub's Windows machines (x64 and Arm64, free for
   public repos), opens the app on each and keeps a screenshot. Hands-on checks (the panel following real windows,
   hotkeys) need a real PC.
+- **Updates:** Velopack from the GitHub Releases, as Sparkle on the Mac: a check a minute after start and daily, a
+  quiet download, installed at the next start or from the tray. Each architecture is its own channel (`win-x64`,
+  `win-arm64`), so both installers share one release without their files colliding. CI packs the next version into a
+  local feed and updates an installed copy to it for real (`NOTEANYWHERE_UPDATES`, `--update-now`).
+- **Locked notes:** until unlocking comes to Windows, a locked note says it's locked, in the notes window and on the
+  panel's cards; the editor never loads or writes its envelope, because typing at the end of one would still pass the
+  store's `mnlock:v1:` guard and break it.
 - **Sync on Windows** (`NoteAnywhere.Core/Sync/`): a port of `SyncCloud.swift`, request for request, to the same
   Supabase project, so a PC syncs with the Mac and the phones.
   - Sign-in by the emailed link or code, or Google in the default browser; the vault, rounds, cursors, batch sizes,
@@ -1142,4 +1149,5 @@ Made by the subagent that wrote the extension:
     transfer may take 5 minutes (URLSession's 30 s limits waiting, not the transfer); "Last synced" shows the time.
   - Tested against an in-memory Supabase that keeps the server's `sync_accept` rules, and a loopback WebSocket for
     Realtime; never against the real project. Not yet tried with a real account.
-- **Status:** Phase 0.
+- **Status:** phases 0–2 and most of 3 (2026-11-26); sync, Calendar and Graph, the browser host, MCP and the
+  writing model are in review; unlocking, signing and the release are next.

@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using NoteAnywhere.Core;
+using NoteAnywhere.Core.Crypto;
 
 namespace NoteAnywhere.Editor;
 
@@ -20,6 +21,14 @@ public sealed class EditorView : ContentControl
 
     // Transparent, as the page is, so the window's theme shows through: WebView2's own white made dark mode's text unreadable.
     readonly WebView2 web = new() { DefaultBackgroundColor = System.Drawing.Color.Transparent };
+    // A locked note's text is its sealed envelope (mnlock:v1:…): the editor never shows it, and never writes over it
+    // (typing at its end would still pass the store's guard and break it). Unlocking isn't on Windows yet.
+    readonly TextBlock lockedText = new()
+    {
+        Text = "This note is locked.\nUnlocking isn't on Windows yet: open it on your Mac or phone.",
+        TextWrapping = System.Windows.TextWrapping.Wrap, Margin = new System.Windows.Thickness(16), Opacity = 0.8,
+        Visibility = System.Windows.Visibility.Collapsed,
+    };
     string? noteId, shown;
     bool ready, focusWhenReady;
 
@@ -30,7 +39,7 @@ public sealed class EditorView : ContentControl
 
     public EditorView()
     {
-        Content = web;
+        Content = new Grid { Children = { web, lockedText } };
         Loaded += async (_, _) =>
         {
             try { await StartAsync(); }
@@ -55,6 +64,7 @@ public sealed class EditorView : ContentControl
             if (value == noteId) return;
             noteId = value;
             shown = null;
+            ShowLock();
             if (ready) _ = LoadAsync();
         }
     }
@@ -113,10 +123,19 @@ public sealed class EditorView : ContentControl
     }
 
     Note? Current => noteId is null ? null : NotesModel.Shared.Find(noteId);
+    bool Locked => Current is { } note && (note.Locked || NoteLock.IsEnvelope(note.Text));
+
+    void ShowLock()
+    {
+        var locked = Locked;
+        web.Visibility = locked ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+        lockedText.Visibility = locked ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+        if (locked && !Page) Height = double.NaN;  // a card fits the message, not the hidden editor
+    }
 
     Task LoadAsync()
     {
-        shown = Current?.Text ?? "";
+        shown = Locked ? "" : Current?.Text ?? "";
         var options = new Dictionary<string, object>
         {
             ["toolbar"] = Page ? "selection" : false, ["fontSize"] = Page ? 15 : 13, ["titleLine"] = true, ["page"] = Page,
@@ -128,7 +147,8 @@ public sealed class EditorView : ContentControl
     /// An edit made elsewhere: the editor shows it, unless it's what the editor already holds.
     void Push()
     {
-        if (!ready || Current is not { } note || note.Text == shown) return;
+        ShowLock();  // sync may lock or unlock the note on show
+        if (!ready || Locked || Current is not { } note || note.Text == shown) return;
         shown = note.Text;
         _ = Call("set", note.Text);
     }
@@ -156,11 +176,11 @@ public sealed class EditorView : ContentControl
                     break;
                 case "change":
                     shown = Text("markdown") ?? "";
-                    if (noteId != null) notes.SaveText(noteId, shown);
+                    if (noteId != null && !Locked) notes.SaveText(noteId, shown);
                     break;
                 case "height":
                     // A card sized to its note (the panel), within the Mac's 44–320 points.
-                    if (!Page && msg.TryGetProperty("value", out var h) && h.ValueKind == JsonValueKind.Number) Height = Math.Clamp(h.GetDouble(), 44, 320);
+                    if (!Page && !Locked && msg.TryGetProperty("value", out var h) && h.ValueKind == JsonValueKind.Number) Height = Math.Clamp(h.GetDouble(), 44, 320);
                     break;
                 case "openNote":
                     if (Text("id") is { } open) OpenNote?.Invoke(open.ToLowerInvariant());
