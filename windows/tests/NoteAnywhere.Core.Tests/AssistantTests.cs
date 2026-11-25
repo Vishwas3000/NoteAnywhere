@@ -30,6 +30,16 @@ public class AssistantTests
         Assert.Null(Assistant.Parse("translate"));
     }
 
+    /// What EditorView's "ai" message does with the page's { action, text }.
+    [Fact]
+    public async Task RunsTheEditorsRequest()
+    {
+        Assert.Equal("Call Sam", await Assistant.Run(new Model("“Call Sam”"), "title", "call sam"));
+        Assert.Equal("Unknown action.", (await Assert.ThrowsAsync<InvalidOperationException>(() => Assistant.Run(new Model("x"), "translate", "text"))).Message);
+        Assert.Equal("Unknown action.", (await Assert.ThrowsAsync<InvalidOperationException>(() => Assistant.Run(new Model("x"), null, "text"))).Message);
+        Assert.Equal("Write something first.", (await Assert.ThrowsAsync<InvalidOperationException>(() => Assistant.Run(new Model("x"), "title", null))).Message);
+    }
+
     [Fact]
     public async Task SaysWhyItCantRun()
     {

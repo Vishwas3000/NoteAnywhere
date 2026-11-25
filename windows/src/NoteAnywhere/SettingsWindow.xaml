@@ -33,5 +33,15 @@
       </ComboBox>
     </Grid>
     <CheckBox x:Name="LoginBox" Content="Open NoteAnywhere when Windows starts" Checked="OnChanged" Unchecked="OnChanged"/>
+    <!-- The ✨ actions' model: downloaded only when the person chooses to (D86). -->
+    <Grid Margin="0,16,0,0">
+      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <StackPanel Margin="0,0,16,0">
+        <TextBlock Text="Writing model"/>
+        <TextBlock x:Name="WritingText" Opacity="0.7" FontSize="12" TextWrapping="Wrap"/>
+        <ProgressBar x:Name="WritingProgress" Height="4" Margin="0,6,0,0" Maximum="1" Visibility="Collapsed"/>
+      </StackPanel>
+      <Button x:Name="WritingButton" Grid.Column="1" MinWidth="140" VerticalAlignment="Center" Click="OnWritingButton"/>
+    </Grid>
   </StackPanel>
 </Window>

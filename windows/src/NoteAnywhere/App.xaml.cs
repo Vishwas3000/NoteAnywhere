@@ -34,6 +34,7 @@ public partial class App : Application
         OpenAtLogin.Apply(saved.OpenAtLogin);
         BrowserRegistration.RegisterThisApp();
         NoteSearch.Start();
+        WritingModel.Shared.DeleteLeftovers();
         front = new FrontWindow();
         panel = new PanelWindow();
         front.Changed += OnFront;

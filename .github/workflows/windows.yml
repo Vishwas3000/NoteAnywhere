@@ -107,18 +107,20 @@ jobs:
         shell: pwsh
         run: |
           dotnet tool install -g vpk --version 1.2.161
-          # --framework webview2: Setup installs the WebView2 runtime the editor needs when a PC lacks it (older Windows 10).
+          # --framework: Setup installs what a PC lacks: the WebView2 runtime the editor needs (older Windows 10), and the
+          # Visual C++ runtime that ONNX Runtime (search, the writing model) loads, msvcp140.dll and the like.
           # NoteAnywhere.App, so the install folder (%LOCALAPPDATA%\NoteAnywhere.App) never holds the notes
           # (%LOCALAPPDATA%\NoteAnywhere): uninstalling removes the whole install folder.
+          $frameworks = "webview2,vcredist143-" + "${{ matrix.rid }}".Substring(4)
           vpk pack --packId NoteAnywhere.App --packVersion (Get-Content VERSION).Trim() --packDir out --mainExe NoteAnywhere.exe `
             --packTitle NoteAnywhere --packAuthors NoteAnywhere --icon windows/src/NoteAnywhere/Assets/NoteAnywhere.ico `
-            --runtime ${{ matrix.rid }} --channel ${{ matrix.rid }} --framework webview2 --outputDir releases
+            --runtime ${{ matrix.rid }} --channel ${{ matrix.rid }} --framework $frameworks --outputDir releases
           Get-ChildItem releases | Format-Table Name, Length
           # The same build as the next patch version, in a folder standing in for GitHub's releases (the update check below).
           $v = [version](Get-Content VERSION).Trim()
           vpk pack --packId NoteAnywhere.App --packVersion "$($v.Major).$($v.Minor).$($v.Build + 1)" --packDir out --mainExe NoteAnywhere.exe `
             --packTitle NoteAnywhere --packAuthors NoteAnywhere --icon windows/src/NoteAnywhere/Assets/NoteAnywhere.ico `
-            --runtime ${{ matrix.rid }} --channel ${{ matrix.rid }} --framework webview2 --outputDir feed
+            --runtime ${{ matrix.rid }} --channel ${{ matrix.rid }} --framework $frameworks --outputDir feed
       - name: Install it as a person would
         shell: pwsh
         run: |

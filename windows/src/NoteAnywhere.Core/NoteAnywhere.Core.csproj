@@ -9,6 +9,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.15" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.31.1" />
+    <!-- The writing model (WritingModel.cs). 0.19.0 needs ONNX Runtime 1.31.0 or later, so search keeps its 1.31.1;
+         0.20.0 would need 1.32.0. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI" Version="0.19.0" />
     <PackageReference Include="Microsoft.ML.Tokenizers" Version="3.0.0" />
   </ItemGroup>
 

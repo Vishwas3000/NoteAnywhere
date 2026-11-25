@@ -1,0 +1,64 @@
+name: Windows writing model
+# ✨ end to end on GitHub's Windows machines (D86): the app's own code downloads Phi-4-mini (4.9 GB) and checks it, then
+# titles a short note through Assistant.Run, as the editor's Title does. Heavy, so it runs by hand or when the model's
+# code changes, never on every push; the model is cached by its Hugging Face commit, so a rerun doesn't fetch it again.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - windows/src/NoteAnywhere.Core/WritingModel.cs
+      - windows/src/NoteAnywhere.Core/Assistant.cs
+      - windows/src/NoteAnywhere.Core/NoteAnywhere.Core.csproj
+      - windows/src/NoteAnywhere/Program.cs
+      - .github/workflows/windows-writing-model.yml
+permissions:
+  contents: read
+jobs:
+  title:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: windows-latest, rid: win-x64 }
+          - { runner: windows-11-arm, rid: win-arm64 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      NOTEANYWHERE_DIR: ${{ github.workspace }}\store  # a scratch store, never anyone's notes; its model is what's cached
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+      - name: Build the app
+        run: dotnet publish windows/src/NoteAnywhere/NoteAnywhere.csproj -c Release -r ${{ matrix.rid }} --self-contained -o out
+      - name: Which model
+        id: model
+        shell: pwsh
+        run: |
+          $commit = (Select-String -Path windows/src/NoteAnywhere.Core/WritingModel.cs -Pattern 'const string Commit = "(\w+)"').Matches[0].Groups[1].Value
+          if (-not $commit) { throw "no Commit in WritingModel.cs" }
+          "commit=$commit" >> $env:GITHUB_OUTPUT
+          Get-PSDrive -PSProvider FileSystem | Format-Table Name, @{ n = "Free GB"; e = { [math]::Round($_.Free / 1GB, 1) } }
+      - name: The model, from an earlier run
+        id: cache
+        uses: actions/cache/restore@v6
+        with:
+          path: store/models/Phi-4-mini-instruct-cpu-int4
+          key: writing-model-${{ steps.model.outputs.commit }}
+      - name: Title a note with it
+        shell: powershell
+        run: |
+          $report = Join-Path $env:RUNNER_TEMP "writing.txt"
+          $run = Start-Process out\NoteAnywhere.exe -ArgumentList "--write-title", $report -Wait -PassThru
+          Write-Host "exit code $($run.ExitCode)"
+          if (Test-Path $report) { Get-Content $report }
+          if ($run.ExitCode -ne 0) { throw "--write-title failed" }
+          $title = Get-Content $report | Where-Object { $_ -like "title, loaded:*" } | ForEach-Object { ($_ -split ": ", 3)[2] }
+          if (-not $title) { throw "the report has no title" }
+      - name: Keep the model for the next run
+        if: always() && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: store/models/Phi-4-mini-instruct-cpu-int4
+          key: writing-model-${{ steps.model.outputs.commit }}
