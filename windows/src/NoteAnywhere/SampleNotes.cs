@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using NoteAnywhere.Core;
+using NoteAnywhere.Core.Crypto;
 
 namespace NoteAnywhere;
 
@@ -21,6 +23,10 @@ static class SampleNotes
         model.Update(cache.Id, n => n with { Starred = true });
         // CI opens probe.txt in Notepad and expects the panel to open with this note.
         model.Add(NoteKind.App, "win.notepad/probe.txt", "Notepad", text: "Notes on probe.txt\n\nThis note waits beside Notepad whenever probe.txt is open.\n\n- [ ] Check the panel opens by itself");
+        // A locked note beside probe.txt, sealed with a password nobody keeps: the panel shows it closed, never its envelope.
+        var locked = model.Add(NoteKind.App, "win.notepad/probe.txt", "Notepad");
+        NoteStore.SetLocked(locked.Id, NoteLock.Seal("Probe secrets\n\nNever on a card.", Convert.ToHexString(RandomNumberGenerator.GetBytes(16))), true);
+        model.Reload();
         model.Add(NoteKind.Url, "arxiv.org/abs/1706.03762", "Attention Is All You Need", text: "Attention is all you need\n\nWhat is an RNN, and what are its limits? #ml #reading");
         // Seven days around today, so the week on screen always has a range, and the month shows one meeting a new week.
         model.Add(NoteKind.Url, "", "", text: $"Plans\n\nTeam offsite {On(-1)} - {On(5)}{{purple}}\nDentist {On(1)}\n\n#personal");
