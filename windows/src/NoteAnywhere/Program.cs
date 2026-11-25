@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Threading;
+using NoteAnywhere.Core;
 using NoteAnywhere.Platform;
 using Velopack;
 
@@ -18,6 +19,7 @@ static class Program
         VelopackApp.Build().Run();
         if (args is ["--report-front", var file, var seconds]) return ReportFront(file, int.Parse(seconds));
         AppDomain.CurrentDomain.UnhandledException += (_, e) => CrashLog.Write(e.ExceptionObject);
+        if (args is ["--mcp", ..]) return McpServer.Run();
         var app = new App();
         app.DispatcherUnhandledException += (_, e) => CrashLog.Write(e.Exception);
         app.InitializeComponent();

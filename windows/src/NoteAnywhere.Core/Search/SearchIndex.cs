@@ -90,7 +90,7 @@ public sealed partial class SearchIndex(string connectionString, Func<string, Ta
     static string Document(ISearchableNote note) => $"{note.Label} {note.Target}\n{note.Text}";
 
     /// Swift's split { !$0.isLetter && !$0.isNumber }: by whole characters, so an accent or a vowel sign stays in its word.
-    static List<string> Words(string text)
+    internal static List<string> Words(string text)
     {
         List<string> words = [];
         var word = new StringBuilder();

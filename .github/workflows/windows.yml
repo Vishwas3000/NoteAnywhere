@@ -26,6 +26,11 @@ jobs:
         run: dotnet test windows/NoteAnywhere.slnx -c Release
       - name: Build the app
         run: dotnet publish windows/src/NoteAnywhere/NoteAnywhere.csproj -c Release -r ${{ matrix.rid }} --self-contained -o out
+      - name: The MCP server (--mcp) end to end
+        timeout-minutes: 5
+        env:
+          NOTEANYWHERE_DIR: ${{ runner.temp }}\mcp-store  # an empty scratch store, never anyone's notes
+        run: python windows/scripts/test_mcp.py out\NoteAnywhere.exe
       - name: Open it and take screenshots
         shell: powershell
         run: |
