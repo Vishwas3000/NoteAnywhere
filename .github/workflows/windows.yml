@@ -1,0 +1,47 @@
+name: Windows app
+# Builds and tests the Windows app (windows/, D86) on GitHub's Windows machines, x64 and Arm64, then opens it on each
+# and takes a screenshot: the project has no Windows PC, so this is where the app first runs.
+on:
+  push:
+    branches: [windows]
+  pull_request:
+    paths: ["windows/**", "editor/**", "app/editor.html", "extension/**", "VERSION", ".github/workflows/windows.yml"]
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: windows-latest, rid: win-x64 }
+          - { runner: windows-11-arm, rid: win-arm64 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+      - name: Test
+        run: dotnet test windows/NoteAnywhere.slnx -c Release
+      - name: Build the app
+        run: dotnet publish windows/src/NoteAnywhere/NoteAnywhere.csproj -c Release -r ${{ matrix.rid }} --self-contained -o out
+      - name: Open it and take a screenshot
+        shell: pwsh
+        run: |
+          $env:NOTEANYWHERE_DIR = Join-Path $env:RUNNER_TEMP "store"  # a scratch store, never anyone's notes
+          New-Item -ItemType Directory -Force shots | Out-Null
+          $app = Start-Process out\NoteAnywhere.exe -PassThru
+          Start-Sleep -Seconds 25
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height
+          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($screen.Location, [System.Drawing.Point]::Empty, $screen.Size)
+          $bmp.Save("shots\app-${{ matrix.rid }}.png")
+          if ($app.HasExited) { throw "NoteAnywhere quit by itself, exit code $($app.ExitCode)" }
+          Stop-Process -Id $app.Id
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: screenshots-${{ matrix.rid }}
+          path: shots/

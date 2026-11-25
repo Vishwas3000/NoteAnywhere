@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>NoteAnywhere</AssemblyName>
+    <RootNamespace>NoteAnywhere</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <StartupObject>NoteAnywhere.Program</StartupObject>
+    <!-- ThemeMode (Windows 11's Fluent look, Light/Dark/System) is marked experimental in WPF. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Program.Main picks the role (app, browser host, MCP server) before WPF starts, so App.xaml is a plain page. -->
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4370.26" />
+    <ProjectReference Include="..\NoteAnywhere.Core\NoteAnywhere.Core.csproj" />
+  </ItemGroup>
+  <!-- The shared editor, as the Mac app bundles it (scripts/make_app.sh): editor/dist plus app/editor.html, side by side. -->
+  <ItemGroup>
+    <Content Include="..\..\..\editor\dist\**" LinkBase="editor" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\app\editor.html" Link="editor\editor.html" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

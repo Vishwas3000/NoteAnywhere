@@ -1111,3 +1111,19 @@ Made by the subagent that wrote the extension:
   a panel created after choosing Light is light; a throwaway app with a web view reported `prefers-color-scheme: dark`
   false under Light and true under Automatic and Dark; the main window rendered light under Light.
 - **Status:** Done.
+
+## D86 — NoteAnywhere for Windows: WPF on .NET 10, the shared editor in WebView2 (2026-11-25)
+
+- **Asked:** a Windows version, built end to end, following the plan written for it (phases 0–4).
+- **Decision:** a native app in `windows/`: C# on .NET 10 (long-term support), WPF with Windows 11's Fluent theme
+  (Light, Dark or the system's), and the shared editor (`editor/dist` and `app/editor.html`, as the Mac bundles them)
+  in WebView2. A one-line shim points the page's `webkit.messageHandlers.mn` at WebView2's `chrome.webview`, so the
+  page is the same file on both. `NoteAnywhere.Core` (plain .NET) holds everything that isn't UI, so its tests run on
+  the Mac too. One program in three roles, as on the Mac: the app, the browsers' native messaging host, `--mcp`.
+- **Why WPF, not WinUI 3** (the plan's first choice): WinUI 3 builds only on Windows, and no Windows machine is
+  available; WPF compiles on the Mac (`EnableWindowsTargeting`), has the Windows 11 look since .NET 9, hosts
+  WebView2, and is what the installer framework (Velopack) targets first.
+- **Testing:** `.github/workflows/windows.yml` builds and tests on GitHub's Windows machines (x64 and Arm64, free for
+  public repos), opens the app on each and keeps a screenshot. Hands-on checks (the panel following real windows,
+  hotkeys) need a real PC.
+- **Status:** Phase 0.

@@ -1,0 +1,12 @@
+<Project>
+  <!-- Every project here: one version for every app, from the repo's VERSION file (as release.sh and Android use). -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Version>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../VERSION').Trim())</Version>
+    <Company>NoteAnywhere</Company>
+    <Product>NoteAnywhere</Product>
+  </PropertyGroup>
+</Project>
