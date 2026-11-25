@@ -30,7 +30,10 @@ public sealed partial class Embedder(string folder) : IDisposable
     readonly Lock gate = new();
     Task<(InferenceSession, BertTokenizer)?>? loading;
 
-    public Embedder() : this(Path.Combine(AppPaths.Data, "models", "all-MiniLM-L6-v2")) { }
+    /// The app's copy, beside the notes.
+    public static string DefaultFolder => Path.Combine(AppPaths.Data, "models", "all-MiniLM-L6-v2");
+
+    public Embedder() : this(DefaultFolder) { }
 
     /// Null when there's no model yet and it can't be downloaded (offline): search then matches words only.
     public async Task<float[]?> EmbedAsync(string text)

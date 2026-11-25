@@ -26,6 +26,11 @@ jobs:
         run: dotnet test windows/NoteAnywhere.slnx -c Release
       - name: Build the app
         run: dotnet publish windows/src/NoteAnywhere/NoteAnywhere.csproj -c Release -r ${{ matrix.rid }} --self-contained -o out
+      - name: The browsers' host, started as Chrome and Firefox start it
+        timeout-minutes: 10
+        env:
+          NOTEANYWHERE_DIR: ${{ runner.temp }}\host-store  # a scratch store, never anyone's notes
+        run: python windows/scripts/test_host.py out\NoteAnywhere.exe
       - name: Open it and take screenshots
         shell: powershell
         run: |
