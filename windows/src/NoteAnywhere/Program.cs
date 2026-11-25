@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Threading;
+using NoteAnywhere.Core;
 using NoteAnywhere.Platform;
 using Velopack;
 
@@ -14,15 +15,21 @@ static class Program
     [STAThread]
     static int Main(string[] args)
     {
-        // The installer's hooks (install, update, uninstall) arrive as arguments and end here; anything else goes on.
-        VelopackApp.Build().Run();
+        // The installer's hooks (install, update, uninstall) arrive as arguments and end here; anything else goes on. A
+        // downloaded update installs as the app starts, never when a browser or an AI app starts this program in another
+        // role: the restart would cut them off.
+        VelopackApp.Build().SetAutoApplyOnStartup(IsApp(args)).Run();
         if (args is ["--report-front", var file, var seconds]) return ReportFront(file, int.Parse(seconds));
         AppDomain.CurrentDomain.UnhandledException += (_, e) => CrashLog.Write(e.ExceptionObject);
+        if (args is ["--mcp", ..]) return McpServer.Run();
         var app = new App();
         app.DispatcherUnhandledException += (_, e) => CrashLog.Write(e.Exception);
         app.InitializeComponent();
         return app.Run();
     }
+
+    /// The app's own launches carry only its flags; a browser passes its extension's origin or manifest, AI apps --mcp.
+    static bool IsApp(string[] args) => args.All(a => a.StartsWith("--", StringComparison.Ordinal)) && !args.Contains("--mcp");
 
     /// Test mode for CI: writes each place that comes to the front as a line of JSON, for `seconds` seconds.
     static int ReportFront(string file, int seconds)
