@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Windows;
 using NoteAnywhere.Core;
 using NoteAnywhere.Platform;
@@ -59,7 +58,12 @@ public partial class App : Application
     void TogglePanel() => ShowNotes();
     void OpenSearch() => ShowNotes();
 
-    static void SendFeedback() => Process.Start(new ProcessStartInfo("https://noteanywhere.app/#feedback") { UseShellExecute = true });
+    static void SendFeedback()
+    {
+        var window = new FeedbackWindow();
+        window.Show();
+        window.Activate();
+    }
 
     protected override void OnExit(ExitEventArgs e)
     {
