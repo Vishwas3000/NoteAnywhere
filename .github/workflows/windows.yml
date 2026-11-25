@@ -36,6 +36,20 @@ jobs:
           if ($app.HasExited) { throw "NoteAnywhere quit by itself, exit code $($app.ExitCode)" }
           & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Out "shots\main-${{ matrix.rid }}.png"
           Stop-Process -Id $app.Id
+      - name: Follow the window in front (Notepad)
+        shell: powershell
+        run: |
+          $file = Join-Path $env:RUNNER_TEMP "probe.txt"
+          Set-Content -Path $file -Value "hello"
+          $report = Join-Path $env:RUNNER_TEMP "front.jsonl"
+          $probe = Start-Process out\NoteAnywhere.exe -ArgumentList "--report-front", $report, "20" -PassThru
+          Start-Sleep -Seconds 4
+          Start-Process notepad.exe -ArgumentList $file
+          $probe.WaitForExit(40000) | Out-Null
+          Get-Process notepad -ErrorAction SilentlyContinue | Stop-Process -Force
+          Write-Host "What NoteAnywhere saw in front:"; Get-Content $report
+          $seen = Get-Content $report | ConvertFrom-Json | Where-Object { $_.Target -like "win.notepad/probe.txt*" }
+          if (-not $seen) { throw "NoteAnywhere didn't see probe.txt in Notepad come to the front" }
       - uses: actions/upload-artifact@v7
         if: always()
         with:

@@ -1,3 +1,9 @@
+using System.IO;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Threading;
+using NoteAnywhere.Platform;
+
 namespace NoteAnywhere;
 
 /// One program in three roles, as on the Mac (docs/ARCHITECTURE.md): browsers start it as their native messaging host,
@@ -7,8 +13,21 @@ static class Program
     [STAThread]
     static int Main(string[] args)
     {
+        if (args is ["--report-front", var file, var seconds]) return ReportFront(file, int.Parse(seconds));
         var app = new App();
         app.InitializeComponent();
+        return app.Run();
+    }
+
+    /// Test mode for CI: writes each place that comes to the front as a line of JSON, for `seconds` seconds.
+    static int ReportFront(string file, int seconds)
+    {
+        var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        using var front = new FrontWindow();
+        void Write(FrontContext c) => File.AppendAllText(file, JsonSerializer.Serialize(c) + "\n");
+        if (front.Current is { } now) Write(now);
+        front.Changed += Write;
+        new DispatcherTimer(TimeSpan.FromSeconds(seconds), DispatcherPriority.Normal, (_, _) => app.Shutdown(), app.Dispatcher).Start();
         return app.Run();
     }
 }
