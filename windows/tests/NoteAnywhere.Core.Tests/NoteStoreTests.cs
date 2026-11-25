@@ -227,3 +227,18 @@ public class NoteStoreTests
         Assert.Equal(["an app's note"], NoteStore.LoadHistory().Where(s => s.Note.Id == app.Id).Select(s => s.Note.Text));
     }
 }
+
+/// Notes written on Windows keep the Mac's line breaks, so they read the same on every device.
+public class WindowsLineEndingTests
+{
+    [Fact]
+    public void WindowsLineBreaksAreStoredAsTheMacs()
+    {
+        var note = new Note { Kind = NoteKind.Url, Target = "", Label = "", Text = "Groceries\r\n- [ ] milk\r\n- [ ] eggs" };
+        NoteStore.Save(note);
+        var saved = NoteStore.LoadAll().Single(n => n.Id == note.Id);
+        Assert.Equal("Groceries\n- [ ] milk\n- [ ] eggs", saved.Text);
+        Assert.Equal("Groceries", saved.Title);
+        NoteStore.Delete(note.Id);
+    }
+}

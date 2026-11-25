@@ -44,6 +44,8 @@ public static class NoteStore
     public static void Save(Note note)
     {
         Validate(note.Id);
+        // Windows' line breaks become the Mac's: a "\r\n" note would be one line (and all title) on the Mac and iPhone.
+        note = note with { Text = note.Text.Replace("\r\n", "\n") };
         Transaction(() =>
         {
             var changed = Run("""
