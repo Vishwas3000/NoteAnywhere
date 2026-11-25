@@ -26,19 +26,15 @@ jobs:
         run: dotnet test windows/NoteAnywhere.slnx -c Release
       - name: Build the app
         run: dotnet publish windows/src/NoteAnywhere/NoteAnywhere.csproj -c Release -r ${{ matrix.rid }} --self-contained -o out
-      - name: Open it and take a screenshot
-        shell: pwsh
+      - name: Open it and take screenshots
+        shell: powershell
         run: |
           $env:NOTEANYWHERE_DIR = Join-Path $env:RUNNER_TEMP "store"  # a scratch store, never anyone's notes
           New-Item -ItemType Directory -Force shots | Out-Null
           $app = Start-Process out\NoteAnywhere.exe -PassThru
           Start-Sleep -Seconds 25
-          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-          $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-          $bmp = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height
-          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($screen.Location, [System.Drawing.Point]::Empty, $screen.Size)
-          $bmp.Save("shots\app-${{ matrix.rid }}.png")
           if ($app.HasExited) { throw "NoteAnywhere quit by itself, exit code $($app.ExitCode)" }
+          & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Out "shots\main-${{ matrix.rid }}.png"
           Stop-Process -Id $app.Id
       - uses: actions/upload-artifact@v7
         if: always()
