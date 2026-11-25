@@ -160,4 +160,4 @@ jobs:
           name: windows-${{ matrix.rid }}
           path: |
             shots/
-            releases/*Setup.exe
+            releases/
