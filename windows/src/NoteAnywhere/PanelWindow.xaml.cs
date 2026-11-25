@@ -20,6 +20,7 @@ public partial class PanelWindow : Window
     public PanelWindow()
     {
         InitializeComponent();
+        placed = WindowPlaces.Restore(this, "panel");
         model.Changed += Refresh;
     }
 

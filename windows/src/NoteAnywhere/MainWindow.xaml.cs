@@ -15,19 +15,37 @@ public partial class MainWindow : Window
     readonly NotesModel model = NotesModel.Shared;
     readonly DispatcherTimer searchDelay = new() { Interval = TimeSpan.FromMilliseconds(250) };
     string? selected, folderFilter;
+    (string Query, List<Note> Notes)? ranked;  // search by meaning's answer, once it arrives
     bool starredOnly, rebuilding;
 
     public MainWindow()
     {
         InitializeComponent();
-        // A small screen (or a 1024×768 test machine) gets a window that fits, centred.
-        var area = SystemParameters.WorkArea;
-        Width = Math.Min(Width, area.Width - 32);
-        Height = Math.Min(Height, area.Height - 32);
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        if (!WindowPlaces.Restore(this, "notes"))
+        {
+            // A small screen (or a 1024×768 test machine) gets a window that fits, centred.
+            var area = SystemParameters.WorkArea;
+            Width = Math.Min(Width, area.Width - 32);
+            Height = Math.Min(Height, area.Height - 32);
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        }
 
         model.Changed += Rebuild;
-        searchDelay.Tick += (_, _) => { searchDelay.Stop(); Rebuild(); };
+        searchDelay.Tick += async (_, _) =>
+        {
+            searchDelay.Stop();
+            Rebuild();  // words at once; meaning when it's ready
+            var query = SearchBox.Text.Trim();
+            if (query.Length == 0) return;
+            try
+            {
+                var notes = await NoteSearch.Search(query);
+                if (SearchBox.Text.Trim() != query) return;
+                ranked = (query, notes);
+                Rebuild();
+            }
+            catch (Exception e) { System.Diagnostics.Trace.WriteLine($"NoteAnywhere: search failed: {e.Message}"); }
+        };
         Editor.OpenNote += Open;
         Editor.SearchTag += tag => SearchBox.Text = "#" + tag;
         InputBindings.Add(new KeyBinding(new Command(NewNote), Key.N, ModifierKeys.Control));
@@ -58,7 +76,9 @@ public partial class MainWindow : Window
         SearchHint.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         if (query.Length > 0)
         {
-            var hits = NoteActions.Search(model.Notes, query);
+            var hits = ranked is { } r && r.Query == query
+                ? r.Notes.Select(n => model.Find(n.Id)).OfType<Note>().ToList()  // the ranking, with today's text
+                : NoteActions.Search(model.Notes, query);
             items.Add(new HeaderItem(hits.Count == 1 ? "1 Result" : $"{hits.Count} Results"));
             items.AddRange(hits.Select(n => new NoteItem(n)));
         }
@@ -125,6 +145,7 @@ public partial class MainWindow : Window
     {
         searchDelay.Stop();
         searchDelay.Start();  // debounce typing
+        if (SearchBox.Text.Trim().Length == 0) ranked = null;
         SearchHint.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 

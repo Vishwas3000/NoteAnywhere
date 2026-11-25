@@ -31,7 +31,8 @@ sealed record NoteItem(Note Note) : SidebarItem
     public string Date => NoteDates.Short(Note.Edited);
     public string Preview => Note.Preview.Length == 0 ? "No additional text" : Note.Preview;
     // The app's or site's mark before the date (D84): a globe for websites, a window for apps, nothing for plain notes.
-    public string SourceGlyph => !Note.HasSource ? "" : Note.Kind == NoteKind.Url ? " " : " ";
+    public string SourceGlyph => Note.Kind == NoteKind.Url ? "\uE774" : "\uE737";
+    public Visibility SourceVisibility => Note.HasSource ? Visibility.Visible : Visibility.Collapsed;
     public string Source => Note.HasSource ? Note.ShortSource() : "";
     public Brush Strip => Note.Color is { } c ? new SolidColorBrush(Swatches[c]) : Brushes.Transparent;
     public Visibility StarVisibility => Note.Starred ? Visibility.Visible : Visibility.Collapsed;
@@ -39,21 +40,23 @@ sealed record NoteItem(Note Note) : SidebarItem
     public static Color Swatch(NoteColor color) => Swatches[color];
 }
 
-/// Headers can't be selected or focused; every other row is a normal list row.
+/// Rows as compact as the Mac's sidebar (the theme's own are much taller); headers can't be selected or focused.
 sealed class SidebarRowStyles : StyleSelector
 {
-    Style? header;
+    Style? row, header;
 
     public override Style? SelectStyle(object item, DependencyObject container)
     {
-        if (item is not HeaderItem) return null;
-        if (header is null)
+        if (row is null)
         {
             // Based on the theme's own row style when it can be found; a lookup that throws would end the app.
-            header = new Style(typeof(ListBoxItem), Application.Current.TryFindResource(typeof(ListBoxItem)) as Style);
+            row = new Style(typeof(ListBoxItem), Application.Current.TryFindResource(typeof(ListBoxItem)) as Style);
+            row.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(10, 2, 10, 2)));
+            row.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 0.0));
+            header = new Style(typeof(ListBoxItem), row);
             header.Setters.Add(new Setter(UIElement.IsHitTestVisibleProperty, false));
             header.Setters.Add(new Setter(UIElement.FocusableProperty, false));
         }
-        return header;
+        return item is HeaderItem ? header : row;
     }
 }

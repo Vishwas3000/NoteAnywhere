@@ -26,9 +26,9 @@
       </Grid>
     </DataTemplate>
     <DataTemplate DataType="{x:Type local:NoteItem}">
-      <Grid Margin="0,10" ToolTip="{Binding Source}" ToolTipService.IsEnabled="{Binding Note.HasSource}">
+      <Grid Margin="0,6" ToolTip="{Binding Source}" ToolTipService.IsEnabled="{Binding Note.HasSource}">
         <Grid.ColumnDefinitions><ColumnDefinition Width="4"/><ColumnDefinition/></Grid.ColumnDefinitions>
-        <Border Background="{Binding Strip}" CornerRadius="2" Margin="-6,2,0,2"/>
+        <Border Background="{Binding Strip}" CornerRadius="2" Width="3" HorizontalAlignment="Left" Margin="-8,2,0,2"/>
         <StackPanel Grid.Column="1">
           <DockPanel>
             <TextBlock Text="&#xE72E; " FontFamily="{StaticResource Icons}" FontSize="11" Opacity="0.6" VerticalAlignment="Center" Visibility="{Binding LockVisibility}"/>
@@ -36,9 +36,13 @@
                        DockPanel.Dock="Right" Visibility="{Binding StarVisibility}"/>
             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
           </DockPanel>
-          <TextBlock TextTrimming="CharacterEllipsis" Margin="0,4,0,0" FontSize="13">
-            <Run Text="{Binding SourceGlyph, Mode=OneWay}" FontFamily="{StaticResource Icons}" FontSize="11"/><Run Text="{Binding Date, Mode=OneWay}"/><Run Text="  "/><Run Text="{Binding Preview, Mode=OneWay}" Foreground="Gray"/>
-          </TextBlock>
+          <DockPanel Margin="0,4,0,0">
+            <TextBlock Text="{Binding SourceGlyph}" FontFamily="{StaticResource Icons}" FontSize="11" Margin="0,0,5,0" VerticalAlignment="Center"
+                       Visibility="{Binding SourceVisibility}"/>
+            <TextBlock TextTrimming="CharacterEllipsis" FontSize="13">
+              <Run Text="{Binding Date, Mode=OneWay}"/><Run Text="  "/><Run Text="{Binding Preview, Mode=OneWay}" Foreground="Gray"/>
+            </TextBlock>
+          </DockPanel>
         </StackPanel>
       </Grid>
     </DataTemplate>
@@ -52,12 +56,12 @@
     <DockPanel Grid.Column="0">
       <Grid DockPanel.Dock="Top" Margin="12,12,12,4">
         <TextBox x:Name="SearchBox" TextChanged="OnSearchChanged" AutomationProperties.Name="Search notes"/>
-        <TextBlock x:Name="SearchHint" Text="Search notes" Margin="12,0,0,0" VerticalAlignment="Center" Opacity="0.5" IsHitTestVisible="False"/>
+        <TextBlock x:Name="SearchHint" Text="Search by meaning or keyword" Margin="12,0,0,0" VerticalAlignment="Center" Opacity="0.5" IsHitTestVisible="False"/>
       </Grid>
       <Button DockPanel.Dock="Bottom" HorizontalAlignment="Left" Margin="12,6,12,12" Click="OnNewFolder" Background="Transparent" BorderThickness="0">
         <TextBlock Opacity="0.75"><Run Text="&#xE710;" FontFamily="{StaticResource Icons}"/><Run Text="  New Folder"/></TextBlock>
       </Button>
-      <ListBox x:Name="Sidebar" BorderThickness="0" Padding="8,0" Background="Transparent"
+      <ListBox x:Name="Sidebar" BorderThickness="0" Padding="8,0" Background="Transparent" HorizontalContentAlignment="Stretch"
                ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemContainerStyleSelector="{StaticResource RowStyles}"
                SelectionChanged="OnSidebarSelection" ContextMenuOpening="OnSidebarMenu" KeyDown="OnSidebarKey">
         <ListBox.ContextMenu><ContextMenu/></ListBox.ContextMenu>

@@ -15,6 +15,8 @@ public partial class App : Application
     MainWindow? main;
     SettingsWindow? settings;
     PanelWindow? panel;
+    SearchPopup? search;
+    WelcomeWindow? welcome;
     CloudSync? sync;
 
     public FrontWindow? Front => front;
@@ -36,13 +38,17 @@ public partial class App : Application
         OpenAtLogin.Apply(saved.OpenAtLogin);
         BrowserRegistration.RegisterThisApp();
         LinkScheme.RegisterThisApp();
+        NoteSearch.Start();
         front = new FrontWindow();
         panel = new PanelWindow();
         front.Changed += OnFront;
         hotkeys = new HotKeys();
         hotkeys.Register(0x4D, TogglePanel);  // Alt+Shift+M
         hotkeys.Register(0x20, OpenSearch);   // Alt+Shift+Space
-        tray = new Tray(ShowNotes, TogglePanel, OpenSearch, () => ShowSettings(), SendFeedback, Shutdown);
+        tray = new Tray(ShowNotes, TogglePanel, OpenSearch, () => ShowSettings(), SendFeedback, ShowWelcome, Shutdown);
+        Updates.Ready += version => tray?.UpdateReady(version, Updates.RestartNow);
+        Updates.Start();
+        if (e.Args.Contains("--update-now")) _ = Updates.NowAndRestart();
         sync = new CloudSync(new SecretStore());
         sync.Start();  // as the Mac at launch: syncing if this PC is signed in
         if (e.Args.Contains("--seed-sample-notes")) SampleNotes.SeedIfEmpty();
@@ -63,6 +69,23 @@ public partial class App : Application
         main.Show();
         if (main.WindowState == WindowState.Minimized) main.WindowState = WindowState.Normal;
         main.Activate();
+        // Once, the first time the notes window shows, as the Mac's NotesWindow.
+        if (Settings.Load() is { WelcomeShown: false } saved)
+        {
+            (saved with { WelcomeShown = true }).Save();
+            ShowWelcome();
+        }
+    }
+
+    void ShowWelcome()
+    {
+        if (welcome is null)
+        {
+            welcome = new WelcomeWindow();
+            welcome.Closed += (_, _) => welcome = null;  // a closed window can't show again
+        }
+        welcome.Show();
+        welcome.Activate();
     }
 
     void ShowSettings(bool syncTab = false)
@@ -91,8 +114,7 @@ public partial class App : Application
         else if (front?.Current is { } c) panel.ShowFor(c, takeFocus: true);
     }
 
-    // The search popup comes next (D86); until then Alt+Shift+Space opens the notes window's search.
-    void OpenSearch() => ShowNotes();
+    void OpenSearch() => (search ??= new SearchPopup()).Toggle();
 
     public void OpenNote(string id)
     {
