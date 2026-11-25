@@ -10,12 +10,11 @@ namespace NoteAnywhere;
 /// search (the privacy page says so); after that the index follows edits, two seconds after they stop.
 static class NoteSearch
 {
-    static readonly string ModelFolder = Path.Combine(AppPaths.Data, "models", "all-MiniLM-L6-v2");
-    static readonly Embedder Embedder = new(ModelFolder);
+    static readonly Embedder Embedder = new();
     static readonly SearchIndex Index = new($"Data Source={Path.Combine(AppPaths.Data, "memorynotes.sqlite")}", Embedder.EmbedAsync);
     static readonly DispatcherTimer Settle = new() { Interval = TimeSpan.FromSeconds(2) };
 
-    static bool ModelOnDisk => File.Exists(Path.Combine(ModelFolder, "model.onnx")) && File.Exists(Path.Combine(ModelFolder, "vocab.txt"));
+    static bool ModelOnDisk => Embedder.HasModel;
 
     public static void Start()
     {
