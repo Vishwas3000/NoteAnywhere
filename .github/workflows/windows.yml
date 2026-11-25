@@ -80,6 +80,17 @@ jobs:
           Start-Process notepad.exe -ArgumentList $file
           Start-Sleep -Seconds 15
           try { & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Notepad" -Out "shots\panel-${{ matrix.rid }}.png" }
+          catch {
+            # What was in front, and whether the app was still there: the panel only follows the window in front.
+            Write-Host "NoteAnywhere still running: $(-not $app.HasExited)"
+            $log = Join-Path $env:NOTEANYWHERE_DIR "crash.log"
+            if (Test-Path $log) { Get-Content $log }
+            Add-Type -Namespace Probe -Name Front -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr w, System.Text.StringBuilder s, int n);'
+            $title = New-Object System.Text.StringBuilder 512
+            [void][Probe.Front]::GetWindowText([Probe.Front]::GetForegroundWindow(), $title, 512)
+            Write-Host "window in front: '$title'"
+            throw
+          }
           finally {
             Get-Process notepad -ErrorAction SilentlyContinue | Stop-Process -Force
             Stop-Process -Id $app.Id -ErrorAction SilentlyContinue
@@ -93,8 +104,13 @@ jobs:
           # (%LOCALAPPDATA%\NoteAnywhere): uninstalling removes the whole install folder.
           vpk pack --packId NoteAnywhere.App --packVersion (Get-Content VERSION).Trim() --packDir out --mainExe NoteAnywhere.exe `
             --packTitle NoteAnywhere --packAuthors NoteAnywhere --icon windows/src/NoteAnywhere/Assets/NoteAnywhere.ico `
-            --runtime ${{ matrix.rid }} --framework webview2 --outputDir releases
+            --runtime ${{ matrix.rid }} --channel ${{ matrix.rid }} --framework webview2 --outputDir releases
           Get-ChildItem releases | Format-Table Name, Length
+          # The same build as the next patch version, in a folder standing in for GitHub's releases (the update check below).
+          $v = [version](Get-Content VERSION).Trim()
+          vpk pack --packId NoteAnywhere.App --packVersion "$($v.Major).$($v.Minor).$($v.Build + 1)" --packDir out --mainExe NoteAnywhere.exe `
+            --packTitle NoteAnywhere --packAuthors NoteAnywhere --icon windows/src/NoteAnywhere/Assets/NoteAnywhere.ico `
+            --runtime ${{ matrix.rid }} --channel ${{ matrix.rid }} --framework webview2 --outputDir feed
       - name: Install it as a person would
         shell: pwsh
         run: |
@@ -108,6 +124,27 @@ jobs:
           $path = (Get-Content $manifest -Raw | ConvertFrom-Json).path
           Write-Host "Chrome's host manifest: $manifest -> $path"
           if ($path -ne $exe) { throw "Chrome would start $path, not the installed app" }
+          Get-Process NoteAnywhere -ErrorAction SilentlyContinue | Stop-Process -Force
+      - name: Update the installed copy to the next version
+        shell: pwsh
+        run: |
+          $v = [version](Get-Content VERSION).Trim()
+          $next = "$($v.Major).$($v.Minor).$($v.Build + 1)"
+          $env:NOTEANYWHERE_UPDATES = (Resolve-Path feed).Path
+          $env:NOTEANYWHERE_DIR = Join-Path $env:RUNNER_TEMP "update-store"
+          $current = Join-Path $env:LOCALAPPDATA "NoteAnywhere.App\current"
+          Start-Process (Join-Path $current "NoteAnywhere.exe") -ArgumentList "--background", "--update-now"
+          $installed = { $f = Join-Path $current "sq.version"; if (Test-Path $f) { ([xml](Get-Content $f -Raw)).package.metadata.version } }
+          foreach ($i in 1..60) { Start-Sleep -Seconds 2; if ((& $installed) -eq $next) { break } }
+          Write-Host "installed version: $(& $installed)"
+          if ((& $installed) -ne $next) {
+            $log = Join-Path $env:NOTEANYWHERE_DIR "crash.log"
+            if (Test-Path $log) { Get-Content $log }
+            Get-ChildItem $current | Format-Table Name, Length
+            throw "the installed copy didn't update to $next"
+          }
+          Start-Sleep -Seconds 10
+          if (-not (Get-Process NoteAnywhere -ErrorAction SilentlyContinue)) { throw "the updated app didn't start again" }
           Get-Process NoteAnywhere -ErrorAction SilentlyContinue | Stop-Process -Force
       - uses: actions/upload-artifact@v7
         if: always()

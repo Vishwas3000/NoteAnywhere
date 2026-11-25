@@ -7,10 +7,11 @@ namespace NoteAnywhere.Platform;
 sealed class Tray : IDisposable
 {
     readonly Forms.NotifyIcon icon;
+    readonly Forms.ContextMenuStrip menu = new();
+    Forms.ToolStripMenuItem? update;
 
     public Tray(Action openNotes, Action togglePanel, Action search, Action settings, Action feedback, Action welcome, Action quit)
     {
-        var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Open Notes", null, (_, _) => openNotes());
         menu.Items.Add("Show/Hide Panel\tAlt+Shift+M", null, (_, _) => togglePanel());
         menu.Items.Add("Search Notes\tAlt+Shift+Space", null, (_, _) => search());
@@ -28,6 +29,18 @@ sealed class Tray : IDisposable
             Visible = true,
         };
         icon.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) openNotes(); };
+    }
+
+    /// A new version has downloaded: the menu's first item installs it now (otherwise it installs at the next start).
+    public void UpdateReady(string version, Action restart)
+    {
+        if (update is null)
+        {
+            update = new Forms.ToolStripMenuItem("", null, (_, _) => restart());
+            menu.Items.Insert(0, update);
+            menu.Items.Insert(1, new Forms.ToolStripSeparator());
+        }
+        update.Text = $"Restart to Update to {version}";
     }
 
     public void Dispose()
