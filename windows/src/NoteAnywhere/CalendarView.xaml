@@ -1,0 +1,42 @@
+<UserControl x:Class="NoteAnywhere.CalendarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <UserControl.Resources>
+    <FontFamily x:Key="Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+    <!-- Days, events and cards: a button that is only its content, as the Mac's .plain buttons. -->
+    <Style x:Key="Plain" TargetType="Button">
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Background="Transparent">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </UserControl.Resources>
+  <DockPanel>
+    <DockPanel DockPanel.Dock="Top" Margin="16,8,12,8">
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+        <Button x:Name="PreviousButton" Content="&#xE76B;" FontFamily="{StaticResource Icons}" Click="OnPrevious" Padding="10,7"
+                AutomationProperties.Name="Previous"/>
+        <Button Content="Today" Click="OnToday" ToolTip="Go to today (Ctrl+T)" Margin="4,0" Padding="12,6"/>
+        <Button x:Name="NextButton" Content="&#xE76C;" FontFamily="{StaticResource Icons}" Click="OnNext" Padding="10,7"
+                AutomationProperties.Name="Next"/>
+        <StackPanel Orientation="Horizontal" Margin="12,0,0,0" ToolTip="Day, week or month" AutomationProperties.Name="View">
+          <RadioButton x:Name="DayMode" Content="Day" Style="{DynamicResource {x:Type ToggleButton}}" Checked="OnMode" Padding="12,6"/>
+          <RadioButton x:Name="WeekMode" Content="Week" Style="{DynamicResource {x:Type ToggleButton}}" Checked="OnMode" Padding="12,6" Margin="4,0"/>
+          <RadioButton x:Name="MonthMode" Content="Month" Style="{DynamicResource {x:Type ToggleButton}}" Checked="OnMode" Padding="12,6"/>
+        </StackPanel>
+      </StackPanel>
+      <TextBlock x:Name="Heading" FontSize="26" FontWeight="Bold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+    </DockPanel>
+    <Border DockPanel.Dock="Top" Height="1" Background="#22808080"/>
+    <ContentControl x:Name="Body" Focusable="False"/>
+  </DockPanel>
+</UserControl>

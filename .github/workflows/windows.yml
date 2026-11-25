@@ -40,6 +40,27 @@ jobs:
           }
           & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Out "shots\main-${{ matrix.rid }}.png"
           Stop-Process -Id $app.Id
+      - name: The calendar and the graph, light and dark
+        shell: powershell
+        run: |
+          # Its own scratch store, so dark mode set here never reaches the other steps' screenshots.
+          $env:NOTEANYWHERE_DIR = Join-Path $env:RUNNER_TEMP "views"
+          New-Item -ItemType Directory -Force $env:NOTEANYWHERE_DIR | Out-Null
+          foreach ($shot in "calendar", "week", "day", "graph", "dark calendar", "dark graph") {
+            if ($shot -like "dark *") { Set-Content (Join-Path $env:NOTEANYWHERE_DIR "settings.json") '{ "appearance": "dark" }' }
+            $app = Start-Process out\NoteAnywhere.exe -ArgumentList "--seed-sample-notes", "--view", $shot.Split(" ")[-1] -PassThru
+            Start-Sleep -Seconds 15
+            if ($app.HasExited) {
+              $log = Join-Path $env:NOTEANYWHERE_DIR "crash.log"
+              if (Test-Path $log) { Get-Content $log }
+              throw "NoteAnywhere quit by itself on $shot, exit code $($app.ExitCode)"
+            }
+            & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Out "shots\$($shot.Replace(' ', '-'))-${{ matrix.rid }}.png"
+            Stop-Process -Id $app.Id
+            $app.WaitForExit()  # one instance at a time: a second would hand over to the first and quit
+          }
+          $log = Join-Path $env:NOTEANYWHERE_DIR "crash.log"
+          if (Test-Path $log) { Get-Content $log; throw "NoteAnywhere logged an error" }
       - name: Follow the window in front (Notepad)
         shell: powershell
         run: |

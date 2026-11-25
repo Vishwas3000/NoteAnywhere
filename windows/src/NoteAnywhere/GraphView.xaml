@@ -1,0 +1,57 @@
+<UserControl x:Class="NoteAnywhere.GraphView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:NoteAnywhere">
+  <UserControl.Resources>
+    <!-- The toggles' legend: each kind's line, as the graph draws it (dashes count in line widths). -->
+    <Style x:Key="Legend" TargetType="Line">
+      <Setter Property="X2" Value="18"/>
+      <Setter Property="Y1" Value="5"/>
+      <Setter Property="Y2" Value="5"/>
+      <Setter Property="Width" Value="18"/>
+      <Setter Property="Height" Value="10"/>
+      <Setter Property="Margin" Value="0,0,6,0"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="Stroke" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+    </Style>
+  </UserControl.Resources>
+  <Grid>
+    <local:GraphCanvas x:Name="Plot" AutomationProperties.Name="Graph of notes"/>
+    <Border x:Name="Toggles" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12" Padding="12" CornerRadius="8" BorderThickness="1"
+            Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+            AutomationProperties.Name="Graph settings">
+      <StackPanel Width="150">
+        <Grid Margin="0,0,0,8">
+          <TextBox x:Name="Filter" TextChanged="OnFilter" ToolTip="Dim notes whose title doesn't contain this" AutomationProperties.Name="Filter"/>
+          <TextBlock x:Name="FilterHint" Text="Filter" Margin="12,0,0,0" VerticalAlignment="Center" Opacity="0.5" IsHitTestVisible="False"/>
+        </Grid>
+        <CheckBox x:Name="Links" IsChecked="True" Click="OnEdges" ToolTip="Links between notes">
+          <StackPanel Orientation="Horizontal"><Line Style="{StaticResource Legend}" StrokeThickness="1.4"/><TextBlock Text="Links"/></StackPanel>
+        </CheckBox>
+        <CheckBox x:Name="Sources" IsChecked="True" Click="OnHubs" ToolTip="Each note joined to its app or website">
+          <StackPanel Orientation="Horizontal"><Line Style="{StaticResource Legend}" StrokeThickness="0.8"/><TextBlock Text="Sources"/></StackPanel>
+        </CheckBox>
+        <CheckBox x:Name="Tags" IsChecked="True" Click="OnHubs" ToolTip="Each note joined to its #tags; notes sharing a tag meet there">
+          <StackPanel Orientation="Horizontal"><Line Style="{StaticResource Legend}" StrokeThickness="1.2" StrokeDashArray="0.4167 2.9167" StrokeDashCap="Round"/><TextBlock Text="Tags"/></StackPanel>
+        </CheckBox>
+        <CheckBox x:Name="Similar" IsChecked="True" Click="OnEdges" ToolTip="Notes with a similar meaning">
+          <StackPanel Orientation="Horizontal"><Line Style="{StaticResource Legend}" StrokeThickness="1" StrokeDashArray="3 3"/><TextBlock Text="Similar"/></StackPanel>
+        </CheckBox>
+        <Button Click="OnFit" HorizontalAlignment="Stretch" Margin="0,8,0,0" ToolTip="Center the graph and zoom to fit it">Fit Graph</Button>
+      </StackPanel>
+    </Border>
+    <Border x:Name="NoConnections" VerticalAlignment="Bottom" HorizontalAlignment="Center" MaxWidth="380" Margin="16" Padding="12" CornerRadius="8"
+            BorderThickness="1" Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+            Visibility="Collapsed">
+      <StackPanel>
+        <TextBlock Text="No Connections" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+        <TextBlock x:Name="NoConnectionsHint" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4,0,0"/>
+      </StackPanel>
+    </Border>
+    <StackPanel x:Name="NoNotes" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="380" Visibility="Collapsed">
+      <TextBlock Text="No Notes Yet" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+      <TextBlock Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0"
+                 Text="Each note shows up here as a dot, joined to its app or website, to the notes it links to and to notes with a similar meaning."/>
+    </StackPanel>
+  </Grid>
+</UserControl>

@@ -65,7 +65,12 @@
     </DockPanel>
     <GridSplitter Grid.Column="1" Width="1" HorizontalAlignment="Stretch" Background="#22808080"/>
     <Grid Grid.Column="2">
-      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="12,10,12,0" AutomationProperties.Name="View">
+        <RadioButton x:Name="NotesTab" Content="Notes" ToolTip="Notes (Ctrl+1)" Checked="OnViewChecked" Style="{DynamicResource {x:Type ToggleButton}}" Padding="12,6"/>
+        <RadioButton x:Name="CalendarTab" Content="Calendar" ToolTip="Calendar (Ctrl+2)" Checked="OnViewChecked" Style="{DynamicResource {x:Type ToggleButton}}" Padding="12,6" Margin="4,0"/>
+        <RadioButton x:Name="GraphTab" Content="Graph" ToolTip="Graph (Ctrl+3)" Checked="OnViewChecked" Style="{DynamicResource {x:Type ToggleButton}}" Padding="12,6"/>
+      </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="12,10,12,0">
         <Button Click="OnNewNote" ToolTip="New Note (Ctrl+N)" Padding="10,6">
           <TextBlock><Run Text="&#xE70F;" FontFamily="{StaticResource Icons}"/><Run Text="  New Note"/></TextBlock>
@@ -73,15 +78,20 @@
         <Button x:Name="DeleteButton" Click="OnDelete" ToolTip="Delete Note" Margin="8,0,0,0" Padding="10,6"
                 Content="&#xE74D;" FontFamily="{StaticResource Icons}" AutomationProperties.Name="Delete Note"/>
       </StackPanel>
-      <StackPanel Grid.Row="1" MaxWidth="680" Margin="56,8,56,0">
-        <TextBlock x:Name="SourceLine" Opacity="0.7" TextTrimming="CharacterEllipsis"/>
-        <TextBlock x:Name="EditedLine" HorizontalAlignment="Center" FontSize="12" Opacity="0.6" Margin="0,8,0,0"/>
-      </StackPanel>
-      <editor:EditorView x:Name="Editor" Grid.Row="2" Margin="0,16,0,0"/>
-      <StackPanel x:Name="NothingSelected" Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
-        <TextBlock Text="No Note Selected" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-        <TextBlock Text="Pick a note in the sidebar, or press Ctrl+N to start one." Opacity="0.7" Margin="0,6,0,0"/>
-      </StackPanel>
+      <Grid x:Name="NotesPane" Grid.Row="1">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
+        <StackPanel MaxWidth="680" Margin="56,8,56,0">
+          <TextBlock x:Name="SourceLine" Opacity="0.7" TextTrimming="CharacterEllipsis"/>
+          <TextBlock x:Name="EditedLine" HorizontalAlignment="Center" FontSize="12" Opacity="0.6" Margin="0,8,0,0"/>
+        </StackPanel>
+        <editor:EditorView x:Name="Editor" Grid.Row="1" Margin="0,16,0,0"/>
+        <StackPanel x:Name="NothingSelected" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+          <TextBlock Text="No Note Selected" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+          <TextBlock Text="Pick a note in the sidebar, or press Ctrl+N to start one." Opacity="0.7" Margin="0,6,0,0"/>
+        </StackPanel>
+      </Grid>
+      <local:CalendarView x:Name="CalendarPane" Grid.Row="1" Margin="0,4,0,0" Visibility="Collapsed"/>
+      <local:GraphView x:Name="GraphPane" Grid.Row="1" Visibility="Collapsed"/>
     </Grid>
   </Grid>
 </Window>
