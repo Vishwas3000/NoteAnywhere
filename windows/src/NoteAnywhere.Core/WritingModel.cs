@@ -6,7 +6,7 @@ namespace NoteAnywhere.Core;
 /// The ✨ actions' model on Windows: Phi-4-mini-instruct (MIT), ONNX int4 for the CPU, through ONNX Runtime GenAI. The
 /// CPU build runs on every x64 and Arm64 PC, with no GPU or driver needed. It isn't part of the app: Settings downloads
 /// it once the person agrees (D86), into models/ beside the notes. The app and the browser host each load it on first
-/// use and let it go after a few idle minutes, as it holds about 5 GB of memory.
+/// use and let it go after a few idle minutes, as it holds about 4 GB of memory.
 public sealed class WritingModel : IWritingModel
 {
     const string Commit = "fc04c8f93df696602fd9f300a30d1bf2e3081347";
@@ -85,16 +85,14 @@ public sealed class WritingModel : IWritingModel
         options.SetSearchOption("max_length", room);
         using var generator = new Generator(phi, options);
         generator.AppendTokenSequences(prompt);
-        var end = tokenizer.GetEosTokenIds().ToArray();
-        List<int> reply = [];
         while (!generator.IsDone())
         {
             cancel.ThrowIfCancellationRequested();
             generator.GenerateNextToken();
-            var token = generator.GetSequence(0)[^1];
-            if (!end.Contains(token)) reply.Add(token);
         }
-        return tokenizer.Decode(reply.ToArray());
+        // The reply is what follows the prompt: the end token that stopped it is never added to the sequence (GenAI's
+        // greedy SelectTop), so the sequence's last token after the final step is the one before, a second time.
+        return tokenizer.Decode(generator.GetSequence(0)[length..]);
     }
 
     void Unload()

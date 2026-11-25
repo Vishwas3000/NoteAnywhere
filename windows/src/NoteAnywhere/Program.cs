@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Threading;
 using NoteAnywhere.Core;
@@ -57,7 +58,9 @@ static class Program
                 clock.Restart();
                 var title = await Assistant.Run(model, "title", Note);
                 Log($"title, {state}: {clock.Elapsed.TotalSeconds:0.0} s: {title}");
-                if (title.Length == 0 || title.Contains('\n')) throw new InvalidOperationException("that isn't a title");
+                // No line break, no special token, no word twice in a row (the reply's last token once came back twice).
+                if (title.Length == 0 || title.Contains('\n') || title.Contains("<|") || Regex.IsMatch(title, @"\b(\w+) \1\b"))
+                    throw new InvalidOperationException("that isn't a title");
             }
             await Search("after");
             Log($"peak memory: {Process.GetCurrentProcess().PeakWorkingSet64 / 1e9:0.0} GB");
