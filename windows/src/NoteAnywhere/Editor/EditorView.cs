@@ -30,7 +30,19 @@ public sealed class EditorView : ContentControl
     public EditorView()
     {
         Content = web;
-        Loaded += async (_, _) => await StartAsync();
+        Loaded += async (_, _) =>
+        {
+            try { await StartAsync(); }
+            catch (Exception e)  // e.g. no WebView2 runtime on an old Windows 10: say so here, keep the app running
+            {
+                CrashLog.Write(e);
+                Content = new TextBlock
+                {
+                    Text = $"The editor couldn't start: {e.Message}\nReinstalling NoteAnywhere installs what it needs.",
+                    TextWrapping = System.Windows.TextWrapping.Wrap, Margin = new System.Windows.Thickness(24), Opacity = 0.8,
+                };
+            }
+        };
         NotesModel.Shared.Changed += Push;
     }
 
@@ -55,9 +67,11 @@ public sealed class EditorView : ContentControl
 
     public void FindInNote() { if (ready) _ = Call("find"); }
 
+    // The scheme list goes through the constructor: the options' CustomSchemeRegistrations starts out null, not empty.
     static Task<CoreWebView2Environment> Environment() => environment ??= CoreWebView2Environment.CreateAsync(null,
         Path.Combine(AppPaths.Data, "WebView2"),
-        new CoreWebView2EnvironmentOptions { CustomSchemeRegistrations = { new(NoteStore.ImageScheme) { TreatAsSecure = true, HasAuthorityComponent = false } } });
+        new CoreWebView2EnvironmentOptions(customSchemeRegistrations:
+            [new(NoteStore.ImageScheme) { TreatAsSecure = true, HasAuthorityComponent = false, AllowedOrigins = [$"https://{Host}"] }]));
 
     async Task StartAsync()
     {

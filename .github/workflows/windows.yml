@@ -72,11 +72,12 @@ jobs:
         shell: pwsh
         run: |
           dotnet tool install -g vpk --version 1.2.161
+          # --framework webview2: Setup installs the WebView2 runtime the editor needs when a PC lacks it (older Windows 10).
           # NoteAnywhere.App, so the install folder (%LOCALAPPDATA%\NoteAnywhere.App) never holds the notes
           # (%LOCALAPPDATA%\NoteAnywhere): uninstalling removes the whole install folder.
           vpk pack --packId NoteAnywhere.App --packVersion (Get-Content VERSION).Trim() --packDir out --mainExe NoteAnywhere.exe `
             --packTitle NoteAnywhere --packAuthors NoteAnywhere --icon windows/src/NoteAnywhere/Assets/NoteAnywhere.ico `
-            --runtime ${{ matrix.rid }} --outputDir releases
+            --runtime ${{ matrix.rid }} --framework webview2 --outputDir releases
           Get-ChildItem releases | Format-Table Name, Length
       - name: Install it as a person would
         shell: pwsh
