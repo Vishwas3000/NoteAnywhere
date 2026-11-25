@@ -38,16 +38,43 @@ jobs:
             if (Test-Path $log) { Get-Content $log }
             throw "NoteAnywhere quit by itself, exit code $($app.ExitCode)"
           }
-          & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Out "shots\main-${{ matrix.rid }}.png"
+          # By title: on a first launch the Welcome window opens too, and either could be the process's "main" window.
+          & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "NoteAnywhere" -Out "shots\main-${{ matrix.rid }}.png"
+          & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Welcome to NoteAnywhere" -Out "shots\welcome-${{ matrix.rid }}.png"
+          # Closing the notes window (WM_CLOSE, as its close button) keeps its place in windows.json; the dark launch below
+          # opens it there.
+          Add-Type -Namespace Probe -Name Win -MemberDefinition '[DllImport("user32.dll")] public static extern bool PostMessage(IntPtr w, uint m, IntPtr a, IntPtr b);'
+          [void][Probe.Win]::PostMessage([WindowShot]::Find([uint32]$app.Id, "NoteAnywhere"), 0x10, [IntPtr]::Zero, [IntPtr]::Zero)
+          Start-Sleep -Seconds 2
+          $places = Join-Path $env:NOTEANYWHERE_DIR "windows.json"
+          if (-not (Test-Path $places)) { throw "closing the notes window didn't keep its place" }
+          Write-Host "windows.json: $(Get-Content $places -Raw)"
           Stop-Process -Id $app.Id
+          # Dark (D85): the editor's light text has to sit on the window's dark background, not on white.
+          $settings = Join-Path $env:NOTEANYWHERE_DIR "settings.json"
+          $saved = Get-Content $settings -Raw | ConvertFrom-Json
+          $saved.appearance = "dark"; $saved | ConvertTo-Json | Set-Content $settings
+          $app = Start-Process out\NoteAnywhere.exe -PassThru
+          Start-Sleep -Seconds 20
+          if ($app.HasExited) {
+            $log = Join-Path $env:NOTEANYWHERE_DIR "crash.log"
+            if (Test-Path $log) { Get-Content $log }
+            throw "NoteAnywhere quit by itself in dark mode, exit code $($app.ExitCode)"
+          }
+          & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "NoteAnywhere" -Out "shots\main-dark-${{ matrix.rid }}.png"
+          Stop-Process -Id $app.Id
+          $saved.appearance = "system"; $saved | ConvertTo-Json | Set-Content $settings
       - name: The calendar and the graph, light and dark
         shell: powershell
         run: |
           # Its own scratch store, so dark mode set here never reaches the other steps' screenshots.
           $env:NOTEANYWHERE_DIR = Join-Path $env:RUNNER_TEMP "views"
-          New-Item -ItemType Directory -Force $env:NOTEANYWHERE_DIR | Out-Null
+          $settings = Join-Path $env:NOTEANYWHERE_DIR "settings.json"
           foreach ($shot in "calendar", "week", "day", "graph", "dark calendar", "dark graph") {
-            if ($shot -like "dark *") { Set-Content (Join-Path $env:NOTEANYWHERE_DIR "settings.json") '{ "appearance": "dark" }' }
+            if ($shot -like "dark *") {  # the first launch saved settings.json (the Welcome window has shown)
+              $saved = Get-Content $settings -Raw | ConvertFrom-Json
+              $saved.appearance = "dark"; $saved | ConvertTo-Json | Set-Content $settings
+            }
             $app = Start-Process out\NoteAnywhere.exe -ArgumentList "--seed-sample-notes", "--view", $shot.Split(" ")[-1] -PassThru
             Start-Sleep -Seconds 15
             if ($app.HasExited) {
@@ -55,7 +82,7 @@ jobs:
               if (Test-Path $log) { Get-Content $log }
               throw "NoteAnywhere quit by itself on $shot, exit code $($app.ExitCode)"
             }
-            & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Out "shots\$($shot.Replace(' ', '-'))-${{ matrix.rid }}.png"
+            & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "NoteAnywhere" -Out "shots\$($shot.Replace(' ', '-'))-${{ matrix.rid }}.png"
             Stop-Process -Id $app.Id
             $app.WaitForExit()  # one instance at a time: a second would hand over to the first and quit
           }
@@ -85,6 +112,17 @@ jobs:
           Start-Process notepad.exe -ArgumentList $file
           Start-Sleep -Seconds 15
           try { & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Notepad" -Out "shots\panel-${{ matrix.rid }}.png" }
+          catch {
+            # What was in front, and whether the app was still there: the panel only follows the window in front.
+            Write-Host "NoteAnywhere still running: $(-not $app.HasExited)"
+            $log = Join-Path $env:NOTEANYWHERE_DIR "crash.log"
+            if (Test-Path $log) { Get-Content $log }
+            Add-Type -Namespace Probe -Name Front -MemberDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr w, System.Text.StringBuilder s, int n);'
+            $title = New-Object System.Text.StringBuilder 512
+            [void][Probe.Front]::GetWindowText([Probe.Front]::GetForegroundWindow(), $title, 512)
+            Write-Host "window in front: '$title'"
+            throw
+          }
           finally {
             Get-Process notepad -ErrorAction SilentlyContinue | Stop-Process -Force
             Stop-Process -Id $app.Id -ErrorAction SilentlyContinue
@@ -98,8 +136,13 @@ jobs:
           # (%LOCALAPPDATA%\NoteAnywhere): uninstalling removes the whole install folder.
           vpk pack --packId NoteAnywhere.App --packVersion (Get-Content VERSION).Trim() --packDir out --mainExe NoteAnywhere.exe `
             --packTitle NoteAnywhere --packAuthors NoteAnywhere --icon windows/src/NoteAnywhere/Assets/NoteAnywhere.ico `
-            --runtime ${{ matrix.rid }} --framework webview2 --outputDir releases
+            --runtime ${{ matrix.rid }} --channel ${{ matrix.rid }} --framework webview2 --outputDir releases
           Get-ChildItem releases | Format-Table Name, Length
+          # The same build as the next patch version, in a folder standing in for GitHub's releases (the update check below).
+          $v = [version](Get-Content VERSION).Trim()
+          vpk pack --packId NoteAnywhere.App --packVersion "$($v.Major).$($v.Minor).$($v.Build + 1)" --packDir out --mainExe NoteAnywhere.exe `
+            --packTitle NoteAnywhere --packAuthors NoteAnywhere --icon windows/src/NoteAnywhere/Assets/NoteAnywhere.ico `
+            --runtime ${{ matrix.rid }} --channel ${{ matrix.rid }} --framework webview2 --outputDir feed
       - name: Install it as a person would
         shell: pwsh
         run: |
@@ -113,6 +156,27 @@ jobs:
           $path = (Get-Content $manifest -Raw | ConvertFrom-Json).path
           Write-Host "Chrome's host manifest: $manifest -> $path"
           if ($path -ne $exe) { throw "Chrome would start $path, not the installed app" }
+          Get-Process NoteAnywhere -ErrorAction SilentlyContinue | Stop-Process -Force
+      - name: Update the installed copy to the next version
+        shell: pwsh
+        run: |
+          $v = [version](Get-Content VERSION).Trim()
+          $next = "$($v.Major).$($v.Minor).$($v.Build + 1)"
+          $env:NOTEANYWHERE_UPDATES = (Resolve-Path feed).Path
+          $env:NOTEANYWHERE_DIR = Join-Path $env:RUNNER_TEMP "update-store"
+          $current = Join-Path $env:LOCALAPPDATA "NoteAnywhere.App\current"
+          Start-Process (Join-Path $current "NoteAnywhere.exe") -ArgumentList "--background", "--update-now"
+          $installed = { $f = Join-Path $current "sq.version"; if (Test-Path $f) { ([xml](Get-Content $f -Raw)).package.metadata.version } }
+          foreach ($i in 1..60) { Start-Sleep -Seconds 2; if ((& $installed) -eq $next) { break } }
+          Write-Host "installed version: $(& $installed)"
+          if ((& $installed) -ne $next) {
+            $log = Join-Path $env:NOTEANYWHERE_DIR "crash.log"
+            if (Test-Path $log) { Get-Content $log }
+            Get-ChildItem $current | Format-Table Name, Length
+            throw "the installed copy didn't update to $next"
+          }
+          Start-Sleep -Seconds 10
+          if (-not (Get-Process NoteAnywhere -ErrorAction SilentlyContinue)) { throw "the updated app didn't start again" }
           Get-Process NoteAnywhere -ErrorAction SilentlyContinue | Stop-Process -Force
       - uses: actions/upload-artifact@v7
         if: always()

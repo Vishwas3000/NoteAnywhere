@@ -15,6 +15,8 @@ public sealed record Settings
     public string DateFormat { get; init; } = "";
     /// Start with Windows, in the notification area, so the panel can follow the window in front.
     public bool OpenAtLogin { get; init; } = true;
+    /// The Welcome window has shown (the Mac's welcomeShown).
+    public bool WelcomeShown { get; init; }
 
     static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
     static string File => Path.Combine(AppPaths.Data, "settings.json");
