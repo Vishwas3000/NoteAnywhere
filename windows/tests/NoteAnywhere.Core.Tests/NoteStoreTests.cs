@@ -229,6 +229,7 @@ public class NoteStoreTests
 }
 
 /// Notes written on Windows keep the Mac's line breaks, so they read the same on every device.
+[Collection("NoteStore")]  // it writes the shared store: never alongside the watcher's tests
 public class WindowsLineEndingTests
 {
     [Fact]
