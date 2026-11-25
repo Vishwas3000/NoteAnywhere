@@ -25,6 +25,13 @@ public partial class MainWindow : Window
         NoteList.SelectedIndex = 0;
     }
 
+    // The app stays in the notification area; closing the window hides it.
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        e.Cancel = true;
+        Hide();
+    }
+
     void OnSelect(object sender, SelectionChangedEventArgs e)
     {
         if (NoteList.SelectedIndex >= 0) Editor.Show(notes[NoteList.SelectedIndex]);

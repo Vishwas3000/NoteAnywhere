@@ -48,6 +48,8 @@ public sealed class EditorView : ContentControl
         await core.AddScriptToExecuteOnDocumentCreatedAsync(
             "window.webkit = { messageHandlers: { mn: { postMessage: (m) => window.chrome.webview.postMessage(m) } } };");
         core.Settings.IsStatusBarEnabled = false;
+        core.Profile.PreferredColorScheme = Appearance.ForWebView;
+        Appearance.Changed += () => core.Profile.PreferredColorScheme = Appearance.ForWebView;
         core.WebMessageReceived += OnMessage;
         core.Navigate($"https://{Host}/editor.html");
     }

@@ -1,0 +1,37 @@
+<Window x:Class="NoteAnywhere.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings" Width="480" SizeToContent="Height" ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
+  <StackPanel Margin="24">
+    <Grid Margin="0,0,0,16">
+      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <StackPanel>
+        <TextBlock Text="Appearance"/>
+        <TextBlock Text="Automatic follows Windows' Light or Dark setting." Opacity="0.7" FontSize="12"/>
+      </StackPanel>
+      <ComboBox x:Name="AppearanceBox" Grid.Column="1" Width="140" VerticalAlignment="Center" SelectionChanged="OnChanged">
+        <ComboBoxItem Tag="system">Automatic</ComboBoxItem>
+        <ComboBoxItem Tag="light">Light</ComboBoxItem>
+        <ComboBoxItem Tag="dark">Dark</ComboBoxItem>
+      </ComboBox>
+    </Grid>
+    <CheckBox x:Name="AutoOpenBox" Checked="OnChanged" Unchecked="OnChanged">
+      <StackPanel>
+        <TextBlock Text="Open notes by themselves"/>
+        <TextBlock Text="When an app, chat or web page has notes. Off: Alt+Shift+M shows them on Windows, Alt+Shift+N in the browser."
+                   Opacity="0.7" FontSize="12" TextWrapping="Wrap"/>
+      </StackPanel>
+    </CheckBox>
+    <Grid Margin="0,16,0,16">
+      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <TextBlock Text="Dates in notes" VerticalAlignment="Center"/>
+      <ComboBox x:Name="DateBox" Grid.Column="1" Width="200" SelectionChanged="OnChanged">
+        <ComboBoxItem Tag="">Automatic (your region's)</ComboBoxItem>
+        <ComboBoxItem Tag="dd/MM/yyyy">30/10/2026</ComboBoxItem>
+        <ComboBoxItem Tag="MM/dd/yyyy">10/30/2026</ComboBoxItem>
+        <ComboBoxItem Tag="yyyy-MM-dd">2026-10-30</ComboBoxItem>
+      </ComboBox>
+    </Grid>
+    <CheckBox x:Name="LoginBox" Content="Open NoteAnywhere when Windows starts" Checked="OnChanged" Unchecked="OnChanged"/>
+  </StackPanel>
+</Window>

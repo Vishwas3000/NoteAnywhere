@@ -3,6 +3,9 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <!-- For the notification-area icon only (NotifyIcon); WPF has none of its own. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\NoteAnywhere.ico</ApplicationIcon>
     <AssemblyName>NoteAnywhere</AssemblyName>
     <RootNamespace>NoteAnywhere</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -14,6 +17,11 @@
     <!-- Program.Main picks the role (app, browser host, MCP server) before WPF starts, so App.xaml is a plain page. -->
     <ApplicationDefinition Remove="App.xaml" />
     <Page Include="App.xaml" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- WPF and Windows Forms both name Application, MessageBox…: only WPF's are imported everywhere. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4370.26" />
