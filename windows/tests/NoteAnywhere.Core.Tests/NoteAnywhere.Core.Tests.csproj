@@ -22,4 +22,10 @@
     <ProjectReference Include="..\..\src\NoteAnywhere.Core\NoteAnywhere.Core.csproj" />
   </ItemGroup>
 
+  <!-- The app's DPAPI secret store: the app has no test project, so its file is compiled in here and tested on Windows. -->
+  <ItemGroup>
+    <Compile Include="..\..\src\NoteAnywhere\Platform\SecretStore.cs" Link="Platform\SecretStore.cs" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.15" />
+  </ItemGroup>
+
 </Project>

@@ -1,5 +1,6 @@
 using System.Windows;
 using NoteAnywhere.Core;
+using NoteAnywhere.Core.Sync;
 using NoteAnywhere.Platform;
 
 namespace NoteAnywhere;
@@ -14,33 +15,46 @@ public partial class App : Application
     MainWindow? main;
     SettingsWindow? settings;
     PanelWindow? panel;
+    CloudSync? sync;
 
     public FrontWindow? Front => front;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        var link = e.Args.FirstOrDefault(a => a.StartsWith(LinkScheme.Prefix, StringComparison.OrdinalIgnoreCase));
         instance = new SingleInstance();
         if (!instance.IsFirst)
         {
-            instance.ShowTheFirst();
+            SingleInstance.Tell(link);
             Shutdown();
             return;
         }
+        instance.Listen(message => Dispatcher.BeginInvoke(() => { if (message is null) ShowNotes(); else OpenLink(message); }));
         var saved = Settings.Load();
         Appearance.Apply(saved.Appearance);
         OpenAtLogin.Apply(saved.OpenAtLogin);
         BrowserRegistration.RegisterThisApp();
+        LinkScheme.RegisterThisApp();
         front = new FrontWindow();
         panel = new PanelWindow();
         front.Changed += OnFront;
         hotkeys = new HotKeys();
         hotkeys.Register(0x4D, TogglePanel);  // Alt+Shift+M
         hotkeys.Register(0x20, OpenSearch);   // Alt+Shift+Space
-        tray = new Tray(ShowNotes, TogglePanel, OpenSearch, ShowSettings, SendFeedback, Shutdown);
-        instance.ListenForShow(() => Dispatcher.Invoke(ShowNotes));
+        tray = new Tray(ShowNotes, TogglePanel, OpenSearch, () => ShowSettings(), SendFeedback, Shutdown);
+        sync = new CloudSync(new SecretStore());
+        sync.Start();  // as the Mac at launch: syncing if this PC is signed in
         if (e.Args.Contains("--seed-sample-notes")) SampleNotes.SeedIfEmpty();
-        if (!e.Args.Contains("--background")) ShowNotes();
+        if (link != null) OpenLink(link);
+        else if (!e.Args.Contains("--background")) ShowNotes();
+    }
+
+    /// memorynotes://auth-callback, from a sign-in email or Google: Settings ▸ Sync shows what comes next.
+    void OpenLink(string link)
+    {
+        ShowSettings(syncTab: true);
+        _ = sync!.Handle(link);
     }
 
     public void ShowNotes()
@@ -51,9 +65,10 @@ public partial class App : Application
         main.Activate();
     }
 
-    void ShowSettings()
+    void ShowSettings(bool syncTab = false)
     {
-        settings ??= new SettingsWindow();
+        settings ??= new SettingsWindow(sync!);
+        if (syncTab) settings.ShowSyncTab();
         settings.Show();
         settings.Activate();
     }
