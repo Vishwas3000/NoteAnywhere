@@ -21,11 +21,14 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        // A small screen (or a 1024×768 test machine) gets a window that fits, centred.
-        var area = SystemParameters.WorkArea;
-        Width = Math.Min(Width, area.Width - 32);
-        Height = Math.Min(Height, area.Height - 32);
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        if (!WindowPlaces.Restore(this, "notes"))
+        {
+            // A small screen (or a 1024×768 test machine) gets a window that fits, centred.
+            var area = SystemParameters.WorkArea;
+            Width = Math.Min(Width, area.Width - 32);
+            Height = Math.Min(Height, area.Height - 32);
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        }
 
         model.Changed += Rebuild;
         searchDelay.Tick += async (_, _) =>

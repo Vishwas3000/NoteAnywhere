@@ -41,6 +41,14 @@ jobs:
           # By title: on a first launch the Welcome window opens too, and either could be the process's "main" window.
           & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "NoteAnywhere" -Out "shots\main-${{ matrix.rid }}.png"
           & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Welcome to NoteAnywhere" -Out "shots\welcome-${{ matrix.rid }}.png"
+          # Closing the notes window (WM_CLOSE, as its close button) keeps its place in windows.json; the dark launch below
+          # opens it there.
+          Add-Type -Namespace Probe -Name Win -MemberDefinition '[DllImport("user32.dll")] public static extern bool PostMessage(IntPtr w, uint m, IntPtr a, IntPtr b);'
+          [void][Probe.Win]::PostMessage([WindowShot]::Find([uint32]$app.Id, "NoteAnywhere"), 0x10, [IntPtr]::Zero, [IntPtr]::Zero)
+          Start-Sleep -Seconds 2
+          $places = Join-Path $env:NOTEANYWHERE_DIR "windows.json"
+          if (-not (Test-Path $places)) { throw "closing the notes window didn't keep its place" }
+          Write-Host "windows.json: $(Get-Content $places -Raw)"
           Stop-Process -Id $app.Id
           # Dark (D85): the editor's light text has to sit on the window's dark background, not on white.
           $settings = Join-Path $env:NOTEANYWHERE_DIR "settings.json"
