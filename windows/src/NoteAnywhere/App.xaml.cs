@@ -31,6 +31,7 @@ public partial class App : Application
         Appearance.Apply(saved.Appearance);
         OpenAtLogin.Apply(saved.OpenAtLogin);
         BrowserRegistration.RegisterThisApp();
+        NoteSearch.Start();
         front = new FrontWindow();
         panel = new PanelWindow();
         front.Changed += OnFront;
