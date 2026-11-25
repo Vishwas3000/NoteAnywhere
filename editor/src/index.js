@@ -45,18 +45,46 @@ function blockAround($pos) {
   return $pos.depth > 0 ? 1 : 0;
 }
 
-/** ⌘⇧↑ / ⌘⇧↓: swap the block holding the cursor with its neighbour, keeping the cursor where it was in it. */
+// How many of `parent`'s blocks move or get passed: all but the empty line the editor keeps at the end of a note (TrailingNode).
+const movable = (parent) => parent.childCount
+  - (parent.type.name === "doc" && parent.lastChild.type.name === "paragraph" && !parent.lastChild.content.size ? 1 : 0);
+
+/**
+ * Where the unit starting with block `index` of `parent` ends (the index after it): a heading carries its section, up to
+ * the next heading of its level or higher; a line of text carries the list right under it ("Bugs:" and its checklist).
+ */
+function unitEnd(parent, index) {
+  const first = parent.child(index), count = movable(parent);
+  let end = index + 1;
+  if (first.type.name === "heading") {
+    while (end < count && !(parent.child(end).type.name === "heading" && parent.child(end).attrs.level <= first.attrs.level)) end++;
+  } else if (first.type.name === "paragraph" && first.content.size && end < count && LISTS[parent.child(end).type.name]) end++;
+  return end;
+}
+
+/** The block starting at `pos` with the blocks that move with it (unitEnd), as {from, to}: what its ⋮⋮ handle drags. */
+export function blockUnit(doc, pos) {
+  const $pos = doc.resolve(pos);
+  return { from: pos, to: $pos.posAtIndex(unitEnd($pos.parent, $pos.index())) };
+}
+
+/**
+ * ⌘⇧↑ / ⌘⇧↓: swap the block holding the cursor, with the blocks that move with it, and the unit next to it, keeping the
+ * cursor where it was in it.
+ */
 function moveBlock(editor, dir) {
   const { state, view } = editor;
   const $from = state.selection.$from;
   const depth = blockAround($from);
   if (!depth) return false;
-  const parent = $from.node(depth - 1), index = $from.index(depth - 1);
-  if (index + dir < 0 || index + dir >= parent.childCount) return true; // at the edge: nothing to do, but don't leak the key
-  const node = $from.node(depth), start = $from.before(depth), offset = $from.pos - start;
-  const neighbour = parent.child(index + dir);
-  const to = dir < 0 ? start - neighbour.nodeSize : start + neighbour.nodeSize;
-  const tr = state.tr.delete(start, start + node.nodeSize).insert(to, node);
+  const parent = $from.node(depth - 1), index = $from.index(depth - 1), end = unitEnd(parent, index);
+  if (dir < 0 ? index === 0 : end >= movable(parent)) return true; // at the edge: nothing to do, but don't leak the key
+  // Above, the largest unit ending here; with none, the line above is the heading it sits under, passed alone.
+  let above = index - 1;
+  for (let i = 0; dir < 0 && i < above; i++) if (unitEnd(parent, i) === index) { above = i; break; }
+  const at = (i) => $from.posAtIndex(i, depth - 1), start = at(index), size = at(end) - start, offset = $from.pos - start;
+  const to = dir < 0 ? at(above) : start + at(unitEnd(parent, end)) - at(end);
+  const tr = state.tr.delete(start, start + size).insert(to, state.doc.slice(start, start + size).content);
   tr.setSelection(TextSelection.near(tr.doc.resolve(to + offset)));
   view.dispatch(tr.scrollIntoView());
   return true;
@@ -173,12 +201,13 @@ function dragHandleView(view, editor) {
   view.dom.addEventListener("mouseleave", (event) => { if (event.relatedTarget !== handle) handle.classList.remove("on"); });
   handle.addEventListener("dragstart", (event) => {
     if (current == null) return;
-    const selection = NodeSelection.create(view.state.doc, current);
+    const { doc } = view.state, selection = NodeSelection.create(doc, current);
+    const { to } = blockUnit(doc, current), slice = doc.slice(current, to); // a heading takes its section, "Bugs:" its list
     view.dispatch(view.state.tr.setSelection(selection));
-    view.dragging = { slice: selection.content(), move: true };
-    dragged = { from: current, size: selection.node.nodeSize, slice: selection.content(), item: ITEMS.has(selection.node.type.name) };
+    view.dragging = { slice, move: true };
+    dragged = { from: current, size: to - current, slice, item: ITEMS.has(selection.node.type.name) };
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", selection.node.textContent);
+    event.dataTransfer.setData("text/plain", doc.textBetween(current, to, "\n"));
     event.dataTransfer.setDragImage(view.nodeDOM(current), 0, 0);
   });
   handle.addEventListener("dragend", finish);
@@ -275,11 +304,11 @@ function dragHandleView(view, editor) {
   return {
     update: attach,
     destroy: () => { handle.remove(); line.remove(); closeMenu(); },
+    // Every drop of a handle drag is ours: ProseMirror's own would delete only the selected first block of a unit.
     drop(event) {
-      const spot = dragged && target(event);
-      if (!spot) return false;
-      const { from, size, slice } = dragged;
-      if (spot.to < from || spot.to > from + size) { // dropped onto itself: nothing moves
+      if (!dragged) return false;
+      const spot = target(event), { from, size, slice } = dragged;
+      if (spot && (spot.to < from || spot.to > from + size)) { // no line shown, or dropped onto itself: nothing moves
         const tr = view.state.tr.delete(from, from + size);
         const to = tr.mapping.map(spot.to);
         tr.replaceRange(to, to, slice);

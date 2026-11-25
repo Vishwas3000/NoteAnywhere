@@ -22,13 +22,17 @@ function mount(markdown, extra = {}) {
   return MNEditor.mount(el, { markdown, ...extra });
 }
 const roundTrip = (md) => assert.equal(mount(md).getMarkdown().trim(), md);
-// Put the cursor at the end of the first text node containing `text`, then press `key` like a user would.
-function press(ed, text, key, shift = false) {
+// Put the cursor right after the first `text`.
+function caretAfter(ed, text) {
   const { state } = ed.editor;
   let at = -1;
   state.doc.descendants((node, pos) => { if (at < 0 && node.isText && node.text.includes(text)) at = pos + node.text.indexOf(text) + text.length; });
   assert.ok(at >= 0, `found "${text}"`);
   ed.editor.commands.setTextSelection(at);
+}
+// Put the cursor at the end of the first text node containing `text`, then press `key` like a user would.
+function press(ed, text, key, shift = false) {
+  caretAfter(ed, text);
   ed.editor.view.dom.dispatchEvent(new window.KeyboardEvent("keydown", { key, shiftKey: shift, bubbles: true, cancelable: true }));
 }
 
@@ -154,6 +158,55 @@ check("⌘⇧↑ moves a paragraph above a heading", () => {
   key(ed, "ArrowUp");
   assert.equal(ed.getMarkdown().trim(), "para\n\n# H");
 });
+// The user's note (D87): a line of text introduces the checklist under it.
+const NOTE = "Bugs:\n\n- [x] Google OAuth\n- [ ] Apple signin\n\nFeatures:\n\n- [ ] posthog dashboard\n- [ ] iCloud sync";
+check("⌘⇧↓ / ⌘⇧↑ move a line with the checklist under it, past the next line and its checklist, cursor and all", () => {
+  const ed = mount(NOTE);
+  caretAfter(ed, "Bu");
+  key(ed, "ArrowDown");
+  const swapped = "Features:\n\n- [ ] posthog dashboard\n- [ ] iCloud sync\n\nBugs:\n\n- [x] Google OAuth\n- [ ] Apple signin";
+  assert.equal(ed.getMarkdown().trim(), swapped);
+  const { $from } = ed.editor.state.selection;
+  assert.deepEqual([$from.parent.textContent, $from.parentOffset], ["Bugs:", 2]);
+  key(ed, "ArrowDown"); // already last: it stays above its checklist, and no empty line appears
+  assert.equal(ed.getMarkdown().trim(), swapped);
+  key(ed, "ArrowUp");
+  assert.equal(ed.getMarkdown().trim(), NOTE);
+});
+check("⌘⇧↑ / ⌘⇧↓ move a heading with its section, past the section next to it", () => {
+  const md = "## Bugs\n\n- [x] Google OAuth\n\nNotes:\n\n- [ ] logs\n\n## Features\n\n- [ ] posthog dashboard";
+  const ed = mount(md);
+  caretAfter(ed, "Features");
+  key(ed, "ArrowUp");
+  assert.equal(ed.getMarkdown().trim(), "## Features\n\n- [ ] posthog dashboard\n\n## Bugs\n\n- [x] Google OAuth\n\nNotes:\n\n- [ ] logs");
+  key(ed, "ArrowDown");
+  assert.equal(ed.getMarkdown().trim(), md);
+});
+check("an ### section ends at the next ##: it passes its sibling, then the next ## section whole", () => {
+  const ed = mount("## Work\n\n### Bugs\n\n- [ ] crash\n\n### Ideas\n\n- [ ] dark mode\n\n## Home\n\n- [ ] groceries");
+  caretAfter(ed, "Bugs");
+  key(ed, "ArrowDown");
+  assert.equal(ed.getMarkdown().trim(), "## Work\n\n### Ideas\n\n- [ ] dark mode\n\n### Bugs\n\n- [ ] crash\n\n## Home\n\n- [ ] groceries");
+  key(ed, "ArrowDown");
+  assert.equal(ed.getMarkdown().trim(), "## Work\n\n### Ideas\n\n- [ ] dark mode\n\n## Home\n\n- [ ] groceries\n\n### Bugs\n\n- [ ] crash");
+});
+check("a checklist item still moves with its nested items, and only within its list", () => {
+  const ed = mount("- [ ] one\n  - [ ] one.a\n  - [ ] one.b\n- [ ] two\n\nafter");
+  caretAfter(ed, "one");
+  key(ed, "ArrowDown");
+  const moved = "- [ ] two\n- [ ] one\n  - [ ] one.a\n  - [ ] one.b\n\nafter";
+  assert.equal(ed.getMarkdown().trim(), moved);
+  key(ed, "ArrowDown"); // last in its list
+  assert.equal(ed.getMarkdown().trim(), moved);
+});
+check("a line with no list right under it moves alone, and passes a line with its list whole", () => {
+  const ed = mount("one\n\ntwo\n\nBugs:\n\n- [ ] crash");
+  caretAfter(ed, "one");
+  key(ed, "ArrowDown");
+  assert.equal(ed.getMarkdown().trim(), "two\n\none\n\nBugs:\n\n- [ ] crash");
+  key(ed, "ArrowDown");
+  assert.equal(ed.getMarkdown().trim(), "two\n\nBugs:\n\n- [ ] crash\n\none");
+});
 check("the drag handle is in the editor", () => {
   const ed = mount("x");
   ed.editor.commands.insertContent("y"); // any update attaches it
@@ -171,6 +224,19 @@ function blockPos(ed, text) {
   });
   return at;
 }
+check("dragging ⋮⋮ carries the block's unit: a heading its section, a line the list under it, an item its own items", () => {
+  const ed = mount("## Work\n\nBugs:\n\n- [ ] crash\n  - [ ] on launch\n\n### Ideas\n\nlater\n\n## Home\n\n- [ ] groceries");
+  const unit = (text) => {
+    const { from, to } = MNEditor.blockUnit(ed.editor.state.doc, blockPos(ed, text));
+    return ed.editor.state.doc.textBetween(from, to, "|");
+  };
+  assert.equal(unit("Work"), "Work|Bugs:|crash|on launch|Ideas|later");
+  assert.equal(unit("Bugs"), "Bugs:|crash|on launch");
+  assert.equal(unit("crash"), "crash|on launch");
+  assert.equal(unit("Ideas"), "Ideas|later");
+  assert.equal(unit("later"), "later");
+  assert.equal(unit("Home"), "Home|groceries", "not the empty line the editor keeps at the end");
+});
 const act = (ed, text, label) => MNEditor.blockActions(ed.editor, blockPos(ed, text)).find((a) => a?.label === label).run();
 check("the handle menu checks the block's own kind and turns it into another", () => {
   const ed = mount("plain\n\n- item");

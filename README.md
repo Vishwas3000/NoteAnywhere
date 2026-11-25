@@ -88,7 +88,8 @@ notes link up.
 - **A real Markdown editor**, shared by the app and the extension: headings, lists that continue, checklists,
   tables, code, quotes, links between notes and maths: `$…$` or `\(…\)` inline, `$$…$$` or `\[…\]` on its own line
   (what ChatGPT and Claude give you when you copy an answer), drawn as real formulas; click one to edit it. A Notion-style ⋮⋮ handle drags any block or list item between
-  blocks, and ⌘⇧↑/↓ moves the current one.
+  blocks, and ⌘⇧↑/↓ moves the current one. What sits under a block moves with it: a heading takes its section, a line
+  of text the list right under it, a list item its sub-items.
 - **Images.** Paste a screenshot or a copied image, or drop an image file, into any note: in the app, the browser panel
   or on iPhone. NoteAnywhere keeps a copy (so a web image still shows when the site goes away) and syncs it end-to-end
   encrypted like the notes.
@@ -177,7 +178,7 @@ Tools: `search_notes`, `list_notes`, `get_note`, `list_tasks`, `list_tags`, `lis
 | ⌘1 / ⌘2 / ⌘3 | Notes / Calendar / Graph |
 | ⌘← / ⌘T / ⌘→ | Calendar: previous / today / next |
 | ⌘⌫ | Delete the selected note (asks first) |
-| ⌘⇧↑ / ⌘⇧↓ | Move the current block or list item |
+| ⌘⇧↑ / ⌘⇧↓ | Move the current block or list item, with what's under it (a heading's section, a line's list) |
 | ⌘⇧9 | Checklist |
 | ⌘⌥P / ⌘⇧K | Highlighted text: add a page from it / link it to a note |
 | `/` | Block menu: headings, lists, to-do, quote, code, table, date; `/break page` draws a divider |

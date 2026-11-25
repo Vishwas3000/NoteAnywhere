@@ -1111,3 +1111,21 @@ Made by the subagent that wrote the extension:
   a panel created after choosing Light is light; a throwaway app with a web view reported `prefers-color-scheme: dark`
   false under Light and true under Automatic and Dark; the main window rendered light under Light.
 - **Status:** Done.
+
+## D87 — A heading or a lead-in line moves with what's under it (2026-11-25)
+
+- **Asked:** "in the macOS build when i move the parent block the child block should also follow it." ⌘⇧↓ on
+  "Features:" put it below its own checklist; a heading and the ⋮⋮ handle also left their blocks behind.
+- **Decision:** in the shared editor (`unitEnd` in `editor/src/index.js`), ⌘⇧↑/↓ and the ⋮⋮ handle move a unit: a heading
+  with its section (up to the next heading of its level or higher), a line of text with the list right under it, else
+  the block alone; a list item still takes its nested items and stays in its list. ⌘⇧↑/↓ swaps the unit with the unit
+  next to it, so "Features:" and its checklist pass "Bugs:" and its checklist whole; a block right under its own heading
+  passes just that heading line, as before. The empty line the editor keeps at the end of a note is in no unit (passing
+  it added a blank line on every press). A handle drop where no drop line shows now does nothing: ProseMirror's own drop
+  would remove only the unit's first block and insert the whole unit, doubling its list. Duplicate and Delete still act
+  on one block.
+- **Worth knowing:** a line moved up to just above a list becomes that list's lead-in and moves with it from then on;
+  a heading moved up past text with no heading of its own (a `#` title's intro) takes that text into its section.
+- **Checked:** `editor/test.js` 74 (6 new). The Mac page (`app/editor.html`, the main window's options) in Playwright's
+  Chromium and WebKit: real ⌘⇧↑/↓ presses and handle drags, 16/16 (13 fail on the old bundle).
+- **Status:** Done.
