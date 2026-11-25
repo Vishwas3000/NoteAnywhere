@@ -288,7 +288,7 @@ public class NativeHostTests
     }
 
     [Fact]
-    public void AWatchingConnectionHearsOfAnotherConnectionsSave()
+    public async Task AWatchingConnectionHearsOfAnotherConnectionsSave()
     {
         var toHost = new AnonymousPipeServerStream(PipeDirection.Out);
         var fromHost = new AnonymousPipeServerStream(PipeDirection.In);
@@ -300,13 +300,13 @@ public class NativeHostTests
             NativeMessaging.Write(toHost, """{"op":"watch"}"""u8);
             Assert.Equal("""{"ok":true}""", Encoding.UTF8.GetString(NativeMessaging.Read(fromHost)!));
             var heard = Task.Run(() => NativeMessaging.Read(fromHost));
-            Assert.False(heard.Wait(TimeSpan.FromSeconds(1)), "an event before anything changed");
+            Assert.NotSame(heard, await Task.WhenAny(heard, Task.Delay(TimeSpan.FromSeconds(1))));  // nothing until a change
             Assert.True(Ok(Call(new { op = "save", note = WebsiteNote(NewID(), NewSite()) })));  // as another tab's host would
-            Assert.True(heard.Wait(TimeSpan.FromSeconds(10)), "no change event within 10 s");
-            Assert.Equal("""{"ok":true,"event":"changed"}""", Encoding.UTF8.GetString(heard.Result!));
+            Assert.Same(heard, await Task.WhenAny(heard, Task.Delay(TimeSpan.FromSeconds(10))));
+            Assert.Equal("""{"ok":true,"event":"changed"}""", Encoding.UTF8.GetString((await heard)!));
 
-            toHost.Dispose();  // the browser closes the pipe
-            Assert.True(running.Wait(TimeSpan.FromSeconds(10)), "Run didn't end when the pipe closed");
+            toHost.Dispose();  // the browser closes the pipe, and Run ends
+            Assert.Same(running, await Task.WhenAny(running, Task.Delay(TimeSpan.FromSeconds(10))));
         }
         finally
         {

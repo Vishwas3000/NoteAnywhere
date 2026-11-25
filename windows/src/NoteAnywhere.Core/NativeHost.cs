@@ -117,7 +117,8 @@ public sealed class NativeHost(IWritingModel? writingModel = null, Func<byte[], 
         var notes = NoteStore.LoadAll();
         var folder = Embedder.DefaultFolder;
         if (!Embedder.Files.All(file => File.Exists(Path.Combine(folder, file.Name))))
-            // No similarity to rank by: each hit has every word (or the tag). Locked notes stay out, as on the Mac.
+            // No similarity to rank by: each hit has every word (or the tag). As on the Mac, at most 20 (a reply stays far
+            // under Chrome's 1 MB) and never a locked note.
             return [.. NoteActions.Search(notes.Where(n => !n.Locked), query).Take(20).Select(n => new Hit<Note>(n, 1))];
         using var embedder = new Embedder(folder);
         var database = new SqliteConnectionStringBuilder { DataSource = NoteStore.DatabasePath, Pooling = false }.ToString();
