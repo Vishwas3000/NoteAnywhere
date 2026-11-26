@@ -43,7 +43,7 @@ jobs:
           # until the PC is idle, which on the Arm64 machines comes mid-job: the CI build then started by itself and the
           # installed app handed over to it. Disabled for this job the way Task Manager's Startup tab does it.
           $approved = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"
-          if (-not (Test-Path $approved)) { New-Item -Path $approved | Out-Null }
+          if (-not (Test-Path $approved)) { New-Item -Path $approved -Force | Out-Null }  # -Force: its parent may not exist either
           New-ItemProperty -Path $approved -Name NoteAnywhere -PropertyType Binary -Value ([byte[]](3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)) -Force | Out-Null
       - name: Open it and take screenshots
         shell: powershell
