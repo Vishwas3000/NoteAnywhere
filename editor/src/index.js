@@ -378,10 +378,10 @@ export const AI_ACTIONS = [
 const SPARKLE = icon('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/>');
 
 /** The ✨ button and its menu. Works on the selection if there is one, otherwise on the whole note. */
-function aiMenu(editor, onAI) {
+function aiMenu(editor, onAI, aiName, aiPlace) {
   const wrap = Object.assign(document.createElement("div"), { className: "mn-ai" });
-  const button = Object.assign(document.createElement("button"), { type: "button", innerHTML: SPARKLE, title: "Apple Intelligence" });
-  button.setAttribute("aria-label", "Apple Intelligence");
+  const button = Object.assign(document.createElement("button"), { type: "button", innerHTML: SPARKLE, title: aiName });
+  button.setAttribute("aria-label", aiName);
   button.setAttribute("aria-haspopup", "menu");
   button.setAttribute("aria-expanded", "false");
   const menu = Object.assign(document.createElement("div"), { className: "mn-ai-menu", hidden: true });
@@ -396,7 +396,7 @@ function aiMenu(editor, onAI) {
     item.onmouseenter = () => item.focus(); // hover and keyboard share one highlight
     return item;
   });
-  const footer = Object.assign(document.createElement("div"), { className: "mn-ai-footer", textContent: "Apple Intelligence · on this Mac" });
+  const footer = Object.assign(document.createElement("div"), { className: "mn-ai-footer", textContent: `${aiName} · ${aiPlace}` });
   menu.append(...items, footer);
   wrap.append(button, menu, status);
 
@@ -1447,7 +1447,8 @@ const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.0
  * onChange(markdown) fires on every user edit (never for setMarkdown); onLinkNote(id) fires for note://<id> links.
  * fontSize is in px; titleLine styles the first block as the note's title (Apple Notes); onHeight(px) reports the
  * content height so a host can size the editor to fit. onAI(action, markdown) => Promise<string> adds a ✨ menu of
- * Apple Intelligence edits (see AI_ACTIONS); the host runs the model, the editor applies the result as one undoable step.
+ * edits (see AI_ACTIONS); the host runs the model, the editor applies the result as one undoable step. aiName and aiPlace
+ * name that model in the menu (the Mac's: "Apple Intelligence", "on this Mac").
  * datePattern ("dd/MM/yyyy", …) shows date chips that way; the Markdown keeps "@yyyy-mm-dd".
  * onAddPage / onFindNotes add "Add page" and "Link to a note…" on highlighted text (see selectionMenu); onNotePreview(id)
  * => Promise<{title, preview}> shows a card when hovering a note link. onAddImage / imageURL: pasted and dropped images
@@ -1457,7 +1458,7 @@ const LINK_ICON = icon('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.0
  * Bold, Italic, Strike, Code and Link on highlighted text instead (the Mac window, D84); false shows neither.
  */
 export function mount(element, { markdown = "", placeholder = "Write a note…", onChange, onLinkNote, toolbar = true,
-  fontSize, titleLine = false, onHeight, onAI, onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview, onAddImage, imageURL, onLinkPreview,
+  fontSize, titleLine = false, onHeight, onAI, aiName = "Apple Intelligence", aiPlace = "on this Mac", onTag, onDate, datePattern, onAddPage, onFindNotes, onNotePreview, onAddImage, imageURL, onLinkPreview,
   onFindTags, tapTags = false } = {}) {
   const root = document.createElement("div");
   root.className = "mn-editor" + (titleLine ? " mn-title-line" : "");
@@ -1677,7 +1678,7 @@ export function mount(element, { markdown = "", placeholder = "Write a note…",
   };
   editor.on("transaction", refreshToolbar);
   refreshToolbar();
-  if (onAI) root.append(aiMenu(editor, onAI));
+  if (onAI) root.append(aiMenu(editor, onAI, aiName, aiPlace));
   const format = toolbar === "selection" ? [
     ...TOOLBAR.slice(0, 4).map(([glyph, name, run, active]) => [glyph, name, () => run(editor.chain().focus()).run(), active]),
     [LINK_ICON, "Link", openLink, "link"],
