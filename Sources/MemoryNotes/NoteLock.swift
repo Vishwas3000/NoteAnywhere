@@ -34,7 +34,7 @@ enum NoteLock {
 
     private static func parts(_ envelope: String) throws -> (salt: Data, combined: Data) {
         guard envelope.hasPrefix(prefix), let data = Data(base64Encoded: String(envelope.dropFirst(prefix.count))),
-              data.count > 16 + 12 + 16 else { throw Failure(errorDescription: "This locked note is damaged.") }
+              data.count >= 16 + 12 + 16 else { throw Failure(errorDescription: "This locked note is damaged.") }  // salt, nonce, tag: an emptied note has no more
         return (data.prefix(16), data.dropFirst(16))
     }
 

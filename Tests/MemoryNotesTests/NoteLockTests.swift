@@ -12,3 +12,10 @@ import Testing
     #expect(again != sealed)
     #expect(throws: NoteLock.Failure.self) { try NoteLock.open(NoteLock.prefix + "garbage", password: "hunter2") }
 }
+
+/// A locked note that was emptied seals to just salt, nonce and tag; it opened as "damaged" until this was allowed.
+@Test func anEmptiedLockedNoteOpens() throws {
+    let sealed = try NoteLock.seal("", password: "hunter2")
+    #expect(try NoteLock.open(sealed, password: "hunter2") == "")
+    #expect(throws: NoteLock.Failure.self) { try NoteLock.open(sealed, password: "wrong") }
+}
