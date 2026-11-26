@@ -170,7 +170,24 @@ jobs:
           }
           Write-Host "Notepad in front for $steady s"
           Start-Sleep -Seconds 5
-          try { & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Notepad" -Out "shots\panel-${{ matrix.rid }}.png" }
+          try {
+            & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Notepad" -Out "shots\panel-${{ matrix.rid }}.png"
+            # The locked card opens with the sample's password ("probe"), put in its box through UI Automation.
+            Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+            $A = [System.Windows.Automation.AutomationElement]
+            $panel = $A::RootElement.FindFirst("Children", (New-Object System.Windows.Automation.AndCondition(
+              (New-Object System.Windows.Automation.PropertyCondition($A::ProcessIdProperty, $app.Id)),
+              (New-Object System.Windows.Automation.PropertyCondition($A::NameProperty, "Notepad")))))
+            function Find($name) { $panel.FindFirst("Descendants", (New-Object System.Windows.Automation.PropertyCondition($A::NameProperty, $name))) }
+            $box = Find "Notes password"
+            if (-not $box) { throw "the locked card has no password box" }
+            try { $box.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue("probe") }
+            catch { Write-Host "typing it instead: $_"; $box.SetFocus(); Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("probe") }
+            (Find "Unlock").GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            Start-Sleep -Seconds 8
+            & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Notepad" -Out "shots\panel-unlocked-${{ matrix.rid }}.png"
+            if ((Find "Notes password") -and -not (Find "Notes password").Current.IsOffscreen) { throw "the card stayed locked" }
+          }
           catch {
             # What was in front, and whether the app was still there: the panel only follows the window in front.
             Write-Host "NoteAnywhere still running: $(-not $app.HasExited)"

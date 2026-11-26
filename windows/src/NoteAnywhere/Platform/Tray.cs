@@ -15,6 +15,8 @@ sealed class Tray : IDisposable
         menu.Items.Add("Open Notes", null, (_, _) => openNotes());
         menu.Items.Add("Show/Hide Panel\tAlt+Shift+M", null, (_, _) => togglePanel());
         menu.Items.Add("Search Notes\tAlt+Shift+Space", null, (_, _) => search());
+        var lockNotes = menu.Items.Add("Lock Notes", null, (_, _) => Core.Crypto.LockSession.Shared.LockNow());
+        menu.Opening += (_, _) => lockNotes.Enabled = Core.Crypto.LockSession.Shared.IsUnlocked;
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Settings…", null, (_, _) => settings());
         menu.Items.Add("Send Feedback…", null, (_, _) => feedback());
