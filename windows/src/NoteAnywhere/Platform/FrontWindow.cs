@@ -1,11 +1,13 @@
 using System.Diagnostics;
 using System.IO;
+using System.Windows.Threading;
 using NoteAnywhere.Core;
 
 namespace NoteAnywhere.Platform;
 
 /// The app and window in front, as a place for notes: the Mac's FrontWindow, fed by Windows' foreground and
-/// title-change events instead of Accessibility notifications. Our own windows never count, so the panel keeps showing
+/// title-change events instead of Accessibility notifications, and a look each second for a change Windows didn't
+/// report. Our own windows never count, so the panel keeps showing
 /// the place you came from while you type in it.
 public sealed record FrontContext(string AppId, string AppName, string Title, string Target);
 
@@ -14,6 +16,7 @@ public sealed class FrontWindow : IDisposable
     readonly Win32.WinEventProc callback;  // held here: the hook calls it for as long as it's installed
     readonly IntPtr foregroundHook, titleHook;
     readonly uint ourProcess = (uint)Environment.ProcessId;
+    readonly DispatcherTimer poll;
     IntPtr window;
 
     public FrontContext? Current { get; private set; }
@@ -26,6 +29,11 @@ public sealed class FrontWindow : IDisposable
         foregroundHook = Win32.SetWinEventHook(Win32.EVENT_SYSTEM_FOREGROUND, Win32.EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, callback, 0, 0, Win32.WINEVENT_OUTOFCONTEXT);
         titleHook = Win32.SetWinEventHook(Win32.EVENT_OBJECT_NAMECHANGE, Win32.EVENT_OBJECT_NAMECHANGE, IntPtr.Zero, callback, 0, 0, Win32.WINEVENT_OUTOFCONTEXT);
         Look(Win32.GetForegroundWindow());
+        // Windows doesn't report every change: a window brought forward after Search's flyout closes can arrive with no
+        // foreground event (GitHub's Arm64 machines, where the panel then stayed hidden). A look each second catches it.
+        poll = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background,
+            (_, _) => { if (Win32.GetForegroundWindow() is var w && w != window) Look(w); }, Dispatcher.CurrentDispatcher);
+        poll.Start();
     }
 
     void OnEvent(IntPtr hook, uint eventType, IntPtr changed, int idObject, int idChild, uint thread, uint time)
@@ -72,6 +80,7 @@ public sealed class FrontWindow : IDisposable
 
     public void Dispose()
     {
+        poll.Stop();
         Win32.UnhookWinEvent(foregroundHook);
         Win32.UnhookWinEvent(titleHook);
     }
