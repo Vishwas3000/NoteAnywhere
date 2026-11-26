@@ -31,6 +31,11 @@ jobs:
         env:
           NOTEANYWHERE_DIR: ${{ runner.temp }}\mcp-store  # an empty scratch store, never anyone's notes
         run: python windows/scripts/test_mcp.py out\NoteAnywhere.exe
+      - name: The browsers' host, started as Chrome and Firefox start it
+        timeout-minutes: 10
+        env:
+          NOTEANYWHERE_DIR: ${{ runner.temp }}\host-store  # a scratch store, never anyone's notes
+        run: python windows/scripts/test_host.py out\NoteAnywhere.exe
       - name: Open it and take screenshots
         shell: powershell
         run: |
@@ -117,28 +122,30 @@ jobs:
           Add-Type -Namespace Probe -Name Front -MemberDefinition @'
           [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
           [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr w, System.Text.StringBuilder s, int n);
-          [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string cls, string title);
-          [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr w, uint m, IntPtr a, IntPtr b);
           [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr w);
           [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
           '@
           Start-Process notepad.exe -ArgumentList $file
+          # GitHub's Arm64 machines put up a "Microsoft account" sign-in window (WWAHost) at moments of their own, sometimes
+          # seconds after Notepad opens, and the panel rightly follows it: end it and bring Notepad forward (after an Alt
+          # press, as Windows only lets the process with the last input change the window in front) until Notepad has
+          # stayed in front for 3 s.
+          $steady = 0
+          foreach ($second in 1..40) {
+            Start-Sleep -Seconds 1
+            $front = New-Object System.Text.StringBuilder 512
+            [void][Probe.Front]::GetWindowText([Probe.Front]::GetForegroundWindow(), $front, 512)
+            if ("$front" -like "*Notepad*") { if (++$steady -ge 3) { break }; continue }
+            $steady = 0
+            Get-Process WWAHost -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "ending WWAHost's '$($_.MainWindowTitle)'"; $_ | Stop-Process -Force }
+            $notepad = Get-Process notepad -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+            if ($notepad) {
+              [Probe.Front]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [Probe.Front]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+              [void][Probe.Front]::SetForegroundWindow($notepad.MainWindowHandle)
+            }
+          }
+          Write-Host "Notepad in front for $steady s"
           Start-Sleep -Seconds 5
-          # GitHub's Arm64 machines sometimes put a "Microsoft account" sign-in window in front, and the panel rightly
-          # follows that instead: close it, then bring Notepad forward (after an Alt press, as Windows only lets the
-          # process with the last input change the window in front).
-          $prompt = [Probe.Front]::FindWindow($null, "Microsoft account")
-          if ($prompt -ne [IntPtr]::Zero) {
-            Write-Host "closing a 'Microsoft account' window"
-            [void][Probe.Front]::PostMessage($prompt, 0x10, [IntPtr]::Zero, [IntPtr]::Zero)
-            Start-Sleep -Seconds 2
-          }
-          $notepad = Get-Process notepad -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
-          if ($notepad) {
-            [Probe.Front]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [Probe.Front]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
-            [void][Probe.Front]::SetForegroundWindow($notepad.MainWindowHandle)
-          }
-          Start-Sleep -Seconds 10
           try { & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Notepad" -Out "shots\panel-${{ matrix.rid }}.png" }
           catch {
             # What was in front, and whether the app was still there: the panel only follows the window in front.

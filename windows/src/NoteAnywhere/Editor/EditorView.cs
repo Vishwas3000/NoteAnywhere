@@ -6,6 +6,7 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using NoteAnywhere.Core;
 using NoteAnywhere.Core.Crypto;
+using NoteAnywhere.Platform;
 
 namespace NoteAnywhere.Editor;
 
@@ -215,7 +216,14 @@ public sealed class EditorView : ContentControl
                     await Reply(id, null, "The writing model isn't on this PC yet: it arrives in a coming update.");
                     break;
                 case "linkPreview":
-                    await Reply(id, null, "Link previews aren't on Windows yet.");
+                    // A pasted link's card or mention, as the Mac's: the pictures become note images, so they show offline.
+                    try
+                    {
+                        if (!Uri.TryCreate(Text("url"), UriKind.Absolute, out var url)) throw new InvalidOperationException("That isn't a web address.");
+                        var page = await LinkPreview.FetchAsync(url, LinkPreview.Web, BrowserHost.LargestFrameAsPng);
+                        await Reply(id, new { title = page.Title, description = page.Description, icon = page.Icon, image = page.Image });
+                    }
+                    catch (Exception failure) { await Reply(id, null, failure.Message); }
                     break;
             }
         }
