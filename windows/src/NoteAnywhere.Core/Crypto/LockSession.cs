@@ -36,6 +36,23 @@ public sealed class LockSession
         Changed?.Invoke();
     }
 
+    /// A notes password exists once a note was locked anywhere: its check value here, or a locked note synced from another
+    /// device, whose password unlocking proves (a new one would split the notes between two passwords).
+    public static bool HasPassword(IEnumerable<Note> notes) =>
+        NoteStore.SyncValue("lock.check") != null || notes.Any(n => n.Locked && NoteLock.IsEnvelope(n.Text));
+
+    /// The first lock's password and hint, by the rules of the Mac's NotesPasswordSheet; throws ArgumentException with a
+    /// message to show.
+    public void SetPassword(string password, string hint)
+    {
+        if (password.Length < 4) throw new ArgumentException("Use at least 4 characters.");
+        if (password == hint) throw new ArgumentException("The hint can't be the password.");
+        NoteStore.SetSyncValue("lock.check", NoteLock.MakeCheck(password));
+        NoteStore.SetSyncValue("lock.hint", hint.Length == 0 ? null : hint);
+        Password = password;
+        Changed?.Invoke();
+    }
+
     public void LockNow()
     {
         if (Password is null) return;

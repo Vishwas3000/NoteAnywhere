@@ -229,6 +229,37 @@ jobs:
             Stop-Process -Id $app.Id -ErrorAction SilentlyContinue
             Stop-Process -Id $watcher.Id -ErrorAction SilentlyContinue
           }
+      - name: The first lock's password window
+        shell: powershell
+        run: |
+          $env:NOTEANYWHERE_DIR = Join-Path $env:RUNNER_TEMP "lock-store"  # no note locked yet: a new notes password
+          $app = Start-Process out\NoteAnywhere.exe -ArgumentList "--background", "--set-notes-password" -PassThru
+          Start-Sleep -Seconds 8
+          try {
+            $title = "Set a Password for Locked Notes"
+            & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title $title -Out "shots\set-password-${{ matrix.rid }}.png"
+            Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+            $A = [System.Windows.Automation.AutomationElement]
+            function Cond($property, $value) { New-Object System.Windows.Automation.PropertyCondition($property, $value) }
+            $dialog = $A::RootElement.FindFirst("Children", (New-Object System.Windows.Automation.AndCondition((Cond $A::ProcessIdProperty $app.Id), (Cond $A::NameProperty $title))))
+            if (-not $dialog) { throw "no '$title' window" }
+            # Each field's label is a text of the same name: the field is the Edit.
+            function Field($name) { $dialog.FindFirst("Descendants", (New-Object System.Windows.Automation.AndCondition((Cond $A::NameProperty $name), (Cond $A::ControlTypeProperty ([System.Windows.Automation.ControlType]::Edit))))) }
+            foreach ($pair in ("Password", "tulip"), ("Verify", "tulip"), ("Hint (recommended)", "a flower")) {
+              (Field $pair[0]).GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($pair[1])
+            }
+            $set = $dialog.FindFirst("Descendants", (Cond $A::NameProperty "Set Password"))
+            $set.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            Start-Sleep -Seconds 2
+            $store = Join-Path $env:NOTEANYWHERE_DIR "memorynotes.sqlite"
+            $check = python -c "import sqlite3,sys; r=sqlite3.connect(sys.argv[1]).execute('select value from sync_state where key=?', ('lock.check',)).fetchone(); print(r[0][:10] if r else 'none')" $store
+            if ($check -ne "mnlock:v1:") { throw "Set Password kept no check value: $check" }
+          }
+          finally {
+            $log = Join-Path $env:NOTEANYWHERE_DIR "crash.log"
+            if (Test-Path $log) { Get-Content $log }
+            Stop-Process -Id $app.Id -ErrorAction SilentlyContinue
+          }
       - name: Make the installer
         shell: pwsh
         run: |

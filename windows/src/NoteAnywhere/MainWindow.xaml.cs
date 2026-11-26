@@ -1,10 +1,12 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using NoteAnywhere.Core;
+using NoteAnywhere.Core.Crypto;
 
 namespace NoteAnywhere;
 
@@ -201,6 +203,17 @@ public partial class MainWindow : Window
     }
 
     /// The right-click menu of the row under the pointer: Apple Notes' note menu (D84), or a folder's.
+    /// Lock Note and Remove Lock need the notes password: set on the first lock, else asked for while notes are shut.
+    bool NotesUnlocked(bool setIfNone) =>
+        LockSession.Shared.IsUnlocked
+        || (setIfNone && !LockSession.HasPassword(model.Notes) ? Prompt.SetNotesPassword(this) : Prompt.UnlockNotes(this, model.Notes));
+
+    void RemoveLock(Note note)
+    {
+        try { model.RemoveLock(note.Id); }
+        catch (CryptographicException e) { MessageBox.Show(this, e.Message, "Remove Lock", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
     void OnSidebarMenu(object sender, ContextMenuEventArgs e)
     {
         var row = ItemsControl.ContainerFromElement(Sidebar, (DependencyObject)e.OriginalSource) as ListBoxItem;
@@ -211,6 +224,8 @@ public partial class MainWindow : Window
             case NoteItem { Note: var note }:
                 Add(menu, note.Pinned ? "Unpin Note" : "Pin Note", () => model.Update(note.Id, n => n with { Pinned = !n.Pinned }));
                 Add(menu, note.Starred ? "Unstar Note" : "Star Note", () => model.Update(note.Id, n => n with { Starred = !n.Starred }));
+                if (note.Locked) Add(menu, "Remove Lock", () => { if (NotesUnlocked(setIfNone: false)) RemoveLock(note); });
+                else Add(menu, "Lock Note", () => { if (NotesUnlocked(setIfNone: true)) model.Lock(note.Id); });
                 menu.Items.Add(new Separator());
                 Add(menu, "New Note", NewNote);
                 Add(menu, "Duplicate Note", () => Open(model.Duplicate(note).Id), !note.Locked);

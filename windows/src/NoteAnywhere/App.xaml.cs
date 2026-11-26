@@ -59,6 +59,7 @@ public partial class App : Application
         sync = new CloudSync(new SecretStore());
         sync.Start();  // as the Mac at launch: syncing if this PC is signed in
         if (e.Args.Contains("--seed-sample-notes")) SampleNotes.SeedIfEmpty();
+        if (e.Args.Contains("--set-notes-password")) Dispatcher.BeginInvoke(() => Prompt.SetNotesPassword(null));  // CI: the first lock's window
         if (link != null) OpenLink(link);
         else if (!e.Args.Contains("--background")) ShowNotes();
         if (e.Args.Contains("--settings")) ShowSettings();  // CI: the writing model's download, by its buttons

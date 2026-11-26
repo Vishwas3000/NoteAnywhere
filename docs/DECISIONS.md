@@ -1136,7 +1136,10 @@ Made by the subagent that wrote the extension:
   checked it, against the first locked note, which then keeps a check value here. Unlocked, a note opens in the
   editor and each edit is sealed again with its envelope's salt. The password stays in memory only, until Lock Notes
   (tray), Windows locking, or quitting. Windows Hello, the Mac's Touch ID, isn't here yet, so nothing keeps the
-  password on the PC. Locking a note and Remove Lock aren't on Windows yet.
+  password on the PC. Lock Note and Remove Lock are in a note's menu in the sidebar. The first lock sets the
+  password, by the Mac's rules: at least 4 characters, typed twice, and a hint that isn't the password. Unlike the
+  Mac, a PC that only has notes locked elsewhere asks for that password, not a new one, so the notes never end up
+  split between two passwords.
 - **Sync on Windows** (`NoteAnywhere.Core/Sync/`): a port of `SyncCloud.swift`, request for request, to the same
   Supabase project, so a PC syncs with the Mac and the phones.
   - Sign-in by the emailed link or code, or Google in the default browser; the vault, rounds, cursors, batch sizes,

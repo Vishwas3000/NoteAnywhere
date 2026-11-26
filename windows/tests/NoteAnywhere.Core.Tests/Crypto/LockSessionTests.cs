@@ -40,6 +40,24 @@ public class LockSessionTests
     }
 
     [Fact]
+    public void TheFirstPasswordIsCheckedAndUnlocksAndAPasswordExistsOnceAnyNoteIsLocked()
+    {
+        NoteStore.SetSyncValue("lock.check", null);
+        Assert.False(LockSession.HasPassword([]));
+        Assert.True(LockSession.HasPassword([Locked(NoteLockTests.MacEnvelope)]));  // locked elsewhere: ask for that one
+        var session = new LockSession();
+        Assert.Equal("Use at least 4 characters.", Assert.Throws<ArgumentException>(() => session.SetPassword("abc", "")).Message);
+        Assert.Equal("The hint can't be the password.", Assert.Throws<ArgumentException>(() => session.SetPassword("tulip", "tulip")).Message);
+        Assert.False(session.IsUnlocked);
+        session.SetPassword("tulip", "a flower");
+        Assert.True(session.IsUnlocked);
+        Assert.True(LockSession.HasPassword([]));
+        Assert.Equal("a flower", LockSession.Hint);
+        Assert.True(NoteLock.IsPassword("tulip", NoteStore.SyncValue("lock.check")!));
+        NoteStore.SetSyncValue("lock.hint", null);
+    }
+
+    [Fact]
     public void WithNothingLockedThereIsNoPasswordToCheck()
     {
         NoteStore.SetSyncValue("lock.check", null);

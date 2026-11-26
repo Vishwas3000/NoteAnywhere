@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows;
 using NoteAnywhere.Core;
+using NoteAnywhere.Core.Crypto;
 
 namespace NoteAnywhere;
 
@@ -64,6 +65,24 @@ sealed class NotesModel
     {
         if (Find(id) is not { } note) return;
         NoteStore.SaveMeta(change(note));
+        Reload();
+    }
+
+    /// Lock Note: sealed with the unlocked notes password (LockSession), as the Mac's NotesModel.lock; SetLocked also
+    /// replaces its history with the envelope and drops its search vector.
+    public void Lock(string id)
+    {
+        if (LockSession.Shared.Password is not { } password || Find(id) is not { Locked: false } note) return;
+        NoteStore.SetLocked(id, NoteLock.Seal(note.Text, password), locked: true);
+        Reload();
+    }
+
+    /// Remove Lock: back to plain text. Throws CryptographicException, with a message to show, when the notes password
+    /// doesn't open it.
+    public void RemoveLock(string id)
+    {
+        if (LockSession.Shared.Password is not { } password || Find(id) is not { Locked: true } note) return;
+        NoteStore.SetLocked(id, NoteLock.Open(note.Text, password), locked: false);
         Reload();
     }
 
