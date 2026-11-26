@@ -140,7 +140,7 @@ public sealed class NativeHost(IWritingModel? writingModel = null, Func<byte[], 
 
     sealed class NoWritingModel : IWritingModel
     {
-        public string? UnavailableReason => "The writing model isn't on this PC yet: open NoteAnywhere and choose ✨ to download it.";
+        public string? UnavailableReason => "The writing model isn't on this PC yet: NoteAnywhere's Settings ▸ Writing model downloads it.";
         public Task<string> Respond(string instructions, string text, CancellationToken cancel) => throw new InvalidOperationException(UnavailableReason);
     }
 }

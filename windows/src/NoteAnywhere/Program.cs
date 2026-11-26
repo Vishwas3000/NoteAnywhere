@@ -1,8 +1,11 @@
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Threading;
 using NoteAnywhere.Core;
+using NoteAnywhere.Core.Search;
 using NoteAnywhere.Platform;
 using Velopack;
 
@@ -23,12 +26,57 @@ static class Program
         // restart would cut it off).
         VelopackApp.Build().SetAutoApplyOnStartup(IsApp(args)).Run();
         if (args is ["--report-front", var file, var seconds]) return ReportFront(file, int.Parse(seconds));
+        if (args is ["--write-title", var report]) return WriteTitle(report).GetAwaiter().GetResult();
         AppDomain.CurrentDomain.UnhandledException += (_, e) => CrashLog.Write(e.ExceptionObject);
         if (args is ["--mcp", ..]) return McpServer.Run();
         var app = new App();
         app.DispatcherUnhandledException += (_, e) => CrashLog.Write(e.Exception);
         app.InitializeComponent();
         return app.Run();
+    }
+
+    /// Test mode for CI: ✨ Title on a short note through Assistant.Run, as the editor runs it, twice (loading the model,
+    /// then loaded). Downloads the writing model first when it isn't here, as Settings does once the person agrees. Search
+    /// embeds the note before and after, as both models share ONNX Runtime in the app. Writes each step, timed, to `file`;
+    /// ends with 0 only if all of it worked.
+    static async Task<int> WriteTitle(string file)
+    {
+        void Log(string line) => File.AppendAllText(file, line + "\n");
+        const string Note = "Saturday: milk, eggs, sourdough bread, apples and coffee beans. Pick up the dry cleaning on the way back.";
+        async Task Search(string when)
+        {
+            using var search = new Embedder();  // its own session each time, so the second starts after the writing model's
+            var vector = await search.EmbedAsync(Note) ?? throw new InvalidOperationException($"search's model failed {when}");
+            Log($"search, {when}: {vector.Length} numbers");
+        }
+        try
+        {
+            var model = WritingModel.Shared;
+            var clock = Stopwatch.StartNew();
+            if (!model.Installed)
+            {
+                await model.DownloadAsync(null, CancellationToken.None);
+                Log($"downloaded {model.SizeText} in {clock.Elapsed.TotalSeconds:0} s");
+            }
+            await Search("before");
+            foreach (var state in new[] { "loading the model", "loaded" })
+            {
+                clock.Restart();
+                var title = await Assistant.Run(model, "title", Note);
+                Log($"title, {state}: {clock.Elapsed.TotalSeconds:0.0} s: {title}");
+                // No line break, no special token, no word twice in a row (the reply's last token once came back twice).
+                if (title.Length == 0 || title.Contains('\n') || title.Contains("<|") || Regex.IsMatch(title, @"\b(\w+) \1\b"))
+                    throw new InvalidOperationException("that isn't a title");
+            }
+            await Search("after");
+            Log($"peak memory: {Process.GetCurrentProcess().PeakWorkingSet64 / 1e9:0.0} GB");
+            return 0;  // the writing model stays loaded, as when the app quits soon after a ✨
+        }
+        catch (Exception e)
+        {
+            Log(e.ToString());
+            return 1;
+        }
     }
 
     /// The app's own launches carry only its flags; a browser passes its extension's origin or manifest, AI apps --mcp.

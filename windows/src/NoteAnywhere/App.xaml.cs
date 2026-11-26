@@ -40,6 +40,7 @@ public partial class App : Application
         BrowserRegistration.RegisterThisApp();
         LinkScheme.RegisterThisApp();
         NoteSearch.Start();
+        WritingModel.Shared.DeleteLeftovers();
         front = new FrontWindow();
         panel = new PanelWindow();
         front.Changed += OnFront;
@@ -60,6 +61,7 @@ public partial class App : Application
         if (e.Args.Contains("--seed-sample-notes")) SampleNotes.SeedIfEmpty();
         if (link != null) OpenLink(link);
         else if (!e.Args.Contains("--background")) ShowNotes();
+        if (e.Args.Contains("--settings")) ShowSettings();  // CI: the writing model's download, by its buttons
     }
 
     /// memorynotes://auth-callback, from a sign-in email or Google: Settings ▸ Sync shows what comes next.

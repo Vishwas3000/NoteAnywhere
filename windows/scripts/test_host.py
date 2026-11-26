@@ -105,7 +105,9 @@ assert b"".join(pieces) == big and len(pieces) == 3
 assert "can't hold" in call({"op": "addImage", "mime": "image/svg+xml", "data": "PHN2Zz4="})["error"]
 assert not call({"op": "image", "id": "../memorynotes.sqlite"})["ok"], "only image ids"
 
-assert call({"op": "ai", "action": "proofread", "text": "teh meeting"})["error"].startswith("The writing model isn't on this PC yet")
+# ✨ runs on the writing model Settings downloads; this scratch store has none, so the host says where to get it.
+ai = call({"op": "ai", "action": "proofread", "text": "teh meeting"})
+assert ai["error"].startswith("Download the writing model first: Settings"), ai
 
 
 # Link previews: the page one redirect on, its favicon.ico (two sizes) and BMP picture made PNGs by WPF's decoders.

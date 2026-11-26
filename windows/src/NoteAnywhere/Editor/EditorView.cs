@@ -267,7 +267,7 @@ public sealed class EditorView : ContentControl
                         : Reply(id, NoteStore.ImageScheme + ":" + NoteStore.SaveImage(data, Text("mime") ?? "")));
                     break;
                 case "ai":
-                    await Reply(id, null, "The writing model isn't on this PC yet: it arrives in a coming update.");
+                    await Reply(id, await Assistant.Run(WritingModel.Shared, Text("action"), Text("text")));
                     break;
                 case "linkPreview":
                     // A pasted link's card or mention, as the Mac's: the pictures become note images, so they show offline.

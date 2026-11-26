@@ -190,7 +190,7 @@ public class NativeHostTests
         Assert.Equal("unknown action nope", Error(new { op = "ai", action = "nope", text = "x" }, host));
         Assert.Equal("Write something first.", Error(new { op = "ai", action = "shorten", text = " " }, host));
         Assert.Equal("Not yet", Error(new { op = "ai", action = "title", text = "x" }, Host(new Model("Not yet"))));
-        Assert.Equal("The writing model isn't on this PC yet: open NoteAnywhere and choose ✨ to download it.",
+        Assert.Equal("The writing model isn't on this PC yet: NoteAnywhere's Settings ▸ Writing model downloads it.",
             Error(new { op = "ai", action = "proofread", text = "teh meeting" }));
     }
 
