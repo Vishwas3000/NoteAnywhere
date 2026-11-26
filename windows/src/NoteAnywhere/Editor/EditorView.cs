@@ -141,6 +141,7 @@ public sealed class EditorView : ContentControl
         {
             ["toolbar"] = Page ? "selection" : false, ["fontSize"] = Page ? 15 : 13, ["titleLine"] = true, ["page"] = Page,
             ["datePattern"] = Settings.Load().DateFormat is { Length: > 0 } f ? f : DateStyle.Region, ["pages"] = true,
+            ["aiName"] = "Phi-4-mini", ["aiPlace"] = "on this PC",  // ✨'s model (WritingModel), named in its menu
         };
         return Call("load", shown, options);
     }

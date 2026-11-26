@@ -521,6 +521,11 @@ await checkAsync("✨ errors show in the status line and leave the note alone", 
   assert.match(ed.editor.options.element.closest(".mn-editor").querySelector(".mn-ai-status").textContent, /Apple Intelligence/);
   assert.equal(ed.editor.isEditable, true);
 });
+check("✨'s menu names the host's model: the Mac's unless the host says otherwise", () => {
+  const footer = (ed) => ed.editor.options.element.closest(".mn-editor").querySelector(".mn-ai-footer").textContent;
+  assert.equal(footer(mount("x", { onAI: async () => "" })), "Apple Intelligence · on this Mac");
+  assert.equal(footer(mount("x", { onAI: async () => "", aiName: "Phi-4-mini", aiPlace: "on this PC" })), "Phi-4-mini · on this PC");
+});
 
 // Images (D53): files the clipboard or a drop carries are kept by the host; the note gets noteimage:<id>.
 const PNG = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);

@@ -364,6 +364,8 @@ function noteRow(note) {
       if (!r.ok) throw new Error(r.error);
       return r.preview;
     }),
+    // ✨ runs in the app the host belongs to: Apple Intelligence on a Mac, the downloaded Phi-4-mini on Windows.
+    ...(/Windows/.test(navigator.userAgent) && { aiName: "Phi-4-mini", aiPlace: "on this PC" }),
     // Ignored by editor bundles that predate the ✨ menu.
     onAI: (action, markdown) => send({ op: "ai", action, text: markdown }).then((r) => {
       if (!r.ok) throw new Error(r.error);
