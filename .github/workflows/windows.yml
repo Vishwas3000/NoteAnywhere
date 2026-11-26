@@ -208,6 +208,10 @@ jobs:
         shell: pwsh
         run: |
           $setup = (Get-ChildItem releases -Filter *Setup.exe | Select-Object -First 1).FullName
+          # The Arm64 machines' desktop can start late and run the login items then, among them the CI build that an earlier
+          # step's launch registered to open at login ("out\NoteAnywhere.exe" --background). The installed app would hand
+          # over to that copy and quit, so it ends first.
+          Get-Process NoteAnywhere -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "ending $($_.Path) $($_.CommandLine)"; $_ | Stop-Process -Force }
           Start-Process $setup -ArgumentList "--silent" -Wait
           Start-Sleep -Seconds 10
           $exe = Join-Path $env:LOCALAPPDATA "NoteAnywhere.App\current\NoteAnywhere.exe"
