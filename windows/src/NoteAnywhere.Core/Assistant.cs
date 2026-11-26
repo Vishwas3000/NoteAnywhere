@@ -30,7 +30,7 @@ public static partial class Assistant
         + "Keep Markdown formatting (headings, lists, checkboxes, links, code) unless asked to change it.\n"
         + "Reply with the result only: no preamble, no explanation, no surrounding code fence.";
 
-    /// A ✨ request as the editor sends it (and the browser's, through the host): the action's name and the text.
+    /// A ✨ request as the editor sends it: the action's name and the text.
     public static async Task<string> Run(IWritingModel model, string? action, string? markdown, CancellationToken cancel = default) =>
         await Run(model, Parse(action) ?? throw new InvalidOperationException("Unknown action."), markdown ?? "", cancel);
 

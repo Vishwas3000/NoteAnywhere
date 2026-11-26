@@ -19,7 +19,7 @@ static class BrowserHost
         using var input = Console.OpenStandardInput();
         using var output = Console.OpenStandardOutput();
         Console.SetOut(Console.Error);  // stdout carries replies and nothing else
-        new NativeHost(toPng: LargestFrameAsPng).Run(input, output);
+        new NativeHost(WritingModel.Shared, LargestFrameAsPng).Run(input, output);  // ✨ on the model Settings downloads
         return 0;
     }
 
