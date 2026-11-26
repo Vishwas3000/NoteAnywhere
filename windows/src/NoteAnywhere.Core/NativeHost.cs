@@ -24,9 +24,7 @@ public sealed class NativeHost(IWritingModel? writingModel = null, Func<byte[], 
     static readonly byte[] ChangedEvent = """{"ok":true,"event":"changed"}"""u8.ToArray();
 
     readonly IWritingModel writing = writingModel ?? new NoWritingModel();
-    // As URLSession: decompressing, and naming itself, which some sites want before they answer.
-    readonly HttpClient web = http ?? new(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All })
-        { DefaultRequestHeaders = { { "User-Agent", "NoteAnywhere" } } };
+    readonly HttpClient web = http ?? LinkPreview.Web;
     readonly Func<Settings> loadSettings = settings ?? Settings.Load;
     readonly Lock sending = new();  // replies (the read loop) and change events (the watcher's thread) share the output
     Stream output = Stream.Null;
