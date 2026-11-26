@@ -212,11 +212,21 @@ jobs:
           Start-Sleep -Seconds 10
           $exe = Join-Path $env:LOCALAPPDATA "NoteAnywhere.App\current\NoteAnywhere.exe"
           if (-not (Test-Path $exe)) { Get-ChildItem (Join-Path $env:LOCALAPPDATA "NoteAnywhere.App") -Recurse -Depth 1; throw "not installed at $exe" }
+          Get-Process NoteAnywhere -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "after Setup, running: $($_.Path) $($_.CommandLine)" }
           if (-not (Get-Process NoteAnywhere -ErrorAction SilentlyContinue)) { Start-Process $exe -ArgumentList "--background"; Start-Sleep -Seconds 10 }
           $manifest = (Get-ItemProperty "HKCU:\Software\Google\Chrome\NativeMessagingHosts\com.memorynotes.host").'(default)'
           $path = (Get-Content $manifest -Raw | ConvertFrom-Json).path
           Write-Host "Chrome's host manifest: $manifest -> $path"
-          if ($path -ne $exe) { throw "Chrome would start $path, not the installed app" }
+          if ($path -ne $exe) {
+            # The installed app registers at every start: say whether it runs, what it logged, and what Setup logged.
+            Get-Process NoteAnywhere -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "running: $($_.Path) $($_.CommandLine)" }
+            $log = Join-Path $env:LOCALAPPDATA "NoteAnywhere\crash.log"
+            if (Test-Path $log) { Get-Content $log }
+            Get-ChildItem (Join-Path $env:LOCALAPPDATA "NoteAnywhere.App"), $env:TEMP -Filter *.log -Recurse -Depth 2 -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -like "*velopack*" -or $_.DirectoryName -like "*NoteAnywhere.App*" } |
+              ForEach-Object { Write-Host "== $($_.FullName)"; Get-Content $_.FullName -Tail 60 }
+            throw "Chrome would start $path, not the installed app"
+          }
           Get-Process NoteAnywhere -ErrorAction SilentlyContinue | Stop-Process -Force
       - name: Update the installed copy to the next version
         shell: pwsh
