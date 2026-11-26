@@ -24,7 +24,7 @@ static class BrowserHost
     }
 
     /// An ICO or BMP as a PNG of its largest frame, as the Mac's LinkPreview.picture makes them.
-    static byte[] LargestFrameAsPng(byte[] picture)
+    internal static byte[] LargestFrameAsPng(byte[] picture)
     {
         var decoder = BitmapDecoder.Create(new MemoryStream(picture), BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
         var encoder = new PngBitmapEncoder();

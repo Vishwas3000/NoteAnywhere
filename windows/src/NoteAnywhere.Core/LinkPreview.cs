@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Text.Unicode;
@@ -13,6 +14,11 @@ public static partial class LinkPreview
     public sealed record Page(string Title, string Description, string Icon, string Image);
 
     const int PageLimit = 2 << 20, PictureLimit = 5 << 20;
+
+    /// For previews in the app and the browser host. As URLSession: decompressing, and naming itself, which some sites
+    /// want before they answer.
+    public static readonly HttpClient Web = new(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All })
+        { DefaultRequestHeaders = { { "User-Agent", "NoteAnywhere" } } };
 
     /// The page's preview with its pictures kept as note images, as the Mac's LinkPreview.fetch; throws with a message to
     /// show. `toPng` makes an ICO or BMP the PNG of its largest frame (the app's decodes with WPF); without it they're left out.
