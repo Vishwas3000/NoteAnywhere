@@ -31,15 +31,15 @@ public class NoteStoreTests
     {
         var id = NewID();
         NoteStore.Save(new Note { Id = id, Kind = NoteKind.Url, Target = "example.com", Label = "", Text = "a", CreatedAt = 1, UpdatedAt = 10 });
-        var dirty = NoteStore.DirtyNotes().Where(n => n.Id == id).ToList();
+        var dirty = NoteStore.DirtyNotes(limit: 10_000).Where(n => n.Id == id).ToList();
         Assert.Equal(["a"], dirty.Select(n => n.BodyMd));
-        Assert.Contains(NoteStore.DirtySnapshots(), s => s.NoteID == id);
+        Assert.Contains(NoteStore.DirtySnapshots(limit: 10_000), s => s.NoteID == id);
         // Edited again before the push finished: stays dirty.
         NoteStore.Save(new Note { Id = id, Kind = NoteKind.Url, Target = "example.com", Label = "", Text = "b", CreatedAt = 1, UpdatedAt = 11 });
         NoteStore.MarkPushed(notes: dirty);
-        Assert.Contains(NoteStore.DirtyNotes(), n => n.Id == id);
-        NoteStore.MarkPushed(notes: [.. NoteStore.DirtyNotes().Where(n => n.Id == id)]);
-        Assert.DoesNotContain(NoteStore.DirtyNotes(), n => n.Id == id);
+        Assert.Contains(NoteStore.DirtyNotes(limit: 10_000), n => n.Id == id);
+        NoteStore.MarkPushed(notes: [.. NoteStore.DirtyNotes(limit: 10_000).Where(n => n.Id == id)]);
+        Assert.DoesNotContain(NoteStore.DirtyNotes(limit: 10_000), n => n.Id == id);
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public class NoteStoreTests
         var id = NewID();
         NoteStore.ApplyRemote([Remote(id, "v1", 10)], []);
         Assert.Equal("v1", Loaded(id).Text);
-        Assert.DoesNotContain(NoteStore.DirtyNotes(), n => n.Id == id);  // pulled rows aren't pushed back
+        Assert.DoesNotContain(NoteStore.DirtyNotes(limit: 10_000), n => n.Id == id);  // pulled rows aren't pushed back
         NoteStore.ApplyRemote([Remote(id, "old", 5)], []);
         Assert.Equal("v1", Loaded(id).Text);
         NoteStore.ApplyRemote([Remote(id, "v2", 20)], []);
@@ -73,7 +73,7 @@ public class NoteStoreTests
         Assert.Contains(NoteStore.Folders(), f => f.Id == folder && f.Name == "Work");
         // A local pin is a change to push, without counting as an edit.
         NoteStore.SaveMeta(local with { Pinned = false, Starred = false });
-        var pushed = NoteStore.DirtyNotes().Single(n => n.Id == note);
+        var pushed = NoteStore.DirtyNotes(limit: 10_000).Single(n => n.Id == note);
         Assert.True(pushed.Pinned == false && pushed.Starred == false && pushed.UpdatedAt == 11);
         Assert.False(Loaded(note).Starred);
     }
