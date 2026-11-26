@@ -1,5 +1,6 @@
 using System.Windows;
 using NoteAnywhere.Core;
+using NoteAnywhere.Core.Sync;
 using NoteAnywhere.Platform;
 
 namespace NoteAnywhere;
@@ -16,23 +17,27 @@ public partial class App : Application
     PanelWindow? panel;
     SearchPopup? search;
     WelcomeWindow? welcome;
+    CloudSync? sync;
 
     public FrontWindow? Front => front;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        var link = e.Args.FirstOrDefault(a => a.StartsWith(LinkScheme.Prefix, StringComparison.OrdinalIgnoreCase));
         instance = new SingleInstance();
         if (!instance.IsFirst)
         {
-            instance.ShowTheFirst();
+            SingleInstance.Tell(link);
             Shutdown();
             return;
         }
+        instance.Listen(message => Dispatcher.BeginInvoke(() => { if (message is null) ShowNotes(); else OpenLink(message); }));
         var saved = Settings.Load();
         Appearance.Apply(saved.Appearance);
         OpenAtLogin.Apply(saved.OpenAtLogin);
         BrowserRegistration.RegisterThisApp();
+        LinkScheme.RegisterThisApp();
         NoteSearch.Start();
         WritingModel.Shared.DeleteLeftovers();
         front = new FrontWindow();
@@ -41,14 +46,23 @@ public partial class App : Application
         hotkeys = new HotKeys();
         hotkeys.Register(0x4D, TogglePanel);  // Alt+Shift+M
         hotkeys.Register(0x20, OpenSearch);   // Alt+Shift+Space
-        tray = new Tray(ShowNotes, TogglePanel, OpenSearch, ShowSettings, SendFeedback, ShowWelcome, Shutdown);
+        tray = new Tray(ShowNotes, TogglePanel, OpenSearch, () => ShowSettings(), SendFeedback, ShowWelcome, Shutdown);
         Updates.Ready += version => tray?.UpdateReady(version, Updates.RestartNow);
         Updates.Start();
         if (e.Args.Contains("--update-now")) _ = Updates.NowAndRestart();
-        instance.ListenForShow(() => Dispatcher.Invoke(ShowNotes));
+        sync = new CloudSync(new SecretStore());
+        sync.Start();  // as the Mac at launch: syncing if this PC is signed in
         if (e.Args.Contains("--seed-sample-notes")) SampleNotes.SeedIfEmpty();
-        if (!e.Args.Contains("--background")) ShowNotes();
+        if (link != null) OpenLink(link);
+        else if (!e.Args.Contains("--background")) ShowNotes();
         if (e.Args.Contains("--settings")) ShowSettings();  // CI: the writing model's download, by its buttons
+    }
+
+    /// memorynotes://auth-callback, from a sign-in email or Google: Settings ▸ Sync shows what comes next.
+    void OpenLink(string link)
+    {
+        ShowSettings(syncTab: true);
+        _ = sync!.Handle(link);
     }
 
     public void ShowNotes()
@@ -76,9 +90,10 @@ public partial class App : Application
         welcome.Activate();
     }
 
-    void ShowSettings()
+    void ShowSettings(bool syncTab = false)
     {
-        settings ??= new SettingsWindow();
+        settings ??= new SettingsWindow(sync!);
+        if (syncTab) settings.ShowSyncTab();
         settings.Show();
         settings.Activate();
     }

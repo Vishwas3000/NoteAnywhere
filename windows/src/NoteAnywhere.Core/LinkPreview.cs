@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Text.Unicode;
@@ -13,6 +14,11 @@ public static partial class LinkPreview
     public sealed record Page(string Title, string Description, string Icon, string Image);
 
     const int PageLimit = 2 << 20, PictureLimit = 5 << 20;
+
+    /// For previews in the app and the browser host. As URLSession: decompressing, and naming itself, which some sites
+    /// want before they answer.
+    public static readonly HttpClient Web = new(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.All })
+        { DefaultRequestHeaders = { { "User-Agent", "NoteAnywhere" } } };
 
     /// The page's preview with its pictures kept as note images, as the Mac's LinkPreview.fetch; throws with a message to
     /// show. `toPng` makes an ICO or BMP the PNG of its largest frame (the app's decodes with WPF); without it they're left out.
@@ -49,7 +55,7 @@ public static partial class LinkPreview
         }
         catch (Exception e)
         {
-            Console.Error.WriteLine($"Link preview: no picture from {address}: {e.Message}");
+            Console.Error.WriteLine($"Link preview: no picture from {address}: {e.Message} {e.InnerException?.Message}");
             return "";
         }
     }
@@ -87,6 +93,18 @@ public static partial class LinkPreview
 
     /// Up to `limit` + 1 bytes, so the caller can tell a cut file; follows redirects and returns the final address.
     static async Task<(byte[] Data, Uri Final)> DownloadAsync(HttpClient http, Uri url, int limit)
+    {
+        try { return await DownloadOnceAsync(http, url, limit).ConfigureAwait(false); }
+        catch (HttpRequestException e)
+        {
+            // A connection that drops before the answer is tried once more (GitHub's Windows machines drop some to a
+            // local test server that closes each one, HTTP/1.0 style).
+            Console.Error.WriteLine($"Link preview: {url} once more, after: {e.Message} {e.InnerException?.Message}");
+            return await DownloadOnceAsync(http, url, limit).ConfigureAwait(false);
+        }
+    }
+
+    static async Task<(byte[] Data, Uri Final)> DownloadOnceAsync(HttpClient http, Uri url, int limit)
     {
         using var idle = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         try

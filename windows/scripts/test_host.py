@@ -29,7 +29,10 @@ def read(stream):
 
 
 def call(msg, how=CHROME):
-    out = subprocess.run(how, input=frame(msg), capture_output=True, env=env, timeout=120).stdout
+    global said
+    done = subprocess.run(how, input=frame(msg), capture_output=True, env=env, timeout=120)
+    said = done.stderr.decode(errors="replace")  # the host's reasons (stdout is for replies), for failure messages
+    out = done.stdout
     (n,) = struct.unpack("<I", out[:4])
     assert len(out) == 4 + n, out[:300]  # the reply, and nothing else on stdout
     return json.loads(out[4:])
@@ -153,12 +156,14 @@ server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Site)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 reply = call({"op": "linkPreview", "url": f"http://127.0.0.1:{server.server_port}/start"})
 assert reply["ok"], reply
-preview = reply["preview"]
+preview, preview_said = reply["preview"], said
+if said.strip():
+    print("the host said:", said.strip())  # a download tried once more shows here even when the check passes
 assert (preview["title"], preview["description"]) == ("Host test", "A page & its pictures"), preview
 
 
 def png_width(src):
-    assert src.startswith("noteimage:"), f"a picture wasn't kept: {preview}"
+    assert src.startswith("noteimage:"), f"a picture wasn't kept: {preview}\nthe host said: {preview_said}"
     r = call({"op": "image", "id": src.split(":", 1)[1]})
     png = base64.b64decode(r["data"])
     assert r["mime"] == "image/png" and png[:8] == b"\x89PNG\r\n\x1a\n", r["mime"]

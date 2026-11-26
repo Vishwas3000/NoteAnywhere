@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Media;
 using Microsoft.Web.WebView2.Core;
 
 namespace NoteAnywhere;
@@ -23,4 +24,10 @@ static class Appearance
         "dark" => CoreWebView2PreferredColorScheme.Dark,
         _ => CoreWebView2PreferredColorScheme.Auto,
     };
+
+    /// Whether the app shows dark now, Automatic included: read from the Fluent theme's own background.
+    public static bool IsDark => Application.Current?.TryFindResource("ApplicationBackgroundColor") is Color { R: < 128 };
+
+    /// Apple Notes' yellow, as the Mac's notesAccent: darker in light mode, so text drawn in it stays legible.
+    public static Color Accent => IsDark ? Color.FromRgb(0xFF, 0xD6, 0x0A) : Color.FromRgb(0xC7, 0x8A, 0x00);
 }

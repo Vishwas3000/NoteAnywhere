@@ -2,46 +2,146 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Settings" Width="480" SizeToContent="Height" ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
-  <StackPanel Margin="24">
-    <Grid Margin="0,0,0,16">
-      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-      <StackPanel>
-        <TextBlock Text="Appearance"/>
-        <TextBlock Text="Automatic follows Windows' Light or Dark setting." Opacity="0.7" FontSize="12"/>
+  <Window.Resources>
+    <Style x:Key="Heading" TargetType="TextBlock">
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+    <Style x:Key="Footnote" TargetType="TextBlock">
+      <Setter Property="Margin" Value="0,8,0,0"/>
+      <Setter Property="Opacity" Value="0.7"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    <!-- A field's prompt, shown until something is typed. -->
+    <Style x:Key="Prompt" TargetType="TextBlock">
+      <Setter Property="Margin" Value="10,6,0,0"/>
+      <Setter Property="Opacity" Value="0.5"/>
+      <Setter Property="IsHitTestVisible" Value="False"/>
+    </Style>
+  </Window.Resources>
+  <TabControl x:Name="Tabs" Margin="8">
+    <TabItem Header="General">
+      <StackPanel Margin="16">
+        <Grid Margin="0,0,0,16">
+          <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <StackPanel>
+            <TextBlock Text="Appearance"/>
+            <TextBlock Text="Automatic follows Windows' Light or Dark setting." Opacity="0.7" FontSize="12"/>
+          </StackPanel>
+          <ComboBox x:Name="AppearanceBox" Grid.Column="1" Width="140" VerticalAlignment="Center" SelectionChanged="OnChanged">
+            <ComboBoxItem Tag="system">Automatic</ComboBoxItem>
+            <ComboBoxItem Tag="light">Light</ComboBoxItem>
+            <ComboBoxItem Tag="dark">Dark</ComboBoxItem>
+          </ComboBox>
+        </Grid>
+        <CheckBox x:Name="AutoOpenBox" Checked="OnChanged" Unchecked="OnChanged">
+          <StackPanel>
+            <TextBlock Text="Open notes by themselves"/>
+            <TextBlock Text="When an app, chat or web page has notes. Off: Alt+Shift+M shows them on Windows, Alt+Shift+N in the browser."
+                       Opacity="0.7" FontSize="12" TextWrapping="Wrap"/>
+          </StackPanel>
+        </CheckBox>
+        <Grid Margin="0,16,0,16">
+          <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <TextBlock Text="Dates in notes" VerticalAlignment="Center"/>
+          <ComboBox x:Name="DateBox" Grid.Column="1" Width="200" SelectionChanged="OnChanged">
+            <ComboBoxItem Tag="">Automatic (your region's)</ComboBoxItem>
+            <ComboBoxItem Tag="dd/MM/yyyy">30/10/2026</ComboBoxItem>
+            <ComboBoxItem Tag="MM/dd/yyyy">10/30/2026</ComboBoxItem>
+            <ComboBoxItem Tag="yyyy-MM-dd">2026-10-30</ComboBoxItem>
+          </ComboBox>
+        </Grid>
+        <CheckBox x:Name="LoginBox" Content="Open NoteAnywhere when Windows starts" Checked="OnChanged" Unchecked="OnChanged"/>
+        <!-- The ✨ actions' model: downloaded only when the person chooses to (D86). -->
+        <Grid Margin="0,16,0,0">
+          <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <StackPanel Margin="0,0,16,0">
+            <TextBlock Text="Writing model"/>
+            <TextBlock x:Name="WritingText" Opacity="0.7" FontSize="12" TextWrapping="Wrap"/>
+            <ProgressBar x:Name="WritingProgress" Height="4" Margin="0,6,0,0" Maximum="1" Visibility="Collapsed"/>
+          </StackPanel>
+          <Button x:Name="WritingButton" Grid.Column="1" MinWidth="140" VerticalAlignment="Center" Click="OnWritingButton"/>
+        </Grid>
       </StackPanel>
-      <ComboBox x:Name="AppearanceBox" Grid.Column="1" Width="140" VerticalAlignment="Center" SelectionChanged="OnChanged">
-        <ComboBoxItem Tag="system">Automatic</ComboBoxItem>
-        <ComboBoxItem Tag="light">Light</ComboBoxItem>
-        <ComboBoxItem Tag="dark">Dark</ComboBoxItem>
-      </ComboBox>
-    </Grid>
-    <CheckBox x:Name="AutoOpenBox" Checked="OnChanged" Unchecked="OnChanged">
-      <StackPanel>
-        <TextBlock Text="Open notes by themselves"/>
-        <TextBlock Text="When an app, chat or web page has notes. Off: Alt+Shift+M shows them on Windows, Alt+Shift+N in the browser."
-                   Opacity="0.7" FontSize="12" TextWrapping="Wrap"/>
+    </TabItem>
+
+    <!-- The Mac's SyncSettingsView: one step at a time, then the account, then what went wrong. -->
+    <TabItem x:Name="SyncTab" Header="Sync">
+      <StackPanel Margin="16">
+        <TextBlock Text="Notes sync between your PC, Mac and phones. Each account only ever sees its own notes."
+                   Style="{StaticResource Footnote}" Margin="0,0,0,16"/>
+        <StackPanel x:Name="SignInPanel">
+          <Button x:Name="GoogleButton" Content="Continue with Google" Padding="12,8" Click="OnGoogle"/>
+          <TextBlock Text="Sign in to sync" Style="{StaticResource Heading}" Margin="0,20,0,8"/>
+          <Grid>
+            <TextBox x:Name="EmailBox" AutomationProperties.Name="Email" TextChanged="OnTyped" KeyDown="OnEmailKey"/>
+            <TextBlock x:Name="EmailPrompt" Text="you@example.com" Style="{StaticResource Prompt}"/>
+          </Grid>
+          <Button x:Name="SendLinkButton" Content="Email Me a Sign-In Link" HorizontalAlignment="Left" Margin="0,8,0,0" Click="OnSendLink"/>
+          <TextBlock Text="No password: we email you a one-time sign-in link." Style="{StaticResource Footnote}"/>
+        </StackPanel>
+
+        <StackPanel x:Name="CodePanel">
+          <TextBlock Text="Check your email" Style="{StaticResource Heading}"/>
+          <TextBlock Text="Open the email on this PC and click its link. It brings you back here, signed in." TextWrapping="Wrap"/>
+          <Grid Margin="0,8,0,0">
+            <TextBox x:Name="CodeBox" AutomationProperties.Name="Or enter the code from the email" TextChanged="OnTyped" KeyDown="OnCodeKey"/>
+            <TextBlock x:Name="CodePrompt" Text="Or enter the code from the email" Style="{StaticResource Prompt}"/>
+          </Grid>
+          <DockPanel Margin="0,8,0,0" LastChildFill="False">
+            <Button Content="Use a Different Email" Click="OnDifferentEmail"/>
+            <Button x:Name="SignInButton" Content="Sign In" DockPanel.Dock="Right" Click="OnSignIn"/>
+          </DockPanel>
+          <TextBlock x:Name="SentTo" Style="{StaticResource Footnote}"/>
+        </StackPanel>
+
+        <StackPanel x:Name="CreatePanel">
+          <TextBlock Text="Last step: choose a sync passphrase" Style="{StaticResource Heading}"/>
+          <Grid>
+            <PasswordBox x:Name="NewPassphrase" AutomationProperties.Name="Sync passphrase" PasswordChanged="OnTyped" KeyDown="OnNewPassphraseKey"/>
+            <TextBlock x:Name="NewPrompt" Text="Sync passphrase: at least 8 characters" Style="{StaticResource Prompt}"/>
+          </Grid>
+          <Grid Margin="0,8,0,0">
+            <PasswordBox x:Name="AgainPassphrase" AutomationProperties.Name="Type it again" PasswordChanged="OnTyped" KeyDown="OnAgainKey"/>
+            <TextBlock x:Name="AgainPrompt" Text="Type it again" Style="{StaticResource Prompt}"/>
+          </Grid>
+          <TextBlock x:Name="PassphraseHint" Margin="0,6,0,0" Opacity="0.7"/>
+          <Button x:Name="CreateButton" Content="Turn On Encrypted Sync" HorizontalAlignment="Left" Margin="0,8,0,0" Click="OnCreate"/>
+          <TextBlock Style="{StaticResource Footnote}"
+                     Text="Your notes are encrypted with it on this PC before they're uploaded, so the server can't read them. Each of your other devices asks for it once. Keep it in your password manager: if you forget it, the synced copy can't be opened (the notes on your devices are fine)."/>
+        </StackPanel>
+
+        <StackPanel x:Name="EnterPanel">
+          <TextBlock Text="Enter your sync passphrase" Style="{StaticResource Heading}"/>
+          <Grid>
+            <PasswordBox x:Name="EnterPassphrase" AutomationProperties.Name="Sync passphrase" PasswordChanged="OnTyped" KeyDown="OnEnterKey"/>
+            <TextBlock x:Name="EnterPrompt" Text="The one you chose before" Style="{StaticResource Prompt}"/>
+          </Grid>
+          <Button x:Name="UnlockButton" Content="Unlock Synced Notes" HorizontalAlignment="Left" Margin="0,8,0,0" Click="OnUnlock"/>
+          <TextBlock Text="You chose it when you first turned on sync on another device." Style="{StaticResource Footnote}"/>
+        </StackPanel>
+
+        <TextBlock x:Name="CheckingText" Text="Checking your account…"/>
+
+        <StackPanel x:Name="AccountPanel" Margin="0,20,0,0">
+          <TextBlock Text="Account" Style="{StaticResource Heading}"/>
+          <DockPanel>
+            <TextBlock Text="Signed in as"/>
+            <TextBlock x:Name="AccountEmail" HorizontalAlignment="Right" Opacity="0.7"/>
+          </DockPanel>
+          <DockPanel x:Name="SyncedRow" Margin="0,6,0,0">
+            <TextBlock Text="Last synced"/>
+            <TextBlock x:Name="SyncedText" HorizontalAlignment="Right" Opacity="0.7"/>
+          </DockPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button x:Name="SyncNowButton" Content="Sync Now" Margin="0,0,8,0" Click="OnSyncNow"/>
+            <Button Content="Sign Out" Click="OnSignOut"/>
+          </StackPanel>
+        </StackPanel>
+
+        <TextBlock x:Name="ErrorText" Margin="0,16,0,0" Foreground="#D70015" TextWrapping="Wrap"/>
       </StackPanel>
-    </CheckBox>
-    <Grid Margin="0,16,0,16">
-      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-      <TextBlock Text="Dates in notes" VerticalAlignment="Center"/>
-      <ComboBox x:Name="DateBox" Grid.Column="1" Width="200" SelectionChanged="OnChanged">
-        <ComboBoxItem Tag="">Automatic (your region's)</ComboBoxItem>
-        <ComboBoxItem Tag="dd/MM/yyyy">30/10/2026</ComboBoxItem>
-        <ComboBoxItem Tag="MM/dd/yyyy">10/30/2026</ComboBoxItem>
-        <ComboBoxItem Tag="yyyy-MM-dd">2026-10-30</ComboBoxItem>
-      </ComboBox>
-    </Grid>
-    <CheckBox x:Name="LoginBox" Content="Open NoteAnywhere when Windows starts" Checked="OnChanged" Unchecked="OnChanged"/>
-    <!-- The ✨ actions' model: downloaded only when the person chooses to (D86). -->
-    <Grid Margin="0,16,0,0">
-      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-      <StackPanel Margin="0,0,16,0">
-        <TextBlock Text="Writing model"/>
-        <TextBlock x:Name="WritingText" Opacity="0.7" FontSize="12" TextWrapping="Wrap"/>
-        <ProgressBar x:Name="WritingProgress" Height="4" Margin="0,6,0,0" Maximum="1" Visibility="Collapsed"/>
-      </StackPanel>
-      <Button x:Name="WritingButton" Grid.Column="1" MinWidth="140" VerticalAlignment="Center" Click="OnWritingButton"/>
-    </Grid>
-  </StackPanel>
+    </TabItem>
+  </TabControl>
 </Window>

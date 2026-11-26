@@ -53,12 +53,14 @@ public partial class MainWindow : Window
         InputBindings.Add(new KeyBinding(new Command(() => { SearchBox.Focus(); SearchBox.SelectAll(); }), Key.F, ModifierKeys.Control | ModifierKeys.Alt));
         Rebuild();
         if (selected is null && model.Notes.Count > 0) Open(model.Notes.MaxBy(n => n.UpdatedAt)!.Id);
+        AddViews();
     }
 
     /// Opens a note: selects its row (leaving a folder or search that hides it) and shows it in the editor.
     public void Open(string id)
     {
         if (model.Find(id) is not { } note) return;
+        NotesTab.IsChecked = true;
         if (folderFilter != null && note.FolderID != folderFilter) folderFilter = null;
         if (starredOnly && !note.Starred) starredOnly = false;
         selected = id;
