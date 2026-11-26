@@ -152,33 +152,47 @@ jobs:
           $watched = Join-Path $env:RUNNER_TEMP "panel-front.jsonl"
           $watcher = Start-Process out\NoteAnywhere.exe -ArgumentList "--report-front", $watched, "90" -PassThru
           Start-Process notepad.exe -ArgumentList $file
-          # GitHub's Arm64 machines put up a "Microsoft account" sign-in window (WWAHost), and Search's flyout, at moments
-          # of their own, sometimes seconds after Notepad opens, and the panel rightly follows them: press Esc (which
-          # closes either when it has the keyboard), end WWAHost, and bring Notepad forward (after an Alt press, as
-          # Windows only lets the process with the last input change the window in front) until Notepad has stayed in
+          # GitHub's Arm64 machines put up windows of their own at moments of their own: a "Microsoft account" sign-in
+          # (WWAHost), Search's flyout, a wsl.exe console. The panel rightly follows them, so Notepad is brought back:
+          # Esc (which closes the first two when they have the keyboard), WWAHost ended, then an Alt press (as Windows only
+          # lets the process with the last input change the window in front) and Notepad forward, until it has stayed in
           # front for 3 s. Each new window in front is written out.
-          $steady = 0; $last = ""
-          foreach ($second in 1..40) {
-            Start-Sleep -Seconds 1
-            $window = [Probe.Front]::GetForegroundWindow()
-            $front = New-Object System.Text.StringBuilder 512
-            [void][Probe.Front]::GetWindowText($window, $front, 512)
-            $owner = 0; [void][Probe.Front]::GetWindowThreadProcessId($window, [ref]$owner)
-            $name = (Get-Process -Id $owner -ErrorAction SilentlyContinue).ProcessName
-            if ($name -eq "Notepad") { if (++$steady -ge 3) { break }; continue }  # Notepad itself, not the panel titled for it
-            $steady = 0
-            $seen = "'$front' ($name)"
-            if ($seen -ne $last) { Write-Host "in front: $seen"; $last = $seen }
-            [Probe.Front]::keybd_event(0x1B, 0, 0, [UIntPtr]::Zero); [Probe.Front]::keybd_event(0x1B, 0, 2, [UIntPtr]::Zero)
-            Get-Process WWAHost -ErrorAction SilentlyContinue | Stop-Process -Force
-            $notepad = Get-Process notepad -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
-            if ($notepad) {
-              [Probe.Front]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [Probe.Front]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
-              [void][Probe.Front]::SetForegroundWindow($notepad.MainWindowHandle)
+          function Notepad-Has-Front {
+            $owner = 0; [void][Probe.Front]::GetWindowThreadProcessId([Probe.Front]::GetForegroundWindow(), [ref]$owner)
+            (Get-Process -Id $owner -ErrorAction SilentlyContinue).ProcessName -eq "Notepad"  # Notepad, not the panel titled for it
+          }
+          function Bring-Notepad {
+            $steady = 0; $last = ""
+            foreach ($second in 1..40) {
+              Start-Sleep -Seconds 1
+              if (Notepad-Has-Front) { if (++$steady -ge 3) { return }; continue }
+              $steady = 0
+              $window = [Probe.Front]::GetForegroundWindow()
+              $front = New-Object System.Text.StringBuilder 512
+              [void][Probe.Front]::GetWindowText($window, $front, 512)
+              $owner = 0; [void][Probe.Front]::GetWindowThreadProcessId($window, [ref]$owner)
+              $seen = "'$front' ($((Get-Process -Id $owner -ErrorAction SilentlyContinue).ProcessName))"
+              if ($seen -ne $last) { Write-Host "in front: $seen"; $last = $seen }
+              [Probe.Front]::keybd_event(0x1B, 0, 0, [UIntPtr]::Zero); [Probe.Front]::keybd_event(0x1B, 0, 2, [UIntPtr]::Zero)
+              Get-Process WWAHost -ErrorAction SilentlyContinue | Stop-Process -Force
+              $notepad = Get-Process notepad -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+              if ($notepad) {
+                [Probe.Front]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [Probe.Front]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+                [void][Probe.Front]::SetForegroundWindow($notepad.MainWindowHandle)
+              }
             }
           }
-          Write-Host "Notepad in front for $steady s"
-          Start-Sleep -Seconds 5
+          # Then the panel has 5 s to settle; if another window took the front meanwhile, again (three tries). With Notepad
+          # in front at the end, a missing panel is a failure.
+          function Settle-Beside-Notepad {
+            foreach ($try in 1..3) {
+              Bring-Notepad
+              Start-Sleep -Seconds 5
+              if (Notepad-Has-Front) { return }
+              Write-Host "something else took the front while the panel settled (try $try)"
+            }
+          }
+          Settle-Beside-Notepad
           try {
             & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Notepad" -Out "shots\panel-${{ matrix.rid }}.png"
             # The locked card opens with the sample's password ("probe"), put in its box through UI Automation.
@@ -193,7 +207,8 @@ jobs:
             try { $box.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue("probe") }
             catch { Write-Host "typing it instead: $_"; $box.SetFocus(); Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("probe") }
             (Find "Unlock").GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-            Start-Sleep -Seconds 8
+            Start-Sleep -Seconds 3
+            Settle-Beside-Notepad
             & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Notepad" -Out "shots\panel-unlocked-${{ matrix.rid }}.png"
             if ((Find "Notes password") -and -not (Find "Notes password").Current.IsOffscreen) { throw "the card stayed locked" }
           }
