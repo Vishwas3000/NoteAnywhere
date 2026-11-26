@@ -1,5 +1,6 @@
 using System.Windows;
 using NoteAnywhere.Core;
+using NoteAnywhere.Core.Crypto;
 using NoteAnywhere.Core.Sync;
 using NoteAnywhere.Platform;
 
@@ -47,6 +48,11 @@ public partial class App : Application
         hotkeys.Register(0x4D, TogglePanel);  // Alt+Shift+M
         hotkeys.Register(0x20, OpenSearch);   // Alt+Shift+Space
         tray = new Tray(ShowNotes, TogglePanel, OpenSearch, () => ShowSettings(), SendFeedback, ShowWelcome, Shutdown);
+        // As the Mac shuts them when the screen locks: unlocked notes lock again when Windows locks.
+        Microsoft.Win32.SystemEvents.SessionSwitch += (_, e) =>
+        {
+            if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionLock) Dispatcher.BeginInvoke(LockSession.Shared.LockNow);
+        };
         Updates.Ready += version => tray?.UpdateReady(version, Updates.RestartNow);
         Updates.Start();
         if (e.Args.Contains("--update-now")) _ = Updates.NowAndRestart();

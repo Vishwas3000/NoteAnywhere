@@ -1130,9 +1130,13 @@ Made by the subagent that wrote the extension:
   quiet download, installed at the next start or from the tray. Each architecture is its own channel (`win-x64`,
   `win-arm64`), so both installers share one release without their files colliding. CI packs the next version into a
   local feed and updates an installed copy to it for real (`NOTEANYWHERE_UPDATES`, `--update-now`).
-- **Locked notes:** until unlocking comes to Windows, a locked note says it's locked, in the notes window and on the
-  panel's cards; the editor never loads or writes its envelope, because typing at the end of one would still pass the
-  store's `mnlock:v1:` guard and break it.
+- **Locked notes:** a shut note shows a password box, in the notes window and on the panel's cards; the editor never
+  loads or writes its envelope, because typing at the end of one would still pass the store's `mnlock:v1:` guard and
+  break it. The notes password (`LockSession`, the Mac's) is checked against `lock.check`, or, on a PC that never
+  checked it, against the first locked note, which then keeps a check value here. Unlocked, a note opens in the
+  editor and each edit is sealed again with its envelope's salt. The password stays in memory only, until Lock Notes
+  (tray), Windows locking, or quitting. Windows Hello, the Mac's Touch ID, isn't here yet, so nothing keeps the
+  password on the PC. Locking a note and Remove Lock aren't on Windows yet.
 - **Sync on Windows** (`NoteAnywhere.Core/Sync/`): a port of `SyncCloud.swift`, request for request, to the same
   Supabase project, so a PC syncs with the Mac and the phones.
   - Sign-in by the emailed link or code, or Google in the default browser; the vault, rounds, cursors, batch sizes,

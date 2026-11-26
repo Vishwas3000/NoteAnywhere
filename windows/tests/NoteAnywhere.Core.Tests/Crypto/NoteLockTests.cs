@@ -8,10 +8,10 @@ namespace NoteAnywhere.Core.Tests.Crypto;
 /// MacCheck is the "lock.check" value LockSession.setPassword stores for that password.
 public class NoteLockTests
 {
-    const string Password = "demo password ünïcødé 🔒";
+    internal const string Password = "demo password ünïcødé 🔒";
     const string Text = "# Demo note\nLine two with émoji 🎉 and **bold**\n\n- [ ] a task @2026-11-03";
-    const string MacEnvelope = "mnlock:v1:4NQnxjSCb61CRIVd8+67sEXv91d6PvlJuaDBCcuO9WUT5zxWi9OTZ1iQgZSmDYsH6xB+GgxefivrAKavulQWdgf8riVmQgf4AZLjFmf5MamtFfqZalSjN+ckp9kYvVKvR2fRQ95aE/w24M0ggbZ7KE/ukknxgOC5";
-    const string MacCheck = "mnlock:v1:OsFtmNE5wMjAvqKkoy2FikBHNvGbzRlmk9n1VRS8Jxh864se4nhYkOKUCIhsCGMiaCw2/3KtkuuCWPgmgsvbUeJLRg==";
+    internal const string MacEnvelope = "mnlock:v1:4NQnxjSCb61CRIVd8+67sEXv91d6PvlJuaDBCcuO9WUT5zxWi9OTZ1iQgZSmDYsH6xB+GgxefivrAKavulQWdgf8riVmQgf4AZLjFmf5MamtFfqZalSjN+ckp9kYvVKvR2fRQ95aE/w24M0ggbZ7KE/ukknxgOC5";
+    internal const string MacCheck = "mnlock:v1:OsFtmNE5wMjAvqKkoy2FikBHNvGbzRlmk9n1VRS8Jxh864se4nhYkOKUCIhsCGMiaCw2/3KtkuuCWPgmgsvbUeJLRg==";
     const string MacEmpty = "mnlock:v1:wMBui7rP1HJ7cTd0mDwyigXY1XaEqJJlg6ib9xHaCF98SzDKDFRUHYozYT4=";
 
     [Fact]

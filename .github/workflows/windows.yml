@@ -36,6 +36,15 @@ jobs:
         env:
           NOTEANYWHERE_DIR: ${{ runner.temp }}\host-store  # a scratch store, never anyone's notes
         run: python windows/scripts/test_host.py out\NoteAnywhere.exe
+      - name: Login items stay off during the job
+        shell: pwsh
+        run: |
+          # Each launch below registers NoteAnywhere to open at login (Run\NoteAnywhere). Windows holds login items back
+          # until the PC is idle, which on the Arm64 machines comes mid-job: the CI build then started by itself and the
+          # installed app handed over to it. Disabled for this job the way Task Manager's Startup tab does it.
+          $approved = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"
+          if (-not (Test-Path $approved)) { New-Item -Path $approved | Out-Null }
+          New-ItemProperty -Path $approved -Name NoteAnywhere -PropertyType Binary -Value ([byte[]](3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)) -Force | Out-Null
       - name: Open it and take screenshots
         shell: powershell
         run: |
@@ -170,7 +179,24 @@ jobs:
           }
           Write-Host "Notepad in front for $steady s"
           Start-Sleep -Seconds 5
-          try { & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Notepad" -Out "shots\panel-${{ matrix.rid }}.png" }
+          try {
+            & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Notepad" -Out "shots\panel-${{ matrix.rid }}.png"
+            # The locked card opens with the sample's password ("probe"), put in its box through UI Automation.
+            Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+            $A = [System.Windows.Automation.AutomationElement]
+            $panel = $A::RootElement.FindFirst("Children", (New-Object System.Windows.Automation.AndCondition(
+              (New-Object System.Windows.Automation.PropertyCondition($A::ProcessIdProperty, $app.Id)),
+              (New-Object System.Windows.Automation.PropertyCondition($A::NameProperty, "Notepad")))))
+            function Find($name) { $panel.FindFirst("Descendants", (New-Object System.Windows.Automation.PropertyCondition($A::NameProperty, $name))) }
+            $box = Find "Notes password"
+            if (-not $box) { throw "the locked card has no password box" }
+            try { $box.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue("probe") }
+            catch { Write-Host "typing it instead: $_"; $box.SetFocus(); Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("probe") }
+            (Find "Unlock").GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            Start-Sleep -Seconds 8
+            & windows\scripts\Save-WindowShot.ps1 -ProcessId $app.Id -Title "Notepad" -Out "shots\panel-unlocked-${{ matrix.rid }}.png"
+            if ((Find "Notes password") -and -not (Find "Notes password").Current.IsOffscreen) { throw "the card stayed locked" }
+          }
           catch {
             # What was in front, and whether the app was still there: the panel only follows the window in front.
             Write-Host "NoteAnywhere still running: $(-not $app.HasExited)"
@@ -210,9 +236,7 @@ jobs:
         shell: pwsh
         run: |
           $setup = (Get-ChildItem releases -Filter *Setup.exe | Select-Object -First 1).FullName
-          # The Arm64 machines' desktop can start late and run the login items then, among them the CI build that an earlier
-          # step's launch registered to open at login ("out\NoteAnywhere.exe" --background). The installed app would hand
-          # over to that copy and quit, so it ends first.
+          # Any copy still running (the CI build) would take the installed app's place: it hands over to it and quits.
           Get-Process NoteAnywhere -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "ending $($_.Path) $($_.CommandLine)"; $_ | Stop-Process -Force }
           Start-Process $setup -ArgumentList "--silent" -Wait
           Start-Sleep -Seconds 10
