@@ -55,7 +55,7 @@ public static partial class LinkPreview
         }
         catch (Exception e)
         {
-            Console.Error.WriteLine($"Link preview: no picture from {address}: {e.Message}");
+            Console.Error.WriteLine($"Link preview: no picture from {address}: {e.Message} {e.InnerException?.Message}");
             return "";
         }
     }
@@ -93,6 +93,18 @@ public static partial class LinkPreview
 
     /// Up to `limit` + 1 bytes, so the caller can tell a cut file; follows redirects and returns the final address.
     static async Task<(byte[] Data, Uri Final)> DownloadAsync(HttpClient http, Uri url, int limit)
+    {
+        try { return await DownloadOnceAsync(http, url, limit).ConfigureAwait(false); }
+        catch (HttpRequestException e)
+        {
+            // A connection that drops before the answer is tried once more (GitHub's Windows machines drop some to a
+            // local test server that closes each one, HTTP/1.0 style).
+            Console.Error.WriteLine($"Link preview: {url} once more, after: {e.Message} {e.InnerException?.Message}");
+            return await DownloadOnceAsync(http, url, limit).ConfigureAwait(false);
+        }
+    }
+
+    static async Task<(byte[] Data, Uri Final)> DownloadOnceAsync(HttpClient http, Uri url, int limit)
     {
         using var idle = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         try

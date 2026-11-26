@@ -157,6 +157,8 @@ threading.Thread(target=server.serve_forever, daemon=True).start()
 reply = call({"op": "linkPreview", "url": f"http://127.0.0.1:{server.server_port}/start"})
 assert reply["ok"], reply
 preview, preview_said = reply["preview"], said
+if said.strip():
+    print("the host said:", said.strip())  # a download tried once more shows here even when the check passes
 assert (preview["title"], preview["description"]) == ("Host test", "A page & its pictures"), preview
 
 
