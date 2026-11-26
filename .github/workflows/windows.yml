@@ -125,7 +125,23 @@ jobs:
           [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr w);
           [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
           [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr w, out uint pid);
+          [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr w);
+          public delegate bool EnumProc(IntPtr w, IntPtr data);
+          [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc proc, IntPtr data);
+          public static string[] Windows(uint process) {
+            var found = new System.Collections.Generic.List<string>();
+            EnumWindows((w, d) => {
+              uint owner; GetWindowThreadProcessId(w, out owner);
+              var text = new System.Text.StringBuilder(512); GetWindowText(w, text, 512);
+              if (owner == process && text.Length > 0) found.Add((IsWindowVisible(w) ? "shown" : "hidden") + " '" + text + "'");
+              return true;
+            }, IntPtr.Zero);
+            return found.ToArray();
+          }
           '@
+          # A second NoteAnywhere writes out each place its window watcher (the app's own code) sees come in front.
+          $watched = Join-Path $env:RUNNER_TEMP "panel-front.jsonl"
+          $watcher = Start-Process out\NoteAnywhere.exe -ArgumentList "--report-front", $watched, "90" -PassThru
           Start-Process notepad.exe -ArgumentList $file
           # GitHub's Arm64 machines put up a "Microsoft account" sign-in window (WWAHost), and Search's flyout, at moments
           # of their own, sometimes seconds after Notepad opens, and the panel rightly follows them: press Esc (which
@@ -138,10 +154,11 @@ jobs:
             $window = [Probe.Front]::GetForegroundWindow()
             $front = New-Object System.Text.StringBuilder 512
             [void][Probe.Front]::GetWindowText($window, $front, 512)
-            if ("$front" -like "*Notepad*") { if (++$steady -ge 3) { break }; continue }
-            $steady = 0
             $owner = 0; [void][Probe.Front]::GetWindowThreadProcessId($window, [ref]$owner)
-            $seen = "'$front' ($((Get-Process -Id $owner -ErrorAction SilentlyContinue).ProcessName))"
+            $name = (Get-Process -Id $owner -ErrorAction SilentlyContinue).ProcessName
+            if ($name -eq "Notepad") { if (++$steady -ge 3) { break }; continue }  # Notepad itself, not the panel titled for it
+            $steady = 0
+            $seen = "'$front' ($name)"
             if ($seen -ne $last) { Write-Host "in front: $seen"; $last = $seen }
             [Probe.Front]::keybd_event(0x1B, 0, 0, [UIntPtr]::Zero); [Probe.Front]::keybd_event(0x1B, 0, 2, [UIntPtr]::Zero)
             Get-Process WWAHost -ErrorAction SilentlyContinue | Stop-Process -Force
@@ -162,11 +179,14 @@ jobs:
             $title = New-Object System.Text.StringBuilder 512
             [void][Probe.Front]::GetWindowText([Probe.Front]::GetForegroundWindow(), $title, 512)
             Write-Host "window in front: '$title'"
+            Write-Host "NoteAnywhere's windows:"; [Probe.Front]::Windows([uint32]$app.Id) | ForEach-Object { Write-Host "  $_" }
+            Write-Host "What its window watcher saw come in front:"; if (Test-Path $watched) { Get-Content $watched }
             throw
           }
           finally {
             Get-Process notepad -ErrorAction SilentlyContinue | Stop-Process -Force
             Stop-Process -Id $app.Id -ErrorAction SilentlyContinue
+            Stop-Process -Id $watcher.Id -ErrorAction SilentlyContinue
           }
       - name: Make the installer
         shell: pwsh
